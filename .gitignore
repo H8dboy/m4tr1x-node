@@ -47,3 +47,6 @@ npm-debug.log*
 
 # Temporary git files
 *.orig
+
+# Claude Code
+.claude/

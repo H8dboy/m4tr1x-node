@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>M4TR1X — UNFILTERED SIGNAL</title>
   <!-- Universal Tauri/Electron bridge — must load first -->
-  <script src="/m4tr1x-bridge.js"></script>
+  <script src="m4tr1x-bridge.js"></script>
   <!-- nostr-tools: bundle locale (servito dal server Express) con fallback CDN -->
   <script>
     (function() {
@@ -55,7 +55,15 @@
     #feed-wrap{position:fixed;inset:0}
     .section-feed{position:absolute;inset:0;overflow-y:scroll;scroll-snap-type:y mandatory;-webkit-overflow-scrolling:touch;display:none;scrollbar-width:none}
     .section-feed::-webkit-scrollbar{display:none}
-    .section-feed.active{display:block}
+    .section-feed.active{display:block;animation:secFadeIn 0.2s ease}
+    @keyframes secFadeIn{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+    @keyframes heartPop{0%{transform:translate(-50%,-50%) scale(0.3);opacity:1}55%{transform:translate(-50%,-50%) scale(1.6)}80%{transform:translate(-50%,-50%) scale(1.2);opacity:1}100%{transform:translate(-50%,-50%) scale(1.3);opacity:0}}
+    .heart-pop{position:absolute;left:50%;top:44%;font-size:5em;pointer-events:none;z-index:50;animation:heartPop 0.7s ease forwards;line-height:1}
+    #session-timer{font-family:var(--font-mono);font-size:0.48em;letter-spacing:2px;color:rgba(0,255,65,0.25);transition:color 0.5s;cursor:pointer;user-select:none}
+    #session-timer.warn{color:rgba(255,204,0,0.7)}
+    .bnav:active{transform:scale(0.85);transition:transform 0.1s}
+    .sact:active{transform:scale(0.8);transition:transform 0.1s}
+    .bkm-active .sact-icon{color:#ffcc00;text-shadow:0 0 8px #ffcc00}
     .video-slide{width:100%;height:100vh;scroll-snap-align:start;position:relative;background:#000;display:flex;align-items:center;justify-content:center;overflow:hidden}
     .slide-video{width:100%;height:100%;object-fit:cover;display:block}
     .slide-video.landscape{object-fit:contain}
@@ -349,6 +357,7 @@
 </head><body>
   <div id="topbar">
     <div class="logo">M4TR1X</div>
+    <span id="session-timer" onclick="toggleSessionAlert()" title="Tempo sessione — clicca per impostare limite">00:00</span>
     <div id="topbar-right">
       <button class="top-btn" onclick="toast('EXPLORE — COMING SOON')">🔍</button>
       <div class="notif-btn-wrap">
@@ -430,7 +439,7 @@
     <button class="bnav post-nav" onclick="openUpload()"><span class="bicon">＋</span></button>
     <button class="bnav music-nav" id="bnav-music" onclick="switchSec('music')"><span class="bicon">🎵</span></button>
     <button class="bnav shop-nav" id="bnav-shop" onclick="switchSec('shop')"><span class="bicon">🛍️</span></button>
-    <button class="bnav dm-nav" id="bnav-dm" onclick="switchSec('dm')"><span class="bicon">💬</span></button>
+    <button class="bnav dm-nav" id="bnav-dm" onclick="switchSec('dm')" style="position:relative"><span class="bicon">💬</span><span id="dm-unread-badge" style="display:none;position:absolute;top:4px;right:4px;background:var(--red);color:#fff;font-size:0.5em;font-family:var(--font-mono);border-radius:8px;padding:1px 5px;min-width:16px;text-align:center;letter-spacing:0"></span></button>
     <button class="bnav" onclick="window.location.href='/app/safety'" title="Stay Safe / امنیت / 安全"><span class="bicon">🛡️</span></button>
   </div>
   <button class="forum-new-btn" id="forum-fab" onclick="openForumModal()">＋</button>
@@ -584,9 +593,18 @@
           <span style="font-size:0.55em;color:rgba(0,255,65,0.35);letter-spacing:2px;font-family:var(--font-mono)">🔒 SIGNAL VERIFIED</span>
           <span class="prof-signal-user" id="prof-signal-user"></span>
         </div>
+        <div id="prof-badge-row" style="display:none;align-items:center;gap:8px;padding:4px 0;font-size:0.72em;letter-spacing:1px;color:#ffcc00">
+          <span id="prof-badge-emoji"></span>
+          <span id="prof-badge-label"></span>
+          <span style="font-size:0.65em;color:rgba(255,204,0,0.5)">· VERIFICATO M4TR1X</span>
+        </div>
         <div class="prof-actions" id="prof-actions" style="display:none">
           <button class="prof-follow-btn" id="prof-follow-btn" onclick="toggleFollow()">FOLLOW</button>
           <button class="prof-dm-btn" onclick="profileDM()">💬 DM</button>
+        </div>
+        <div id="prof-own-actions" style="display:none;gap:8px;margin-top:6px;flex-wrap:wrap">
+          <button class="prof-edit-btn" id="prof-edit-btn" onclick="openEditProfile()" style="background:rgba(0,255,65,0.08);border:1px solid rgba(0,255,65,0.3);color:var(--green);font-family:var(--font-mono);font-size:0.65em;letter-spacing:2px;padding:6px 14px;cursor:pointer">✏ EDIT PROFILE</button>
+          <button class="prof-badge-req-btn" id="req-badge-btn" onclick="openBadgeModal()" style="background:rgba(255,204,0,0.08);border:1px solid rgba(255,204,0,0.3);color:#ffcc00;font-family:var(--font-mono);font-size:0.65em;letter-spacing:2px;padding:6px 14px;cursor:pointer">🏅 RICHIEDI BADGE</button>
         </div>
       </div>
       <div class="prof-stats">
@@ -606,6 +624,73 @@
     </div>
     <div class="notif-list" id="notif-list">
       <div class="notif-empty">[ SIGNALS INCOMING... ]</div>
+    </div>
+  </div>
+
+  <!-- ===== BADGE REQUEST MODAL ===== -->
+  <div id="badge-modal" style="display:none;position:fixed;inset:0;z-index:500;background:rgba(0,0,0,0.93);align-items:flex-end" onclick="if(event.target===this)closeBadgeModal()">
+    <div style="width:100%;background:#050a05;border-top:1px solid rgba(255,204,0,0.3);padding:20px 16px 32px;max-height:85vh;overflow-y:auto">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+        <span style="font-family:var(--font-display);font-size:0.8em;letter-spacing:3px;color:#ffcc00">🏅 BADGE PROFESSIONALE</span>
+        <button onclick="closeBadgeModal()" style="background:none;border:none;color:var(--green);font-size:1.2em;cursor:pointer">✕</button>
+      </div>
+      <div id="badge-status-display" style="display:none;margin-bottom:14px;padding:10px;border:1px solid rgba(255,204,0,0.2);font-size:0.7em;letter-spacing:1px"></div>
+      <div id="badge-form">
+        <div style="margin-bottom:12px">
+          <label style="font-size:0.65em;letter-spacing:2px;color:rgba(0,255,65,0.6);display:block;margin-bottom:6px">CATEGORIA PROFESSIONALE</label>
+          <select id="badge-category-sel" style="width:100%;background:#0a0f0a;border:1px solid rgba(0,255,65,0.3);color:var(--green);font-family:var(--font-mono);font-size:0.75em;padding:10px;outline:none">
+            <option value="">-- Seleziona categoria --</option>
+            <option value="⚕️ Medico">⚕️ Medico</option>
+            <option value="⚖️ Avvocato">⚖️ Avvocato</option>
+            <option value="🔨 Magistrato">🔨 Magistrato</option>
+            <option value="🏗️ Ingegnere">🏗️ Ingegnere</option>
+            <option value="📰 Giornalista">📰 Giornalista</option>
+            <option value="💼 Economista">💼 Economista</option>
+            <option value="🔬 Ricercatore">🔬 Ricercatore</option>
+            <option value="🎓 Professore">🎓 Professore</option>
+            <option value="🧠 Psicologo">🧠 Psicologo</option>
+            <option value="💊 Farmacista">💊 Farmacista</option>
+            <option value="🌿 Nutrizionista">🌿 Nutrizionista</option>
+            <option value="⚡ Esperto IT">⚡ Esperto IT</option>
+            <option value="🏛️ Funzionario Pubblico">🏛️ Funzionario Pubblico</option>
+          </select>
+        </div>
+        <div style="margin-bottom:16px">
+          <label style="font-size:0.65em;letter-spacing:2px;color:rgba(0,255,65,0.6);display:block;margin-bottom:6px">DOCUMENTO DI VERIFICA (PDF, JPG, PNG · max 10MB)</label>
+          <div id="badge-doc-zone" onclick="document.getElementById('badge-doc-input').click()" style="border:1px dashed rgba(255,204,0,0.3);padding:18px;text-align:center;cursor:pointer;font-size:0.7em;letter-spacing:1px;color:rgba(255,204,0,0.5)">
+            <div style="font-size:1.8em;margin-bottom:6px">📄</div>
+            <div id="badge-doc-name">Tocca per selezionare documento</div>
+          </div>
+          <input type="file" id="badge-doc-input" accept=".pdf,.jpg,.jpeg,.png" style="display:none" onchange="onBadgeDocSelected(this)">
+        </div>
+        <div style="font-size:0.6em;letter-spacing:1px;color:rgba(255,204,0,0.4);margin-bottom:16px;line-height:1.6">
+          ⚠ Il documento verrà verificato dall'admin M4TR1X. Solo professionisti verificati ricevono il badge. I dati sono gestiti localmente sul server.
+        </div>
+        <button onclick="submitBadgeRequest()" style="width:100%;background:rgba(255,204,0,0.12);border:1px solid #ffcc00;color:#ffcc00;font-family:var(--font-display);font-size:0.7em;letter-spacing:3px;padding:14px;cursor:pointer">INVIA RICHIESTA</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== EDIT PROFILE MODAL ===== -->
+  <div id="edit-profile-modal" style="display:none;position:fixed;inset:0;z-index:500;background:rgba(0,0,0,0.93);align-items:flex-end" onclick="if(event.target===this)closeEditProfile()">
+    <div style="width:100%;background:#050a05;border-top:1px solid rgba(0,255,65,0.3);padding:20px 16px 32px;max-height:85vh;overflow-y:auto">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+        <span style="font-family:var(--font-display);font-size:0.8em;letter-spacing:3px;color:var(--green)">✏ EDIT PROFILE</span>
+        <button onclick="closeEditProfile()" style="background:none;border:none;color:var(--green);font-size:1.2em;cursor:pointer">✕</button>
+      </div>
+      <div style="margin-bottom:12px">
+        <label style="font-size:0.65em;letter-spacing:2px;color:rgba(0,255,65,0.6);display:block;margin-bottom:6px">DISPLAY NAME</label>
+        <input id="edit-prof-name" type="text" placeholder="Your name..." style="width:100%;background:#0a0f0a;border:1px solid rgba(0,255,65,0.3);color:var(--green);font-family:var(--font-mono);font-size:0.8em;padding:10px;outline:none">
+      </div>
+      <div style="margin-bottom:12px">
+        <label style="font-size:0.65em;letter-spacing:2px;color:rgba(0,255,65,0.6);display:block;margin-bottom:6px">BIO</label>
+        <textarea id="edit-prof-bio" rows="4" placeholder="About you..." style="width:100%;background:#0a0f0a;border:1px solid rgba(0,255,65,0.3);color:var(--green);font-family:var(--font-mono);font-size:0.8em;padding:10px;outline:none;resize:vertical"></textarea>
+      </div>
+      <div style="margin-bottom:20px">
+        <label style="font-size:0.65em;letter-spacing:2px;color:rgba(0,255,65,0.6);display:block;margin-bottom:6px">PICTURE URL</label>
+        <input id="edit-prof-picture" type="url" placeholder="https://..." style="width:100%;background:#0a0f0a;border:1px solid rgba(0,255,65,0.3);color:var(--green);font-family:var(--font-mono);font-size:0.8em;padding:10px;outline:none">
+      </div>
+      <button onclick="saveEditProfile()" style="width:100%;background:rgba(0,255,65,0.12);border:1px solid var(--green);color:var(--green);font-family:var(--font-display);font-size:0.7em;letter-spacing:3px;padding:14px;cursor:pointer">SAVE &amp; PUBLISH</button>
     </div>
   </div>
 
@@ -803,6 +888,8 @@
     document.getElementById('cmt-input').addEventListener('keydown',e=>{if(e.key==='Enter')postComment()});
     document.getElementById('dm-msg-input').addEventListener('keydown',e=>{if(e.key==='Enter')sendDm()});
     document.getElementById('fw-audio').addEventListener('ended',()=>{document.getElementById('fw-play-btn').textContent='\u25B6'});
+    // Initialize DM unread badge from persisted data
+    updateDmUnreadBadge();
   });
 
   function connectRelays(){
@@ -811,7 +898,7 @@
       w.onopen=()=>{ws[url].ok=true;if(!S.loaded.signal){loadSec('signal');S.loaded.signal=true;setTimeout(initNotifications,2000)}};
       w.onclose=w.onerror=()=>{ws[url].ok=false};
     }catch(e){}});
-    setTimeout(()=>{if(!S.loaded.signal){document.getElementById('feed-signal').innerHTML='<div class="slide-placeholder"><div class="ph-text" style="color:var(--green-dark)">[ NO RELAY \u2014 BE THE FIRST TO UPLOAD ]</div></div>'}},9000);
+    setTimeout(()=>{if(!S.loaded.signal){document.getElementById('feed-signal').innerHTML='<div class="slide-placeholder"><div class="ph-text" style="color:var(--green-dark);text-align:center;line-height:2">[ NESSUN VIDEO ANCORA ]\n\nSei uno dei primi.\nPubblica qualcosa — premi + in basso.\nNessun algoritmo. Solo persone vere.</div></div>'}},9000);
   }
 
   // ========== SECTION SWITCH ==========
@@ -1040,7 +1127,7 @@
         });
       } catch (err) {} });
     });
-    setTimeout(() => { if (!seen.forum.size) c.innerHTML = '<div class="slide-placeholder"><div class="ph-text" style="color:rgba(187,102,255,0.3)">[ NO DISCUSSIONS YET \u2014 START ONE ]</div></div>' }, 6000);
+    setTimeout(() => { if (!seen.forum.size) c.innerHTML = '<div class="slide-placeholder"><div class="ph-text" style="color:rgba(187,102,255,0.3);text-align:center;line-height:2">[ NESSUNA DISCUSSIONE ]\n\nIl forum è federato con Mastodon.\nPremi + in basso per iniziare una discussione.\nRaggiunge migliaia di server indipendenti.</div></div>' }, 6000);
   }
 
   function openForumModal(){document.getElementById('forum-modal').classList.add('open')}
@@ -1067,7 +1154,21 @@
   function loadDMs() {
     const list = document.getElementById('dm-list');
     list.innerHTML = '<div class="slide-placeholder"><div class="ph-text">[ INITIALIZING SIGNAL PROTOCOL... ]</div></div>';
+
+    // Show persisted conversations immediately
     const convos = {};
+    // Seed from localStorage first
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (!key || !key.startsWith('m4tr1x_dm_msgs_')) continue;
+      const pk = key.replace('m4tr1x_dm_msgs_', '');
+      const msgs = loadDmMessages(pk);
+      if (msgs.length) {
+        const last = msgs[msgs.length - 1];
+        convos[pk] = { ts: last.ts, content: last.text, fromCache: true };
+      }
+    }
+
     Object.entries(ws).forEach(([url, r]) => {
       if (!r.ok) return;
       const sid = 'dm_' + rnd();
@@ -1083,29 +1184,44 @@
       } catch (err) {} };
       r.w.addEventListener('message', handler);
     });
-    setTimeout(async () => {
+
+    const renderList = async () => {
       const keys = Object.keys(convos).sort((a, b) => convos[b].ts - convos[a].ts);
-      if (!keys.length) { list.innerHTML = '<div class="slide-placeholder"><div class="ph-text" style="color:rgba(0,255,65,0.2)">[ SIGNAL READY \u2014 NO MESSAGES YET ]</div></div>'; return }
+      if (!keys.length) { list.innerHTML = '<div class="slide-placeholder"><div class="ph-text" style="color:rgba(0,255,65,0.2);text-align:center;line-height:2">[ NESSUN MESSAGGIO ]\n\nI tuoi DM sono cifrati end-to-end.\nNessuno può leggerli tranne te.\nCerca un utente per iniziare una chat.</div></div>'; return }
       list.innerHTML = '';
       for (const pk of keys) {
+        const lastSeen = getDmLastSeen(pk);
+        const msgs = loadDmMessages(pk);
+        const unreadCount = msgs.filter(m => !m.isMe && m.ts > lastSeen).length;
         const div = document.createElement('div'); div.className = 'dm-item';
         div.onclick = () => openDmChat(pk);
-        let preview = 'Signal encrypted message';
-        try { preview = await SignalEngine.decryptMessage(pk, convos[pk].content.split('?iv=')[0], 1); } catch(e) {}
+        let preview = convos[pk].fromCache ? (convos[pk].content || 'Signal encrypted message') : 'Signal encrypted message';
+        if (!convos[pk].fromCache) {
+          try { preview = await SignalEngine.decryptMessage(pk, convos[pk].content.split('?iv=')[0], 1); } catch(e) {}
+        }
         if (preview.length > 40) preview = preview.substring(0, 40) + '...';
+        const unreadBadge = unreadCount > 0 ? '<span style="background:var(--red);color:#fff;font-size:0.6em;border-radius:8px;padding:1px 6px;margin-left:4px">' + unreadCount + '</span>' : '';
         div.innerHTML = '<div class="dm-av" id="dmav-' + pk + '">\u{1F464}</div>' +
-          '<div class="dm-info"><div class="dm-name" id="dmnm-' + pk + '">' + shortenKey(pk) + '</div>' +
+          '<div class="dm-info"><div class="dm-name" id="dmnm-' + pk + '">' + shortenKey(pk) + unreadBadge + '</div>' +
           '<div class="dm-preview">\u{1F512} ' + esc(preview) + '</div></div>' +
           '<span class="dm-time">' + ago(convos[pk].ts) + '</span>';
         list.appendChild(div);
         loadProf(pk).then(p => {
           if (!p) return;
-          const av = document.getElementById('dmav-' + pk); const nm = document.getElementById('dmnm-' + pk);
-          if (p.name || p.display_name) nm.textContent = p.name || p.display_name;
-          // No avatar image per design
+          const nm = document.getElementById('dmnm-' + pk);
+          if (nm && (p.name || p.display_name)) {
+            nm.innerHTML = (p.name || p.display_name) + (unreadCount > 0 ? '<span style="background:var(--red);color:#fff;font-size:0.6em;border-radius:8px;padding:1px 6px;margin-left:4px">' + unreadCount + '</span>' : '');
+          }
         });
       }
-    }, 4000);
+    };
+
+    // Render cached immediately if available
+    if (Object.keys(convos).length) renderList();
+    // Re-render after relay data arrives
+    setTimeout(renderList, 4000);
+    // Update global unread badge
+    updateDmUnreadBadge();
   }
 
   function openDmChat(pk) {
@@ -1120,8 +1236,20 @@
       if (p.name || p.display_name) nm.textContent = p.name || p.display_name;
       if (p.picture && av) av.innerHTML = '<img src="' + p.picture + '" style="width:100%;height:100%;object-fit:cover;border-radius:50%">';
     });
-    // Load and decrypt messages
+    // Render persisted messages first
+    const persisted = loadDmMessages(pk);
     const msgSet = new Set();
+    persisted.forEach(m => {
+      msgSet.add(m.id);
+      const div = document.createElement('div'); div.className = 'dm-msg' + (m.isMe ? ' me' : '');
+      div.innerHTML = '<div class="dm-msg-bubble">' + esc(m.text) + '</div><div class="dm-msg-time">\u{1F512} ' + ago(m.ts) + '</div>';
+      msgs.appendChild(div);
+    });
+    if (persisted.length) msgs.scrollTop = msgs.scrollHeight;
+    // Mark conversation as seen
+    markDmSeen(pk);
+    // Load fresh messages from relays
+    const allMessages = [...persisted];
     Object.entries(ws).forEach(([url, r]) => {
       if (!r.ok) return;
       const sid = 'dmc_' + rnd();
@@ -1146,6 +1274,11 @@
         div.innerHTML = '<div class="dm-msg-bubble">' + esc(decrypted) + '</div><div class="dm-msg-time">\u{1F512} ' + ago(ev.created_at) + '</div>';
         msgs.appendChild(div);
         msgs.scrollTop = msgs.scrollHeight;
+        // Persist new message
+        allMessages.push({ id: ev.id, isMe, text: decrypted, ts: ev.created_at });
+        saveDmMessages(pk, allMessages.sort((a, b) => a.ts - b.ts));
+        // Mark seen immediately since chat is open
+        markDmSeen(pk);
       } catch (err) {} });
     });
   }
@@ -1170,6 +1303,10 @@
       const div = document.createElement('div'); div.className = 'dm-msg me';
       div.innerHTML = '<div class="dm-msg-bubble">' + esc(txt) + '</div><div class="dm-msg-time">\u{1F512} now</div>';
       msgs.appendChild(div); msgs.scrollTop = msgs.scrollHeight;
+      // Persist sent message
+      const sentMsgs = loadDmMessages(S.dmTarget);
+      sentMsgs.push({ id: signed.id || ('local_' + Date.now()), isMe: true, text: txt, ts: signed.created_at || now() });
+      saveDmMessages(S.dmTarget, sentMsgs);
       toast('\u{1F512} SIGNAL ENCRYPTED MESSAGE SENT');
     } catch (e) { toast('ERROR: ' + e.message) }
   }
@@ -1229,11 +1366,23 @@
     const tags=ev.tags.filter(t=>t[0]==='t'&&!t[1].startsWith('m4tr1x-')).map(t=>'#'+t[1]).join(' ');
     const ft=ev.tags.find(t=>t[0]==='film-title')?.[1]||'';const mt=ev.tags.find(t=>t[0]==='music-title')?.[1]||'';const g=ev.tags.find(t=>t[0]==='genre')?.[1]||'';
     const mainTitle=ft||mt;
-    el.innerHTML='<video class="slide-video" preload="none" loop muted playsinline><source src="'+vurl+'" type="video/mp4"></video><div class="ai-badge scanning" id="aib-'+ev.id+'">[ SCAN ]</div><div class="grad-top"></div><div class="grad-bot"></div><div class="play-flash" id="pf-'+ev.id+'"></div><div class="slide-info"><div class="slide-author"><div class="slide-av" id="av-'+ev.id+'">\u{1F464}</div><span class="slide-name" id="nm-'+ev.id+'">'+shortenKey(ev.pubkey)+'</span><span class="slide-time">'+ago(ev.created_at)+'</span></div>'+(mainTitle?'<div class="slide-meta">'+esc(mainTitle)+(g?'<span class="slide-genre">'+esc(g)+'</span>':'')+'</div>':'')+(cap?'<div class="slide-caption">'+cap+'</div>':'')+(tags?'<div class="slide-tags">'+tags+'</div>':'')+'</div><div class="slide-actions"><div class="sact" onclick="viewProf(\''+ev.pubkey+'\')"><div class="sact-icon" id="sav-'+ev.id+'">\u{1F464}</div><span class="sact-label">PROFILE</span></div><div class="sact zap-act" onclick="openZap(\''+ev.id+'\',\''+ev.pubkey+'\')"><div class="sact-icon">\u26A1</div><span class="sact-label">ZAP</span></div><div class="sact" onclick="openComments(\''+ev.id+'\')"><div class="sact-icon">\u{1F4AC}</div><span class="sact-label">REPLY</span></div><div class="sact" onclick="shareEv(\''+ev.id+'\')"><div class="sact-icon">\u{1F4E1}</div><span class="sact-label">RELAY</span></div><div class="sact" onclick="dlVid(\''+vurl+'\')"><div class="sact-icon">\u2B07</div><span class="sact-label">SAVE</span></div><div class="sact label-real-act" id="lbr-'+ev.id+'" onclick="submitLabel(\''+ev.id+'\',\'REAL\')"><div class="sact-icon">\u2705</div><span class="sact-label">REAL</span></div><div class="sact label-ai-act" id="lba-'+ev.id+'" onclick="submitLabel(\''+ev.id+'\',\'AI_GENERATED\')"><div class="sact-icon">\u26A0\uFE0F</div><span class="sact-label">AI</span></div><div class="label-stats-panel" id="lbs-'+ev.id+'"></div></div><div class="vid-prog"><div class="vid-prog-fill" id="vp-'+ev.id+'"></div></div>';
+    const bkmActive=isBookmarked(ev.id)?'bkm-active':'';
+    el.innerHTML='<video class="slide-video" preload="none" loop muted playsinline><source src="'+vurl+'" type="video/mp4"></video><div class="ai-badge scanning" id="aib-'+ev.id+'">[ SCAN ]</div><div class="grad-top"></div><div class="grad-bot"></div><div class="play-flash" id="pf-'+ev.id+'"></div><div class="slide-info"><div class="slide-author"><div class="slide-av" id="av-'+ev.id+'">\u{1F464}</div><span class="slide-name" id="nm-'+ev.id+'">'+shortenKey(ev.pubkey)+'</span><span class="slide-time">'+ago(ev.created_at)+'</span></div>'+(mainTitle?'<div class="slide-meta">'+esc(mainTitle)+(g?'<span class="slide-genre">'+esc(g)+'</span>':'')+'</div>':'')+(cap?'<div class="slide-caption">'+cap+'</div>':'')+(tags?'<div class="slide-tags">'+tags+'</div>':'')+'</div><div class="slide-actions"><div class="sact" onclick="viewProf(\''+ev.pubkey+'\')"><div class="sact-icon" id="sav-'+ev.id+'">\u{1F464}</div><span class="sact-label">PROFILE</span></div><div class="sact zap-act" onclick="openZap(\''+ev.id+'\',\''+ev.pubkey+'\')"><div class="sact-icon">\u26A1</div><span class="sact-label">ZAP</span></div><div class="sact" onclick="openComments(\''+ev.id+'\')"><div class="sact-icon">\u{1F4AC}</div><span class="sact-label">REPLY</span></div><div class="sact" onclick="shareEv(\''+ev.id+'\')"><div class="sact-icon">\u{1F4E1}</div><span class="sact-label">RELAY</span></div><div class="sact '+bkmActive+'" id="bkm-'+ev.id+'" onclick="toggleBookmark(\''+ev.id+'\',\''+vurl+'\',\''+esc(mainTitle||cap.slice(0,40))+'\')"><div class="sact-icon">\u2605</div><span class="sact-label">SAVE</span></div><div class="sact" onclick="dlVid(\''+vurl+'\')"><div class="sact-icon">\u2B07</div><span class="sact-label">DOWNLOAD</span></div><div class="sact label-real-act" id="lbr-'+ev.id+'" onclick="submitLabel(\''+ev.id+'\',\'REAL\')"><div class="sact-icon">\u2705</div><span class="sact-label">REAL</span></div><div class="sact label-ai-act" id="lba-'+ev.id+'" onclick="submitLabel(\''+ev.id+'\',\'AI_GENERATED\')"><div class="sact-icon">\u26A0\uFE0F</div><span class="sact-label">AI</span></div><div class="label-stats-panel" id="lbs-'+ev.id+'"></div></div><div class="vid-prog"><div class="vid-prog-fill" id="vp-'+ev.id+'"></div></div>';
     const vid=el.querySelector('video');
     vid.addEventListener('loadedmetadata',()=>{if(vid.videoWidth>vid.videoHeight)vid.classList.add('landscape')});
     vid.addEventListener('timeupdate',()=>{if(vid.duration){const f=document.getElementById('vp-'+ev.id);if(f)f.style.width=(vid.currentTime/vid.duration*100)+'%'}});
-    el.addEventListener('click',e=>{if(e.target.closest('.slide-actions')||e.target.closest('.slide-author'))return;togglePlay(vid,ev.id)});
+    let _lastTap=0;
+    el.addEventListener('click',e=>{
+      if(e.target.closest('.slide-actions')||e.target.closest('.slide-author'))return;
+      const now2=Date.now();
+      if(now2-_lastTap<320){
+        _lastTap=0;
+        const h=document.createElement('div');h.className='heart-pop';h.textContent='\u2764\uFE0F';el.appendChild(h);setTimeout(()=>h.remove(),800);
+      } else {
+        _lastTap=now2;
+        setTimeout(()=>{if(Date.now()-_lastTap>=280)togglePlay(vid,ev.id)},300);
+      }
+    });
     let aiBadgeDone=false;
     const obs=new IntersectionObserver(entries=>{entries.forEach(en=>{if(en.isIntersecting){vid.preload='auto';vid.muted=S.muted;vid.play().catch(()=>{});if(!aiBadgeDone){aiBadgeDone=true;scheduleAIBadge(ev.id,vurl)}}else{vid.pause()}})},{threshold:0.65});
     obs.observe(el);return el;
@@ -1251,13 +1400,24 @@
     if(p?.picture){const img='<img src="'+p.picture+'" style="width:100%;height:100%;object-fit:cover;border-radius:50%">';av.innerHTML=img;if(sav)sav.innerHTML=img}
   }
   function loadProf(pk){
+    // Check localStorage cache first for own profile (used by edit modal)
+    const lsKey = 'm4tr1x_profile_' + pk;
+    if(profCache[pk])return Promise.resolve(profCache[pk]);
+    // Seed from localStorage if available
+    try {
+      const lsCached = JSON.parse(localStorage.getItem(lsKey) || 'null');
+      if (lsCached) profCache[pk] = lsCached;
+    } catch(e) {}
     if(profCache[pk])return Promise.resolve(profCache[pk]);
     return new Promise(res=>{let done=false;
     Object.values(ws).forEach(r=>{if(!r.ok)return;const sid='p_'+rnd();
     r.w.send(JSON.stringify(['REQ',sid,{kinds:[0],authors:[pk],limit:1}]));
-    const h=e=>{try{const d=JSON.parse(e.data);if(d[0]==='EVENT'&&d[1]===sid){const p=JSON.parse(d[2].content);profCache[pk]=p;if(!done){done=true;res(p)}r.w.removeEventListener('message',h)}}catch(err){}};
+    const h=e=>{try{const d=JSON.parse(e.data);if(d[0]==='EVENT'&&d[1]===sid){const p=JSON.parse(d[2].content);profCache[pk]=p;
+    // Cache to localStorage for own profile
+    try{localStorage.setItem('m4tr1x_profile_'+pk, JSON.stringify(p))}catch(se){}
+    if(!done){done=true;res(p)}r.w.removeEventListener('message',h)}}catch(err){}};
     r.w.addEventListener('message',h)});
-    setTimeout(()=>{if(!done)res(null)},4000);});
+    setTimeout(()=>{if(!done)res(profCache[pk]||null)},4000);});
   }
   // ========== CROWDSOURCED LABELING ==========
   async function submitLabel(videoHash, label) {
@@ -1358,8 +1518,15 @@
     const isMe = pk === S.pubkey;
     const actRow = document.getElementById('prof-actions');
     actRow.style.display = isMe ? 'none' : 'flex';
+    const ownRow = document.getElementById('prof-own-actions');
+    if (ownRow) ownRow.style.display = isMe ? 'flex' : 'none';
     if (!isMe) refreshFollowBtn(pk);
+    // Reset badge row
+    const badgeRow = document.getElementById('prof-badge-row');
+    if (badgeRow) badgeRow.style.display = 'none';
     panel.classList.add('open');
+    // Load badge
+    loadBadge(pk);
     // Load Nostr profile metadata
     loadProf(pk).then(p => {
       if (!p) return;
@@ -1682,6 +1849,264 @@
     }catch(e){toast('ERROR: '+e.message);ptxt.textContent='FAILED';fill.style.width='0%';btn.disabled=false;btn.textContent='PUBLISH ON NOSTR'}
   }
 
+  // ========== BADGE SYSTEM ==========
+  const BADGE_CATEGORIES = {
+    '⚕️ Medico':              { emoji: '⚕️', label: 'MEDICO' },
+    '⚖️ Avvocato':            { emoji: '⚖️', label: 'AVVOCATO' },
+    '🔨 Magistrato':          { emoji: '🔨', label: 'MAGISTRATO' },
+    '🏗️ Ingegnere':           { emoji: '🏗️', label: 'INGEGNERE' },
+    '📰 Giornalista':         { emoji: '📰', label: 'GIORNALISTA' },
+    '💼 Economista':          { emoji: '💼', label: 'ECONOMISTA' },
+    '🔬 Ricercatore':         { emoji: '🔬', label: 'RICERCATORE' },
+    '🎓 Professore':          { emoji: '🎓', label: 'PROFESSORE' },
+    '🧠 Psicologo':           { emoji: '🧠', label: 'PSICOLOGO' },
+    '💊 Farmacista':          { emoji: '💊', label: 'FARMACISTA' },
+    '🌿 Nutrizionista':       { emoji: '🌿', label: 'NUTRIZIONISTA' },
+    '⚡ Esperto IT':          { emoji: '⚡', label: 'ESPERTO IT' },
+    '🏛️ Funzionario Pubblico':{ emoji: '🏛️', label: 'FUNZIONARIO PUBBLICO' },
+  };
+
+  async function loadBadge(pk) {
+    try {
+      const r = await fetch('/api/v1/badge/' + pk);
+      const data = await r.json();
+      const row = document.getElementById('prof-badge-row');
+      if (!row) return;
+      if (data.badge) {
+        const cat = data.badge.category;
+        const info = BADGE_CATEGORIES[cat] || { emoji: '🏅', label: cat };
+        document.getElementById('prof-badge-emoji').textContent = info.emoji;
+        document.getElementById('prof-badge-label').textContent = info.label;
+        row.style.display = 'flex';
+      } else {
+        row.style.display = 'none';
+      }
+    } catch(e) {}
+  }
+
+  function openBadgeModal() {
+    const m = document.getElementById('badge-modal');
+    m.style.display = 'flex';
+    document.getElementById('badge-status-display').style.display = 'none';
+    document.getElementById('badge-form').style.display = 'block';
+    document.getElementById('badge-category-sel').value = '';
+    document.getElementById('badge-doc-name').textContent = 'Tocca per selezionare documento';
+    document.getElementById('badge-doc-input').value = '';
+    checkMyBadgeStatus();
+  }
+
+  function closeBadgeModal() {
+    document.getElementById('badge-modal').style.display = 'none';
+  }
+
+  function onBadgeDocSelected(input) {
+    if (input.files && input.files[0]) {
+      document.getElementById('badge-doc-name').textContent = input.files[0].name;
+    }
+  }
+
+  async function submitBadgeRequest() {
+    const category = document.getElementById('badge-category-sel').value;
+    const docInput = document.getElementById('badge-doc-input');
+    if (!category) { toast('⚠ Seleziona una categoria'); return; }
+    if (!docInput.files || !docInput.files[0]) { toast('⚠ Carica un documento'); return; }
+    if (!S.pubkey) { toast('ERROR: Not logged in'); return; }
+    const fd = new FormData();
+    fd.append('pubkey', S.pubkey);
+    fd.append('category', category);
+    fd.append('document', docInput.files[0]);
+    try {
+      const r = await fetch('/api/v1/badge/request', { method: 'POST', body: fd });
+      const data = await r.json();
+      if (data.error) { toast('ERROR: ' + data.error); return; }
+      toast('🏅 RICHIESTA INVIATA — in attesa di verifica');
+      document.getElementById('badge-form').style.display = 'none';
+      const sd = document.getElementById('badge-status-display');
+      sd.style.display = 'block';
+      sd.style.color = '#ffcc00';
+      sd.textContent = '⏳ RICHIESTA IN CORSO — L\'admin verificherà il tuo documento';
+    } catch(e) { toast('ERROR: ' + e.message); }
+  }
+
+  async function checkMyBadgeStatus() {
+    if (!S.pubkey) return;
+    try {
+      const r = await fetch('/api/v1/badge/my/' + S.pubkey);
+      const data = await r.json();
+      const sd = document.getElementById('badge-status-display');
+      const form = document.getElementById('badge-form');
+      if (!data.request) return;
+      const req = data.request;
+      sd.style.display = 'block';
+      if (req.status === 'approved') {
+        const info = BADGE_CATEGORIES[req.category] || { emoji: '🏅', label: req.category };
+        sd.style.color = '#00ff41';
+        sd.textContent = '✅ BADGE APPROVATO: ' + info.emoji + ' ' + info.label;
+        form.style.display = 'none';
+        // Update req-badge-btn text
+        const btn = document.getElementById('req-badge-btn');
+        if (btn) { btn.textContent = info.emoji + ' ' + info.label; btn.style.borderColor = '#00ff41'; btn.style.color = '#00ff41'; }
+      } else if (req.status === 'pending') {
+        sd.style.color = '#ffcc00';
+        sd.textContent = '⏳ RICHIESTA IN CORSO — in attesa di verifica admin';
+        form.style.display = 'none';
+      } else if (req.status === 'rejected') {
+        sd.style.color = 'var(--red)';
+        sd.textContent = '❌ RICHIESTA RIFIUTATA' + (req.notes ? ': ' + req.notes : '') + ' — puoi inviarne una nuova';
+      }
+    } catch(e) {}
+  }
+
+  // ========== EDIT PROFILE ==========
+  function openEditProfile() {
+    const m = document.getElementById('edit-profile-modal');
+    m.style.display = 'flex';
+    // Pre-fill from localStorage cached profile
+    try {
+      const cached = JSON.parse(localStorage.getItem('m4tr1x_profile_' + S.pubkey) || '{}');
+      document.getElementById('edit-prof-name').value = cached.name || cached.display_name || '';
+      document.getElementById('edit-prof-bio').value = cached.about || '';
+      document.getElementById('edit-prof-picture').value = cached.picture || '';
+    } catch(e) {}
+  }
+
+  function closeEditProfile() {
+    document.getElementById('edit-profile-modal').style.display = 'none';
+  }
+
+  async function saveEditProfile() {
+    const name    = document.getElementById('edit-prof-name').value.trim();
+    const about   = document.getElementById('edit-prof-bio').value.trim();
+    const picture = document.getElementById('edit-prof-picture').value.trim();
+    if (!S.pubkey) { toast('ERROR: Not logged in'); return; }
+    const meta = {};
+    if (name)    meta.name    = name;
+    if (about)   meta.about   = about;
+    if (picture) meta.picture = picture;
+    try {
+      // Publish kind 0 (profile metadata) Nostr event
+      const ev = { kind: 0, pubkey: S.pubkey, created_at: now(), tags: [], content: JSON.stringify(meta) };
+      const signed = await signEv(ev);
+      broadcast(signed);
+      // Cache locally
+      const existing = JSON.parse(localStorage.getItem('m4tr1x_profile_' + S.pubkey) || '{}');
+      const updated = { ...existing, ...meta };
+      localStorage.setItem('m4tr1x_profile_' + S.pubkey, JSON.stringify(updated));
+      // Update profile panel immediately
+      if (name) document.getElementById('prof-name').textContent = name;
+      closeEditProfile();
+      toast('✅ PROFILE UPDATED');
+    } catch(e) { toast('ERROR: ' + e.message); }
+  }
+
+  // ========== DM PERSISTENCE + UNREAD BADGE ==========
+  function dmStorageKey(pk) { return 'm4tr1x_dm_msgs_' + pk; }
+  function dmLastSeenKey(pk) { return 'm4tr1x_dm_seen_' + pk; }
+
+  function saveDmMessages(pk, messages) {
+    try {
+      // Keep last 200 messages per conversation
+      const toSave = messages.slice(-200);
+      localStorage.setItem(dmStorageKey(pk), JSON.stringify(toSave));
+    } catch(e) {}
+  }
+
+  function loadDmMessages(pk) {
+    try {
+      return JSON.parse(localStorage.getItem(dmStorageKey(pk)) || '[]');
+    } catch(e) { return []; }
+  }
+
+  function markDmSeen(pk) {
+    localStorage.setItem(dmLastSeenKey(pk), String(Math.floor(Date.now() / 1000)));
+    updateDmUnreadBadge();
+  }
+
+  function getDmLastSeen(pk) {
+    return parseInt(localStorage.getItem(dmLastSeenKey(pk)) || '0', 10);
+  }
+
+  function updateDmUnreadBadge() {
+    try {
+      let totalUnread = 0;
+      // Find all DM conversation keys
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (!key || !key.startsWith('m4tr1x_dm_msgs_')) continue;
+        const pk = key.replace('m4tr1x_dm_msgs_', '');
+        const msgs = loadDmMessages(pk);
+        const lastSeen = getDmLastSeen(pk);
+        // Count messages from others that are newer than last-seen
+        const unread = msgs.filter(m => !m.isMe && m.ts > lastSeen).length;
+        totalUnread += unread;
+      }
+      const badge = document.getElementById('dm-unread-badge');
+      if (!badge) return;
+      if (totalUnread > 0) {
+        badge.textContent = totalUnread > 99 ? '99+' : String(totalUnread);
+        badge.style.display = 'inline-block';
+      } else {
+        badge.style.display = 'none';
+      }
+    } catch(e) {}
+  }
+
+  // ========== BOOKMARKS ==========
+  function getBookmarks(){try{return JSON.parse(localStorage.getItem('m4tr1x_bookmarks')||'[]')}catch(e){return[]}}
+  function saveBookmarks(list){try{localStorage.setItem('m4tr1x_bookmarks',JSON.stringify(list.slice(-200)))}catch(e){}}
+  function isBookmarked(id){return getBookmarks().some(b=>b.id===id)}
+  function toggleBookmark(id,vurl,title){
+    let list=getBookmarks();
+    const idx=list.findIndex(b=>b.id===id);
+    if(idx>=0){list.splice(idx,1);toast('\u2605 RIMOSSO DAI SALVATI')}
+    else{list.push({id,vurl,title,ts:Date.now()});toast('\u2605 SALVATO!')}
+    saveBookmarks(list);
+    const btn=document.getElementById('bkm-'+id);
+    if(btn)btn.classList.toggle('bkm-active',idx<0);
+  }
+
+  // ========== SESSION TIMER ==========
+  const _sessionStart=Date.now();
+  let _sessionAlertMin=0;
+  function _tickTimer(){
+    const elapsed=Math.floor((Date.now()-_sessionStart)/1000);
+    const m=Math.floor(elapsed/60),s=elapsed%60;
+    const el=document.getElementById('session-timer');
+    if(!el)return;
+    el.textContent=(m<10?'0':'')+m+':'+(s<10?'0':'')+s;
+    if(_sessionAlertMin>0&&m>=_sessionAlertMin&&s===0){
+      el.classList.add('warn');
+      toast('\u23F0 '+_sessionAlertMin+' MIN — PRENDITI UNA PAUSA!');
+    } else if(m<_sessionAlertMin){el.classList.remove('warn')}
+  }
+  setInterval(_tickTimer,1000);
+  function toggleSessionAlert(){
+    const opts=[0,10,20,30,60];
+    const cur=_sessionAlertMin;
+    const next=opts[(opts.indexOf(cur)+1)%opts.length];
+    _sessionAlertMin=next;
+    toast(next===0?'TIMER DISATTIVATO':'AVVISO TRA '+next+' MIN');
+    if(next===0)document.getElementById('session-timer').classList.remove('warn');
+  }
+
+  // ========== SWIPE SECTION (touch + mouse) ==========
+  (function(){
+    const SEC_ORDER=['signal','film','music','forum','shop','dm'];
+    let _tx=0,_ty=0,_swiping=false;
+    const fw=document.getElementById('feed-wrap');
+    fw.addEventListener('touchstart',e=>{_tx=e.touches[0].clientX;_ty=e.touches[0].clientY;_swiping=true},{passive:true});
+    fw.addEventListener('touchend',e=>{
+      if(!_swiping)return;_swiping=false;
+      const dx=e.changedTouches[0].clientX-_tx;
+      const dy=e.changedTouches[0].clientY-_ty;
+      if(Math.abs(dx)>60&&Math.abs(dx)>Math.abs(dy)*2){
+        const idx=SEC_ORDER.indexOf(S.section);
+        if(dx<0&&idx<SEC_ORDER.length-1)switchSec(SEC_ORDER[idx+1]);
+        else if(dx>0&&idx>0)switchSec(SEC_ORDER[idx-1]);
+      }
+    },{passive:true});
+  })();
+
   // NOSTR SIGNING
   async function signEv(event){
     if(S.method==='extension'&&window.nostr)return await window.nostr.signEvent(event);
@@ -1699,6 +2124,6 @@
   function ago(ts){const s=Math.floor(Date.now()/1000)-ts;if(s<60)return s+'s';if(s<3600)return Math.floor(s/60)+'m';if(s<86400)return Math.floor(s/3600)+'h';return Math.floor(s/86400)+'d'}
   function now(){return Math.floor(Date.now()/1000)}
   function rnd(){return Math.random().toString(36).slice(2,8)}
-  <\/script>
-<\/body>
-<\/html>
+  </script>
+</body>
+</html>

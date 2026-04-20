@@ -9,12 +9,13 @@ const Database = require('better-sqlite3')
 let db
 
 function getDbPath() {
+  if (process.env.M4TR1X_DATA_DIR) {
+    return path.join(process.env.M4TR1X_DATA_DIR, 'm4tr1x.db')
+  }
   try {
-    // In Electron: salva nel folder dati utente (es. AppData su Windows)
     const { app } = require('electron')
     return path.join(app.getPath('userData'), 'm4tr1x.db')
   } catch {
-    // Fallback per sviluppo fuori da Electron
     return path.join(process.cwd(), 'm4tr1x.db')
   }
 }

@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>M4TR1X — Loading</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@700;900&display=swap');
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      height: 100%; width: 100%;
+      background: #000;
+      color: #00ff41;
+      font-family: 'Share Tech Mono', monospace;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent, transparent 3px,
+        rgba(0,255,65,0.012) 3px, rgba(0,255,65,0.012) 4px
+      );
+      pointer-events: none;
+      z-index: 9999;
+    }
+    .logo {
+      font-family: 'Orbitron', monospace;
+      font-size: 2em;
+      font-weight: 900;
+      letter-spacing: 8px;
+      color: #00ff41;
+      text-shadow: 0 0 30px #00ff41, 0 0 60px rgba(0,255,65,0.4);
+      margin-bottom: 48px;
+    }
+    .dots {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 32px;
+    }
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #00ff41;
+      animation: pulse 1.2s ease-in-out infinite;
+    }
+    .dot:nth-child(2) { animation-delay: 0.2s; }
+    .dot:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes pulse {
+      0%, 100% { opacity: 0.2; transform: scale(0.8); }
+      50% { opacity: 1; transform: scale(1.2); box-shadow: 0 0 10px #00ff41; }
+    }
+    .status {
+      font-size: 0.75em;
+      color: rgba(0,255,65,0.5);
+      letter-spacing: 2px;
+    }
+  </style>
+</head>
+<body>
+  <div class="logo">M4TR1X</div>
+  <div class="dots">
+    <div class="dot"></div>
+    <div class="dot"></div>
+    <div class="dot"></div>
+  </div>
+  <div class="status" id="status">INITIALIZING...</div>
+
+  <script>
+    const STATUS_EL = document.getElementById('status');
+    const HEALTH_URL = 'http://127.0.0.1:8080/health';
+    const APP_URL    = 'http://localhost:8080/app';
+    const INTERVAL = 800;  // ms between polls
+
+    let elapsed = 0;
+
+    function poll() {
+      fetch(HEALTH_URL, { cache: 'no-store' })
+        .then(r => {
+          if (r.ok) {
+            STATUS_EL.textContent = 'ONLINE — CONNECTING...';
+            window.location.href = APP_URL;
+          } else {
+            retry();
+          }
+        })
+        .catch(() => retry());
+    }
+
+    function retry() {
+      elapsed += INTERVAL;
+      const secs = Math.ceil(elapsed / 1000);
+      if (secs < 30) {
+        STATUS_EL.textContent = 'STARTING SERVER...';
+      } else {
+        STATUS_EL.textContent = 'INSTALLING DEPENDENCIES... (' + secs + 's) — FIRST RUN ONLY';
+      }
+      setTimeout(poll, INTERVAL);
+    }
+
+    // Start polling after a short initial delay
+    setTimeout(poll, 300);
+  </script>
+</body>
+</html>

@@ -4,7 +4,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>M4TR1X — Stay Safe</title>
-<script src="/m4tr1x-bridge.js"></script>
+<script src="m4tr1x-bridge.js"></script>
 <style>
   :root {
     --green:  #00ff41;
@@ -17,6 +17,8 @@
   }
   * { margin:0; padding:0; box-sizing:border-box; }
   body { background:var(--bg); color:var(--text); font-family:'Courier New',monospace; min-height:100vh; padding:16px 16px 30px; }
+  .back-btn { display:flex; align-items:center; gap:8px; background:none; border:1px solid var(--border); color:var(--green); font-family:'Courier New',monospace; font-size:12px; letter-spacing:1px; padding:7px 14px; cursor:pointer; margin-bottom:16px; transition:0.2s; }
+  .back-btn:hover { border-color:var(--green); }
   .lang-bar { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:20px; border-bottom:1px solid var(--border); padding-bottom:14px; }
   .lang-btn { background:var(--card); border:1px solid var(--border); color:var(--text); padding:5px 12px; cursor:pointer; font-size:12px; letter-spacing:0.5px; transition:all 0.15s; }
   .lang-btn:hover, .lang-btn.active { border-color:var(--green); color:var(--green); }
@@ -49,6 +51,8 @@
 </style>
 </head>
 <body>
+
+<button class="back-btn" onclick="history.length>1 ? history.back() : window.location.href='/app'">← BACK</button>
 
 <!-- Language bar -->
 <div class="lang-bar" id="lang-bar">

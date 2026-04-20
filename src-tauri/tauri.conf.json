@@ -24,11 +24,12 @@
         "resizable":       true,
         "decorations":     true,
         "backgroundColor": "#000000",
-        "url":             "http://localhost:8080/app"
+        "url":             "loading.html",
+        "devtools":        true
       }
     ],
     "security": {
-      "csp": "default-src 'self' http://localhost:8080; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; media-src 'self' https:; connect-src 'self' http://localhost:8080 wss: https:; frame-src https:; object-src 'none'; base-uri 'self'"
+      "csp": "default-src 'self' http://localhost:8080 http://127.0.0.1:8080; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; media-src 'self' https:; connect-src 'self' http://localhost:8080 http://127.0.0.1:8080 wss: https:; frame-src https:; object-src 'none'; base-uri 'self'"
     }
   },
 
@@ -41,7 +42,7 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "targets": "all",
+    "targets": ["nsis"],
     "copyright": "MIT — Free to use, fork, and build upon.",
     "category":  "SocialNetworking",
     "shortDescription": "Decentralized privacy-first social video.",
@@ -49,12 +50,10 @@
 
     "windows": {
       "nsis": {
-        "installMode":             "currentUser",
-        "installerIcon":           "../assets/icon.ico",
-        "headerImage":             "../assets/icon-1024.png",
-        "sidebarImage":            "../assets/icon-1024.png",
-        "createDesktopShortcut":   true,
-        "createStartMenuShortcut": true
+        "installMode":   "currentUser",
+        "installerIcon": "../assets/icon.ico",
+        "headerImage":   "../assets/icon-1024.png",
+        "sidebarImage":  "../assets/icon-1024.png"
       }
     },
 
@@ -79,10 +78,26 @@
       "minimumSystemVersion": "16.0"
     },
 
-    "resources": [
-      { "src": "../server/**/*",  "target": "server"  },
-      { "src": "../models/**/*",  "target": "models"  },
-      { "src": "../train/**/*",   "target": "train"   }
-    ]
+    "resources": {
+      "../server/index.js":          "server/index.js",
+      "../server/db.js":             "server/db.js",
+      "../server/nostr.js":          "server/nostr.js",
+      "../server/core.js":           "server/core.js",
+      "../server/ai_detector.js":    "server/ai_detector.js",
+      "../server/monero.js":         "server/monero.js",
+      "../server/shop.js":           "server/shop.js",
+      "../server/uploader.js":       "server/uploader.js",
+      "../server/crowdtrain.js":     "server/crowdtrain.js",
+      "../server/model_updater.js":  "server/model_updater.js",
+      "../server/mastodon.js":       "server/mastodon.js",
+      "../server/peertube.js":       "server/peertube.js",
+      "../server/funkwhale.js":      "server/funkwhale.js",
+      "../server/tor.js":            "server/tor.js",
+      "../server/badges.js":         "server/badges.js",
+      "../server/package.json":      "server/package.json",
+      "../frontend/**/*":            "frontend",
+      "../models/**/*":              "models",
+      "../train/**/*":               "train"
+    }
   }
 }

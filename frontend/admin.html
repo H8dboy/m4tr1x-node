@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>M4TR1X — Admin Panel</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap');
+    :root {
+      --green: #00ff41;
+      --green-dim: #00aa2b;
+      --green-dark: #002200;
+      --black: #000;
+      --surface: rgba(5,10,5,0.97);
+      --red: #ff2222;
+      --yellow: #ffcc00;
+      --font-mono: 'Share Tech Mono', monospace;
+      --font-display: 'Orbitron', monospace;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      background: var(--black);
+      color: var(--green);
+      font-family: var(--font-mono);
+      min-height: 100vh;
+    }
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(0,255,65,0.012) 3px, rgba(0,255,65,0.012) 4px);
+      pointer-events: none;
+      z-index: 9999;
+    }
+    #header {
+      background: rgba(0,0,0,0.9);
+      border-bottom: 1px solid rgba(0,255,65,0.2);
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .logo {
+      font-family: var(--font-display);
+      font-size: 1em;
+      font-weight: 900;
+      letter-spacing: 4px;
+      color: var(--green);
+      text-shadow: 0 0 15px var(--green);
+    }
+    .logo span { color: var(--red); }
+    #login-panel {
+      max-width: 400px;
+      margin: 80px auto;
+      padding: 32px;
+      border: 1px solid rgba(0,255,65,0.2);
+      background: rgba(5,10,5,0.9);
+    }
+    .login-title {
+      font-family: var(--font-display);
+      font-size: 0.75em;
+      letter-spacing: 3px;
+      margin-bottom: 24px;
+      color: var(--yellow);
+    }
+    .field { margin-bottom: 16px; }
+    .field label {
+      display: block;
+      font-size: 0.6em;
+      letter-spacing: 2px;
+      color: rgba(0,255,65,0.5);
+      margin-bottom: 6px;
+    }
+    .field input, .field textarea, .field select {
+      width: 100%;
+      background: #0a0f0a;
+      border: 1px solid rgba(0,255,65,0.3);
+      color: var(--green);
+      font-family: var(--font-mono);
+      font-size: 0.8em;
+      padding: 10px;
+      outline: none;
+    }
+    .field input:focus, .field textarea:focus {
+      border-color: var(--green);
+    }
+    .btn {
+      width: 100%;
+      background: rgba(0,255,65,0.1);
+      border: 1px solid var(--green);
+      color: var(--green);
+      font-family: var(--font-display);
+      font-size: 0.65em;
+      letter-spacing: 3px;
+      padding: 12px;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+    .btn:hover { background: rgba(0,255,65,0.2); }
+    .btn-danger {
+      background: rgba(255,34,34,0.1);
+      border-color: var(--red);
+      color: var(--red);
+    }
+    .btn-danger:hover { background: rgba(255,34,34,0.2); }
+    .btn-approve {
+      background: rgba(0,255,65,0.1);
+      border-color: var(--green);
+      color: var(--green);
+      font-size: 0.6em;
+      padding: 6px 12px;
+      letter-spacing: 2px;
+    }
+    .btn-approve:hover { background: rgba(0,255,65,0.2); }
+    .btn-reject {
+      background: rgba(255,34,34,0.1);
+      border-color: var(--red);
+      color: var(--red);
+      font-size: 0.6em;
+      padding: 6px 12px;
+      letter-spacing: 2px;
+    }
+    .btn-reject:hover { background: rgba(255,34,34,0.2); }
+    #dashboard { padding: 24px; max-width: 900px; margin: 0 auto; }
+    .dash-title {
+      font-family: var(--font-display);
+      font-size: 0.75em;
+      letter-spacing: 3px;
+      color: var(--yellow);
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .filter-tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+    .filter-tab {
+      background: none;
+      border: 1px solid rgba(0,255,65,0.2);
+      color: rgba(0,255,65,0.5);
+      font-family: var(--font-mono);
+      font-size: 0.6em;
+      letter-spacing: 2px;
+      padding: 5px 12px;
+      cursor: pointer;
+    }
+    .filter-tab.active {
+      border-color: var(--green);
+      color: var(--green);
+      background: rgba(0,255,65,0.08);
+    }
+    .request-card {
+      background: rgba(5,10,5,0.9);
+      border: 1px solid rgba(0,255,65,0.15);
+      margin-bottom: 12px;
+      padding: 16px;
+    }
+    .request-card.status-pending { border-left: 3px solid var(--yellow); }
+    .request-card.status-approved { border-left: 3px solid var(--green); }
+    .request-card.status-rejected { border-left: 3px solid var(--red); }
+    .card-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    .card-pubkey {
+      font-size: 0.65em;
+      color: rgba(0,255,65,0.6);
+      letter-spacing: 1px;
+      margin-bottom: 4px;
+    }
+    .card-category {
+      font-size: 0.8em;
+      letter-spacing: 1px;
+    }
+    .card-status {
+      font-size: 0.55em;
+      letter-spacing: 2px;
+      padding: 3px 8px;
+      border: 1px solid;
+    }
+    .card-status.pending { color: var(--yellow); border-color: var(--yellow); }
+    .card-status.approved { color: var(--green); border-color: var(--green); }
+    .card-status.rejected { color: var(--red); border-color: var(--red); }
+    .card-meta {
+      font-size: 0.6em;
+      color: rgba(0,255,65,0.4);
+      margin-bottom: 12px;
+      line-height: 1.6;
+    }
+    .card-meta span { color: rgba(0,255,65,0.7); }
+    .card-actions { display: flex; gap: 8px; align-items: flex-start; flex-wrap: wrap; }
+    .approve-form { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .approve-form select {
+      background: #0a0f0a;
+      border: 1px solid rgba(0,255,65,0.3);
+      color: var(--green);
+      font-family: var(--font-mono);
+      font-size: 0.65em;
+      padding: 6px 8px;
+      outline: none;
+    }
+    .reject-form { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .reject-form input {
+      background: #0a0f0a;
+      border: 1px solid rgba(255,34,34,0.3);
+      color: var(--red);
+      font-family: var(--font-mono);
+      font-size: 0.65em;
+      padding: 6px 8px;
+      outline: none;
+      width: 200px;
+    }
+    .card-notes {
+      font-size: 0.6em;
+      color: rgba(255,34,34,0.7);
+      margin-top: 6px;
+      font-style: italic;
+    }
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      font-size: 0.65em;
+      letter-spacing: 2px;
+      color: rgba(0,255,65,0.2);
+    }
+    #toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: rgba(0,255,65,0.12);
+      border: 1px solid var(--green);
+      color: var(--green);
+      font-family: var(--font-mono);
+      font-size: 0.7em;
+      letter-spacing: 2px;
+      padding: 10px 20px;
+      opacity: 0;
+      transition: 0.3s;
+      pointer-events: none;
+      white-space: nowrap;
+      z-index: 1000;
+    }
+    #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    .logout-btn {
+      background: none;
+      border: 1px solid rgba(255,34,34,0.3);
+      color: rgba(255,34,34,0.6);
+      font-family: var(--font-mono);
+      font-size: 0.6em;
+      letter-spacing: 2px;
+      padding: 5px 12px;
+      cursor: pointer;
+    }
+    .logout-btn:hover { border-color: var(--red); color: var(--red); }
+    #refresh-btn {
+      background: none;
+      border: 1px solid rgba(0,255,65,0.3);
+      color: rgba(0,255,65,0.6);
+      font-family: var(--font-mono);
+      font-size: 0.6em;
+      letter-spacing: 2px;
+      padding: 5px 12px;
+      cursor: pointer;
+    }
+    #refresh-btn:hover { border-color: var(--green); color: var(--green); }
+  </style>
+</head>
+<body>
+  <div id="header">
+    <div class="logo">M4TR1X <span>ADMIN</span></div>
+    <div id="header-actions" style="display:none;gap:8px;align-items:center">
+      <button id="refresh-btn" onclick="loadRequests()">⟳ REFRESH</button>
+      <button class="logout-btn" onclick="logout()">LOGOUT</button>
+    </div>
+  </div>
+
+  <!-- LOGIN PANEL -->
+  <div id="login-panel">
+    <div class="login-title">🔐 ADMIN ACCESS</div>
+    <div class="field">
+      <label>ADMIN KEY</label>
+      <input type="password" id="admin-key-input" placeholder="Enter admin key..." onkeydown="if(event.key==='Enter')doLogin()">
+    </div>
+    <button class="btn" onclick="doLogin()">ACCESS PANEL</button>
+    <div id="login-error" style="display:none;margin-top:12px;font-size:0.6em;letter-spacing:2px;color:var(--red)"></div>
+  </div>
+
+  <!-- DASHBOARD -->
+  <div id="dashboard" style="display:none">
+    <div class="dash-title">
+      <span>🏅 BADGE REQUESTS</span>
+      <span id="pending-count" style="font-size:0.75em;color:var(--red);font-family:var(--font-mono)"></span>
+    </div>
+    <div class="filter-tabs">
+      <button class="filter-tab active" onclick="setFilter('all', this)">ALL</button>
+      <button class="filter-tab" onclick="setFilter('pending', this)">PENDING</button>
+      <button class="filter-tab" onclick="setFilter('approved', this)">APPROVED</button>
+      <button class="filter-tab" onclick="setFilter('rejected', this)">REJECTED</button>
+    </div>
+    <div id="requests-list"></div>
+  </div>
+
+  <div id="toast"></div>
+
+  <script>
+    const CATEGORIES = [
+      '⚕️ Medico', '⚖️ Avvocato', '🔨 Magistrato', '🏗️ Ingegnere',
+      '📰 Giornalista', '💼 Economista', '🔬 Ricercatore', '🎓 Professore',
+      '🧠 Psicologo', '💊 Farmacista', '🌿 Nutrizionista',
+      '⚡ Esperto IT', '🏛️ Funzionario Pubblico',
+    ];
+
+    let adminKey = '';
+    let allRequests = [];
+    let currentFilter = 'all';
+
+    function doLogin() {
+      const key = document.getElementById('admin-key-input').value.trim();
+      if (!key) { showLoginError('Inserisci la chiave admin'); return; }
+      adminKey = key;
+      // Test the key by fetching requests
+      fetch('/api/v1/admin/badges', { headers: { 'x-admin-key': adminKey } })
+        .then(r => {
+          if (r.status === 401) { showLoginError('Chiave admin non valida'); adminKey = ''; return null; }
+          if (r.status === 403) { showLoginError('Accesso consentito solo da localhost'); adminKey = ''; return null; }
+          return r.json();
+        })
+        .then(data => {
+          if (!data) return;
+          document.getElementById('login-panel').style.display = 'none';
+          document.getElementById('dashboard').style.display = 'block';
+          document.getElementById('header-actions').style.display = 'flex';
+          allRequests = Array.isArray(data) ? data : [];
+          renderRequests();
+        })
+        .catch(e => showLoginError('Errore: ' + e.message));
+    }
+
+    function showLoginError(msg) {
+      const el = document.getElementById('login-error');
+      el.textContent = msg;
+      el.style.display = 'block';
+    }
+
+    function logout() {
+      adminKey = '';
+      allRequests = [];
+      document.getElementById('login-panel').style.display = 'block';
+      document.getElementById('dashboard').style.display = 'none';
+      document.getElementById('header-actions').style.display = 'none';
+      document.getElementById('admin-key-input').value = '';
+      document.getElementById('login-error').style.display = 'none';
+    }
+
+    function loadRequests() {
+      if (!adminKey) return;
+      fetch('/api/v1/admin/badges', { headers: { 'x-admin-key': adminKey } })
+        .then(r => r.json())
+        .then(data => {
+          allRequests = Array.isArray(data) ? data : [];
+          renderRequests();
+          toast('AGGIORNATO');
+        })
+        .catch(e => toast('ERRORE: ' + e.message));
+    }
+
+    function setFilter(f, btn) {
+      currentFilter = f;
+      document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+      btn.classList.add('active');
+      renderRequests();
+    }
+
+    function renderRequests() {
+      const list = document.getElementById('requests-list');
+      let filtered = allRequests;
+      if (currentFilter !== 'all') filtered = allRequests.filter(r => r.status === currentFilter);
+
+      const pending = allRequests.filter(r => r.status === 'pending').length;
+      const pc = document.getElementById('pending-count');
+      pc.textContent = pending > 0 ? pending + ' IN ATTESA' : '';
+
+      if (!filtered.length) {
+        list.innerHTML = '<div class="empty-state">[ NESSUNA RICHIESTA ]</div>';
+        return;
+      }
+
+      list.innerHTML = '';
+      filtered.forEach(req => {
+        const card = document.createElement('div');
+        card.className = 'request-card status-' + req.status;
+        card.id = 'card-' + req.id;
+
+        const dateStr = new Date(req.created_at).toLocaleString('it-IT');
+        const shortPk = req.pubkey.slice(0, 12) + '…' + req.pubkey.slice(-8);
+
+        let actionsHtml = '';
+        if (req.status === 'pending') {
+          const opts = CATEGORIES.map(c => '<option value="' + esc(c) + '"' + (c === req.category ? ' selected' : '') + '>' + esc(c) + '</option>').join('');
+          actionsHtml = `
+            <div class="approve-form">
+              <select id="approve-cat-${req.id}">${opts}</select>
+              <button class="btn-approve" onclick="doApprove('${req.id}')">✅ APPROVA</button>
+            </div>
+            <div class="reject-form">
+              <input type="text" id="reject-notes-${req.id}" placeholder="Motivazione rifiuto...">
+              <button class="btn-reject" onclick="doReject('${req.id}')">❌ RIFIUTA</button>
+            </div>
+          `;
+        }
+
+        card.innerHTML = `
+          <div class="card-head">
+            <div>
+              <div class="card-pubkey">${esc(shortPk)}</div>
+              <div class="card-category">${esc(req.category)}</div>
+            </div>
+            <span class="card-status ${req.status}">${req.status.toUpperCase()}</span>
+          </div>
+          <div class="card-meta">
+            📄 Documento: <span>${esc(req.document_filename)}</span><br>
+            📅 Inviato: <span>${esc(dateStr)}</span>
+            ${req.updated_at !== req.created_at ? '<br>🔄 Aggiornato: <span>' + esc(new Date(req.updated_at).toLocaleString('it-IT')) + '</span>' : ''}
+          </div>
+          ${req.notes ? '<div class="card-notes">Note: ' + esc(req.notes) + '</div>' : ''}
+          ${actionsHtml ? '<div class="card-actions">' + actionsHtml + '</div>' : ''}
+        `;
+        list.appendChild(card);
+      });
+    }
+
+    async function doApprove(id) {
+      const category = document.getElementById('approve-cat-' + id)?.value;
+      if (!category) { toast('Seleziona categoria'); return; }
+      try {
+        const r = await fetch('/api/v1/admin/badge/' + id + '/approve', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-admin-key': adminKey },
+          body: JSON.stringify({ category }),
+        });
+        const data = await r.json();
+        if (data.error) { toast('ERRORE: ' + data.error); return; }
+        toast('✅ APPROVATO');
+        // Update local state
+        const idx = allRequests.findIndex(r => r.id === id);
+        if (idx >= 0) { allRequests[idx].status = 'approved'; allRequests[idx].category = category; }
+        renderRequests();
+      } catch(e) { toast('ERRORE: ' + e.message); }
+    }
+
+    async function doReject(id) {
+      const notes = document.getElementById('reject-notes-' + id)?.value || '';
+      try {
+        const r = await fetch('/api/v1/admin/badge/' + id + '/reject', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-admin-key': adminKey },
+          body: JSON.stringify({ notes }),
+        });
+        const data = await r.json();
+        if (data.error) { toast('ERRORE: ' + data.error); return; }
+        toast('❌ RIFIUTATO');
+        const idx = allRequests.findIndex(r => r.id === id);
+        if (idx >= 0) { allRequests[idx].status = 'rejected'; allRequests[idx].notes = notes; }
+        renderRequests();
+      } catch(e) { toast('ERRORE: ' + e.message); }
+    }
+
+    function esc(s) {
+      return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    function toast(msg) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.classList.add('show');
+      setTimeout(() => t.classList.remove('show'), 3000);
+    }
+
+    // Auto-focus key input
+    document.getElementById('admin-key-input').focus();
+  </script>
+</body>
+</html>

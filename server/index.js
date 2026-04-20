@@ -43,6 +43,10 @@ const {
   getConfirmedLabels, registerModelVersion, getLatestModelVersion,
 } = require('./crowdtrain')
 const { checkAndUpdateModel } = require('./model_updater')
+const {
+  initBadgeDb, requestBadge, getApprovedBadge, getAllRequests,
+  approveRequest, rejectRequest, getUserRequest,
+} = require('./badges')
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 const MAX_FILE_MB      = parseInt(process.env.MAX_FILE_SIZE_MB || '100')
@@ -50,8 +54,13 @@ const API_KEY          = process.env.M4TR1X_API_KEY || ''
 const ALLOWED_ORIGINS  = (process.env.ALLOWED_ORIGINS || 'http://localhost:8080').split(',')
 const ALLOWED_EXT      = new Set(['.mp4', '.mov', '.avi', '.webm', '.mkv'])
 
-const UPLOAD_DIR = path.join(process.cwd(), 'uploads')
+const DATA_DIR      = process.env.M4TR1X_DATA_DIR || process.cwd()
+const UPLOAD_DIR    = path.join(DATA_DIR, 'uploads')
 if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true })
+
+const ADMIN_KEY      = process.env.ADMIN_KEY || 'admin123'
+const BADGE_DOCS_DIR = path.join(DATA_DIR, 'badge_docs')
+if (!fs.existsSync(BADGE_DOCS_DIR)) fs.mkdirSync(BADGE_DOCS_DIR, { recursive: true })
 
 // ─── App ──────────────────────────────────────────────────────────────────────
 const app = express()
@@ -61,7 +70,7 @@ app.use(cors({
   origin: [...ALLOWED_ORIGINS, 'http://localhost:8080', 'http://127.0.0.1:8080'],
   credentials: false,
   methods: ['GET', 'POST'],
-  allowedHeaders: ['X-Nostr-Pubkey', 'X-API-Key', 'Content-Type'],
+  allowedHeaders: ['X-Nostr-Pubkey', 'X-API-Key', 'X-Admin-Key', 'Content-Type'],
 }))
 
 app.use(express.json())
@@ -70,6 +79,17 @@ app.use(express.json())
 const upload = multer({
   dest: UPLOAD_DIR,
   limits: { fileSize: MAX_FILE_MB * 1024 * 1024 },
+})
+
+// Badge document upload (PDF, JPG, PNG — max 10MB)
+const badgeUpload = multer({
+  dest: BADGE_DOCS_DIR,
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const allowed = ['.pdf', '.jpg', '.jpeg', '.png']
+    const ext = path.extname(file.originalname).toLowerCase()
+    cb(null, allowed.includes(ext))
+  },
 })
 
 // ─── Rate limiting ────────────────────────────────────────────────────────────
@@ -590,13 +610,118 @@ app.post('/api/v1/train/model/update', verifyApiKey, async (req, res) => {
   }
 })
 
+// ─── Routes: Professional Badge System ───────────────────────────────────────
+
+// Middleware: solo localhost per endpoint admin
+function localhostOnly(req, res, next) {
+  const ip = req.ip || req.connection.remoteAddress || ''
+  if (ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1') return next()
+  return res.status(403).json({ error: 'Admin access restricted to localhost' })
+}
+
+// Middleware: verifica x-admin-key header
+function verifyAdminKey(req, res, next) {
+  const key = req.headers['x-admin-key']
+  if (!key || key !== ADMIN_KEY) {
+    return res.status(401).json({ error: 'Invalid or missing admin key' })
+  }
+  next()
+}
+
+// POST /api/v1/badge/request — utente invia richiesta con documento
+app.post('/api/v1/badge/request', badgeUpload.single('document'), async (req, res) => {
+  try {
+    const { pubkey, category } = req.body
+    if (!pubkey || !category) {
+      if (req.file) fs.unlinkSync(req.file.path)
+      return res.status(400).json({ error: 'pubkey e category sono richiesti' })
+    }
+    if (!req.file) {
+      return res.status(400).json({ error: 'Documento obbligatorio (PDF, JPG o PNG)' })
+    }
+    // Controlla se esiste già una richiesta pending o approvata
+    const existing = getUserRequest(pubkey)
+    if (existing && (existing.status === 'pending' || existing.status === 'approved')) {
+      fs.unlinkSync(req.file.path)
+      return res.status(409).json({
+        error: 'Hai già una richiesta in corso o un badge approvato',
+        status: existing.status,
+      })
+    }
+    const filename = req.file.filename + path.extname(req.file.originalname).toLowerCase()
+    // Rinomina il file con estensione corretta
+    fs.renameSync(req.file.path, path.join(BADGE_DOCS_DIR, filename))
+    const id = requestBadge(pubkey, category, filename)
+    res.status(201).json({ success: true, id, status: 'pending' })
+  } catch (err) {
+    console.error('[BADGES] Errore richiesta:', err)
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// GET /api/v1/badge/my/:pubkey — stato richiesta dell'utente stesso (must be before /:pubkey)
+app.get('/api/v1/badge/my/:pubkey', (req, res) => {
+  try {
+    const request = getUserRequest(req.params.pubkey)
+    if (!request) return res.json({ request: null })
+    res.json({ request })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// GET /api/v1/badge/:pubkey — badge approvato pubblico di un utente
+app.get('/api/v1/badge/:pubkey', (req, res) => {
+  try {
+    const badge = getApprovedBadge(req.params.pubkey)
+    if (!badge) return res.json({ badge: null })
+    res.json({ badge })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// GET /api/v1/admin/badges — lista tutte le richieste (admin only)
+app.get('/api/v1/admin/badges', localhostOnly, verifyAdminKey, (req, res) => {
+  try {
+    const { status } = req.query
+    const requests = getAllRequests(status || null)
+    res.json(requests)
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// POST /api/v1/admin/badge/:id/approve — approva richiesta (admin only)
+app.post('/api/v1/admin/badge/:id/approve', localhostOnly, verifyAdminKey, (req, res) => {
+  try {
+    const { category } = req.body
+    if (!category) return res.status(400).json({ error: 'category richiesta' })
+    approveRequest(req.params.id, category)
+    res.json({ success: true, status: 'approved' })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// POST /api/v1/admin/badge/:id/reject — rifiuta richiesta (admin only)
+app.post('/api/v1/admin/badge/:id/reject', localhostOnly, verifyAdminKey, (req, res) => {
+  try {
+    const { notes } = req.body
+    rejectRequest(req.params.id, notes || '')
+    res.json({ success: true, status: 'rejected' })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
 // ─── Serve nostr-tools bundle da node_modules (evita dipendenza CDN esterna) ──
 // Cerca il bundle in ordine: build CommonJS → bundle UMD → fallback 404
 app.get('/libs/nostr.bundle.js', (req, res) => {
   const candidates = [
-    path.join(__dirname, '..', 'node_modules', 'nostr-tools', 'lib', 'nostr.bundle.js'),
-    path.join(__dirname, '..', 'node_modules', 'nostr-tools', 'lib', 'nostr.bundle.cjs'),
-    path.join(__dirname, '..', 'node_modules', 'nostr-tools', 'dist', 'nostr.bundle.js'),
+    path.join(__dirname, 'node_modules', 'nostr-tools', 'lib', 'nostr.bundle.js'),
+    path.join(__dirname, 'node_modules', 'nostr-tools', 'lib', 'nostr.bundle.cjs'),
+    path.join(__dirname, 'node_modules', 'nostr-tools', 'dist', 'nostr.bundle.js'),
   ]
   for (const p of candidates) {
     if (fs.existsSync(p)) {
@@ -607,13 +732,20 @@ app.get('/libs/nostr.bundle.js', (req, res) => {
 })
 
 // Serve il frontend (HTML statico)
-const frontendPath = path.join(__dirname, '..', 'frontend')
+// In production, Tauri passes the bundled frontend path via env var.
+// In dev, fall back to the local ../frontend directory.
+const frontendPath = process.env.M4TR1X_FRONTEND_PATH || path.join(__dirname, '..', 'frontend')
 if (fs.existsSync(frontendPath)) {
   app.use('/app', express.static(frontendPath))
 
   // Route esplicita per la pagina sicurezza (6 lingue per utenti a rischio)
   app.get('/app/safety', (req, res) => {
     res.sendFile(path.join(frontendPath, 'safety.html'))
+  })
+
+  // Admin panel — solo localhost
+  app.get('/admin', localhostOnly, (req, res) => {
+    res.sendFile(path.join(frontendPath, 'admin.html'))
   })
 
   // Fallback SPA — rimanda a index.html per qualsiasi route non trovata
@@ -629,6 +761,7 @@ function startServer(port = 8080) {
   initDb()
   initShopDb()
   initCrowdtrainDb()
+  initBadgeDb()
   // Check for model updates at startup (background, non-blocking)
   setTimeout(() => checkAndUpdateModel().catch(() => {}), 5000)
   return new Promise((resolve, reject) => {
@@ -647,3 +780,11 @@ function stopServer() {
 }
 
 module.exports = { startServer, stopServer, app }
+
+// Auto-start when run directly (e.g. node index.js)
+if (require.main === module) {
+  startServer().catch(err => {
+    console.error('[SERVER] Errore avvio:', err)
+    process.exit(1)
+  })
+}
