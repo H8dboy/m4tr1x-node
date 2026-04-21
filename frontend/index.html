@@ -46,28 +46,35 @@
     toast('NODE DEACTIVATED');closeNodeModal();
   }
   // LIVE STREAMING
-  let _liveStream=null,_liveMedia=null;
+  // ── Live Streaming — WebRTC P2P via Nostr signaling ──────────────────────────
+  let _liveStream=null, _liveMedia=null, _livePC=null, _liveViewerPCs={};
+  const ICE_SERVERS=[{urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun1.l.google.com:19302'}];
+
   async function loadLiveStreams(){
     const list=document.getElementById('live-streams-list');
     if(!list)return;
     const r=await fetch('/api/v1/live/streams').then(r=>r.json()).catch(()=>({streams:[]}));
-    if(!r.streams.length){list.innerHTML='<div class="slide-placeholder"><div class="ph-text" style="color:rgba(255,0,68,0.3)">[ NO LIVE STREAMS ]
-
-Be the first to go live.
-Press GO LIVE above.</div></div>';return;}
+    if(!r.streams.length){
+      list.innerHTML='<div class="slide-placeholder"><div class="ph-text" style="color:rgba(255,0,68,0.3)">[ NO LIVE STREAMS ]\n\nBe the first to go live.\nPress GO LIVE above.</div></div>';
+      return;
+    }
     list.innerHTML='';
     r.streams.forEach(s=>{
       const div=document.createElement('div');div.className='live-card';
       div.innerHTML='<div class="live-card-badge">● LIVE</div><div class="live-card-info"><div class="live-card-title">'+esc(s.title)+'</div><div class="live-card-meta">'+esc(s.category.toUpperCase())+' · '+shortenKey(s.pubkey)+'</div></div>';
-      div.onclick=()=>joinLiveStream(s);list.appendChild(div);
+      div.onclick=()=>joinLiveStream(s);
+      list.appendChild(div);
     });
   }
+
   function openGoLive(){document.getElementById('golive-modal').style.display='flex';}
   function closeGoLive(){
     document.getElementById('golive-modal').style.display='none';
     if(_liveMedia){_liveMedia.getTracks().forEach(t=>t.stop());_liveMedia=null;}
     document.getElementById('live-preview-wrap').style.display='none';
   }
+
+  // Streamer: start camera + broadcast offer via Nostr
   async function startGoLive(){
     if(!S.pubkey){toast('LOGIN FIRST');return;}
     try{
@@ -77,23 +84,102 @@ Press GO LIVE above.</div></div>';return;}
       const title=document.getElementById('live-title-input').value||'Live Stream';
       const category=document.getElementById('live-cat-select').value;
       const r=await fetch('/api/v1/live/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,category})}).then(r=>r.json());
-      if(r.ok){_liveStream=r.stream;toast('YOU ARE LIVE: '+title);closeGoLive();switchSec('live');loadLiveStreams();}
-      else toast('ERROR: '+r.error);
+      if(!r.ok){toast('ERROR: '+r.error);return;}
+      _liveStream=r.stream;
+
+      // Create RTCPeerConnection for streamer (will accept viewer answers)
+      _livePC=new RTCPeerConnection({iceServers:ICE_SERVERS});
+      _liveMedia.getTracks().forEach(t=>_livePC.addTrack(t,_liveMedia));
+
+      // Broadcast offer via Nostr relay
+      const offer=await _livePC.createOffer();
+      await _livePC.setLocalDescription(offer);
+
+      // Wait for ICE gathering then publish offer
+      await new Promise(res=>{
+        if(_livePC.iceGatheringState==='complete'){res();return;}
+        _livePC.onicegatheringstatechange=()=>{if(_livePC.iceGatheringState==='complete')res();};
+        setTimeout(res,3000); // max 3s
+      });
+
+      // Publish offer as Nostr event tagged with stream-id
+      const offerEvent={kind:1,pubkey:S.pubkey,created_at:Math.floor(Date.now()/1000),
+        tags:[['t','m4tr1x-webrtc-offer'],['stream-id',_liveStream.streamId]],
+        content:JSON.stringify({type:'offer',sdp:_livePC.localDescription})};
+      const signedOffer=await signEv(offerEvent);
+      broadcast(signedOffer);
+
+      // Listen for answers from viewers
+      wsSub('live-answers-'+_liveStream.streamId,ev=>{
+        try{
+          const sig=JSON.parse(ev.content);
+          if(sig.type!=='answer')return;
+          if(ev.tags.find(t=>t[0]==='stream-id'&&t[1]===_liveStream.streamId)){
+            _livePC.setRemoteDescription(new RTCSessionDescription(sig.sdp)).catch(()=>{});
+          }
+        }catch{}
+      });
+
+      toast('🔴 LIVE: '+title);
+      closeGoLive();
+      switchSec('live');
+      loadLiveStreams();
     }catch(e){toast('CAMERA ERROR: '+e.message);}
   }
+
   async function stopGoLive(){
     if(!_liveStream)return;
-    await fetch('/api/v1/live/stop',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({streamId:_liveStream.streamId})});
+    await fetch('/api/v1/live/stop',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({streamId:_liveStream.streamId})}).catch(()=>{});
+    if(_livePC){_livePC.close();_livePC=null;}
     if(_liveMedia){_liveMedia.getTracks().forEach(t=>t.stop());_liveMedia=null;}
-    _liveStream=null;toast('STREAM ENDED');loadLiveStreams();
+    wsUnsub('live-answers-'+_liveStream.streamId);
+    _liveStream=null;
+    toast('STREAM ENDED');
+    loadLiveStreams();
   }
-  function joinLiveStream(s){
+
+  // Viewer: connect to live stream via WebRTC
+  async function joinLiveStream(s){
     document.getElementById('liveview-modal').style.display='flex';
     document.getElementById('liveview-title').textContent=s.title;
     document.getElementById('liveview-author').textContent=shortenKey(s.pubkey)+' · '+s.category.toUpperCase();
-    if(_liveMedia)document.getElementById('liveview-video').srcObject=_liveMedia;
+
+    const pc=new RTCPeerConnection({iceServers:ICE_SERVERS});
+    _liveViewerPCs[s.streamId]=pc;
+
+    pc.ontrack=e=>{
+      const vid=document.getElementById('liveview-video');
+      if(vid && e.streams[0]) vid.srcObject=e.streams[0];
+    };
+
+    // Subscribe to streamer's offer
+    const subId='live-offer-'+s.streamId;
+    wsSub(subId,async ev=>{
+      try{
+        const sig=JSON.parse(ev.content);
+        if(sig.type!=='offer')return;
+        if(!ev.tags.find(t=>t[0]==='stream-id'&&t[1]===s.streamId))return;
+        wsUnsub(subId);
+
+        await pc.setRemoteDescription(new RTCSessionDescription(sig.sdp));
+        const answer=await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+
+        // Send answer back via Nostr
+        const answerEvent={kind:1,pubkey:S.pubkey,created_at:Math.floor(Date.now()/1000),
+          tags:[['t','m4tr1x-webrtc-answer'],['stream-id',s.streamId],['p',s.pubkey]],
+          content:JSON.stringify({type:'answer',sdp:pc.localDescription})};
+        const signed=await signEv(answerEvent);
+        broadcast(signed);
+      }catch{}
+    });
   }
-  function closeLiveView(){document.getElementById('liveview-modal').style.display='none';}
+
+  function closeLiveView(){
+    document.getElementById('liveview-modal').style.display='none';
+    Object.values(_liveViewerPCs).forEach(pc=>{try{pc.close();}catch{}});
+    _liveViewerPCs={};
+  }
   </script>
   <link rel="stylesheet" href="m4tr1x.css">
   <link rel="stylesheet" href="comfort.css">
@@ -872,7 +958,19 @@ Press GO LIVE above.</div></div>';return;}
     _subs[sid] = handler;
     if (eoseHandler) _esubs[sid] = eoseHandler;
   }
+  // wsSub + send REQ to all connected relays
+  function wsReq(sid, filter, handler, eoseHandler) {
+    wsSub(sid, handler, eoseHandler);
+    Object.values(ws).forEach(r=>{
+      if(r.ok && r.w && r.w.readyState===1)
+        r.w.send(JSON.stringify(['REQ', sid, filter]));
+    });
+  }
   function wsUnsub(sid) {
+    Object.values(ws).forEach(r=>{
+      if(r.ok && r.w && r.w.readyState===1)
+        try{r.w.send(JSON.stringify(['CLOSE',sid]));}catch{}
+    });
     delete _subs[sid]; delete _esubs[sid];
   }
   function wsDispatch(e) {
@@ -883,14 +981,39 @@ Press GO LIVE above.</div></div>';return;}
     } catch(err) {}
   }
 
+  const _reconnectTimers={};
+  function connectRelay(url){
+    try{
+      if(ws[url]?.w && ws[url].w.readyState<=1) return; // already connecting/open
+      const w=new WebSocket(url);
+      ws[url]={w,ok:false};
+      w.onopen=()=>{
+        ws[url].ok=true;
+        if(_reconnectTimers[url]){clearTimeout(_reconnectTimers[url]);delete _reconnectTimers[url];}
+        if(!S.loaded.signal){loadSec('signal');S.loaded.signal=true;setTimeout(initNotifications,2000);}
+      };
+      w.onclose=()=>{
+        ws[url].ok=false;
+        // exponential backoff: 3s → 6s → 12s → max 30s
+        const prev=ws[url]?._retryDelay||3000;
+        const delay=Math.min(prev*2,30000);
+        ws[url]={w:null,ok:false,_retryDelay:delay};
+        _reconnectTimers[url]=setTimeout(()=>connectRelay(url),delay);
+      };
+      w.onerror=()=>{ws[url].ok=false;};
+      w.onmessage=wsDispatch;
+    }catch(e){}
+  }
   function connectRelays(){
-    RELAYS.forEach(url=>{try{
-      const w=new WebSocket(url);ws[url]={w,ok:false};
-      w.onopen=()=>{ws[url].ok=true;if(!S.loaded.signal){loadSec('signal');S.loaded.signal=true;setTimeout(initNotifications,2000)}};
-      w.onclose=w.onerror=()=>{ws[url].ok=false};
-      w.onmessage = wsDispatch;  // single central handler
-    }catch(e){}});
-    setTimeout(()=>{if(!S.loaded.signal){document.getElementById('feed-signal').innerHTML='<div class="slide-placeholder"><div class="ph-text" style="color:var(--green-dark);text-align:center;line-height:2">[ NESSUN VIDEO ANCORA ]\n\nSei uno dei primi.\nPubblica qualcosa — premi + in basso.\nNessun algoritmo. Solo persone vere.</div></div>'}},9000);
+    RELAYS.forEach(url=>connectRelay(url));
+    setTimeout(()=>{
+      const anyOk=Object.values(ws).some(r=>r.ok);
+      if(!S.loaded.signal){
+        document.getElementById('feed-signal').innerHTML = anyOk
+          ? '<div class="slide-placeholder"><div class="ph-text" style="color:var(--green-dark);text-align:center;line-height:2">[ NESSUN VIDEO ANCORA ]\n\nSei uno dei primi.\nPubblica qualcosa — premi + in basso.\nNessun algoritmo. Solo persone vere.</div></div>'
+          : '<div class="slide-placeholder"><div class="ph-text" style="color:rgba(255,68,85,0.4);text-align:center;line-height:2">[ NESSUN RELAY CONNESSO ]\n\nControlla la tua connessione internet.\nRiconnessione automatica in corso...</div></div>';
+      }
+    },9000);
   }
 
   // ========== SECTION SWITCH ==========
