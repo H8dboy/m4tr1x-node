@@ -49,6 +49,24 @@ let mainWindow
 let torStatus = { torEnabled: false, port: null, source: null }
 const SERVER_PORT = 8080
 
+// Wait until the local server is actually responding before loading the app
+function waitForServer(port, maxMs = 15000) {
+  const http = require('http')
+  const start = Date.now()
+  return new Promise((resolve, reject) => {
+    function attempt() {
+      http.get(`http://localhost:${port}/app`, res => {
+        res.resume()
+        resolve()
+      }).on('error', () => {
+        if (Date.now() - start > maxMs) return reject(new Error('Server timeout'))
+        setTimeout(attempt, 300)
+      })
+    }
+    attempt()
+  })
+}
+
 // ─── Content Security Policy ──────────────────────────────────────────────────
 function setupCSP() {
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
@@ -91,6 +109,7 @@ async function createWindow() {
     height:    900,
     minWidth:  375,
     minHeight: 667,
+    show:      false,
     webPreferences: {
       preload:          path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -106,6 +125,11 @@ async function createWindow() {
     icon: path.join(__dirname, 'assets/icon.png'),
   })
 
+  // Show loading screen immediately (file:// — no server needed)
+  const loadingPath = path.join(__dirname, 'frontend', 'loading.html')
+  await mainWindow.loadFile(loadingPath)
+  mainWindow.show()
+
   // Start local API server
   try {
     const { startServer } = require('./server/index')
@@ -115,7 +139,17 @@ async function createWindow() {
     console.error('[M4TR1X] Failed to start server:', err)
   }
 
-  mainWindow.loadURL(`http://localhost:${SERVER_PORT}/app`)
+  // Wait until server is ready then switch to the app
+  try {
+    await waitForServer(SERVER_PORT)
+    mainWindow.loadURL(`http://localhost:${SERVER_PORT}/app`)
+  } catch (err) {
+    console.error('[M4TR1X] Server did not respond in time:', err)
+    // Show error in loading screen
+    mainWindow.webContents.executeJavaScript(
+      `document.body.innerHTML='<div style="color:#ff4455;font-family:monospace;padding:40px;text-align:center">[ SERVER ERROR ]<br><br>${err.message}<br><br>Riavvia l\'app.</div>'`
+    )
+  }
 
   // SECURITY: external links → system browser
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {

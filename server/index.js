@@ -57,19 +57,17 @@ const {
 
 // âââ Embedded Nostr Relay âââââââââââââââââââââââââââââââââââââââââââââââââââââ
 // Avviato in processo figlio per evitare che EADDRINUSE faccia crashare il server
-const { spawn: _spawnRelay } = require('child_process')
 const _net = require('net')
 const _sock = _net.createConnection(4848, '127.0.0.1')
 _sock.once('connect', () => { _sock.destroy(); console.log('[RELAY] Already running on :4848') })
 _sock.once('error', () => {
-  const rp = _spawnRelay(process.execPath, [require('path').join(__dirname, 'relay.js')], {
-    stdio: 'inherit', env: { ...process.env }
-  })
-  rp.on('error', e => console.error('[RELAY] Error:', e.message))
-  process.on('exit', () => rp.kill())
-  console.log('[M4TR1X] Embedded Nostr relay starting on ws://localhost:4848')
+  try {
+    require('./relay')
+    console.log('[M4TR1X] Embedded Nostr relay starting on ws://localhost:4848')
+  } catch (e) {
+    console.error('[RELAY] Failed to start relay:', e.message)
+  }
 })
-
 // âââ Config âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 const MAX_FILE_MB      = parseInt(process.env.MAX_FILE_SIZE_MB || '100')
 const API_KEY          = process.env.M4TR1X_API_KEY || ''
