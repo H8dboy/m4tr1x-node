@@ -140,6 +140,7 @@
 
   // Viewer: connect to live stream via WebRTC
   async function joinLiveStream(s){
+    if(!S.pubkey){toast('LOGIN FIRST');return;}
     document.getElementById('liveview-modal').style.display='flex';
     document.getElementById('liveview-title').textContent=s.title;
     document.getElementById('liveview-author').textContent=shortenKey(s.pubkey)+' · '+s.category.toUpperCase();
@@ -251,6 +252,15 @@
         </div>
         <div class="shop-grid" id="shop-grid"><div class="slide-placeholder" style="grid-column:span 2"><div class="ph-text">[ LOADING MARKETPLACE... ]</div></div></div>
         <div class="shop-powered">DECENTRALIZED MARKETPLACE · M4TR1X TOKEN ECONOMY</div>
+      </div>
+    </div>
+    <div class="section-feed" id="feed-live">
+      <div style="padding:16px">
+        <div style="display:flex;gap:10px;margin-bottom:16px">
+          <button class="go-live-btn" onclick="openGoLive()" style="flex:1">🔴 GO LIVE</button>
+          <button class="go-live-btn" onclick="stopGoLive()" style="flex:1;background:rgba(255,255,255,0.06)">⏹ STOP</button>
+        </div>
+        <div id="live-streams-list"><div class="slide-placeholder"><div class="ph-text" style="color:rgba(255,0,68,0.3)">[ NO LIVE STREAMS ]\n\nBe the first to go live.</div></div></div>
       </div>
     </div>
     <div class="section-feed" id="feed-dm">
@@ -842,7 +852,7 @@
     async getSession(peerPubkey) {
       if (this.sessions[peerPubkey]) return this.sessions[peerPubkey];
       // Derive initial shared secret from Nostr keys (seed for Signal session)
-      const seed = new TextEncoder().encode(S.pubkey + peerPubkey + 'm4tr1x-signal');
+      const seed = new TextEncoder().encode((S.pubkey||'anon') + peerPubkey + 'm4tr1x-signal');
       const hashBuffer = await crypto.subtle.digest('SHA-256', seed);
       const sharedKey = new Uint8Array(hashBuffer);
       this.sessions[peerPubkey] = {
@@ -879,7 +889,7 @@
     }
   };
   // ========== STATE ==========
-  const S={pubkey:window._pk,method:window._method,privkey:window._priv,muted:true,section:'signal',loaded:{signal:false,film:false,music:false,forum:false,shop:false,dm:false,live:false},cmtEventId:null,zapEventId:null,zapPubkey:null,zapCreatorH8Id:null,file:null,uploadCat:'signal',tokenBalance:0,tokenAmount:0,dmTarget:null,fwPlaying:null,h8address:null};
+  const S={pubkey:window._pk,method:window._method,privkey:window._priv,muted:true,section:'signal',loaded:{signal:false,film:false,music:false,forum:false,shop:false,dm:false,live:true},cmtEventId:null,zapEventId:null,zapPubkey:null,zapCreatorH8Id:null,file:null,uploadCat:'signal',tokenBalance:0,tokenAmount:0,dmTarget:null,fwPlaying:null,h8address:null};
   const RELAYS=CONFIG.relays;
   const BLOSSOM=CONFIG.blossom;
   const CAT_TAG={signal:'m4tr1x-signal',film:'m4tr1x-film',music:'m4tr1x-music'};
@@ -1018,18 +1028,19 @@
 
   // ========== SECTION SWITCH ==========
   // Section label map
-  const SEC_LABELS = {signal:'📡 SIGNAL',film:'🎬 FILM',music:'🎵 MUSIC',forum:'🏛️ FORUM',shop:'🛍️ SHOP',dm:'💬 MESSAGES'};
+  const SEC_LABELS = {signal:'📡 SIGNAL',film:'🎬 FILM',music:'🎵 MUSIC',forum:'🏛️ FORUM',shop:'🛍️ SHOP',dm:'💬 MESSAGES',live:'🔴 LIVE'};
 
   function switchSec(name){
     S.section=name;
     document.querySelectorAll('.sec-tab').forEach(t=>{const secName=t.getAttribute('onclick').match(/'(\w+)'/)[1];t.classList.toggle('active',secName===name)});
     document.querySelectorAll('.section-feed').forEach(f=>f.classList.remove('active'));
-    document.getElementById('feed-'+name).classList.add('active');
+    const feedEl=document.getElementById('feed-'+name);if(feedEl)feedEl.classList.add('active');
     document.querySelectorAll('.section-banner').forEach(b=>b.classList.remove('show'));
-    if(name!=='signal')document.getElementById('banner-'+name).classList.add('show');
+    if(name!=='signal'){const bn=document.getElementById('banner-'+name);if(bn)bn.classList.add('show');}
     document.querySelectorAll('.bnav').forEach(b=>b.classList.remove('active'));
-    const bmap={signal:'bnav-signal',film:'bnav-film',music:'bnav-music',forum:'bnav-forum',shop:'bnav-shop',dm:'bnav-dm'};
-    if(bmap[name])document.getElementById(bmap[name]).classList.add('active');
+    const bmap={signal:'bnav-signal',film:'bnav-film',music:'bnav-music',forum:'bnav-forum',shop:'bnav-shop',dm:'bnav-dm',live:'bnav-live'};
+    if(bmap[name]){const bn=document.getElementById(bmap[name]);if(bn)bn.classList.add('active');}
+    if(name==='live')loadLiveStreams();
     document.getElementById('forum-fab').classList.toggle('show',name==='forum');
     document.getElementById('shop-fab').classList.toggle('show',name==='shop');
     document.getElementById('mute-btn').style.display=(name==='signal'||name==='film'||name==='music')?'flex':'none';
@@ -1081,6 +1092,7 @@
     if(sec==='music'){loadFunkwhale();loadNostrMusic();return}
     if(sec==='film'){loadPeerTube();loadNostrFilm();return}
     const c=document.getElementById('feed-'+sec);
+    if(!c)return;
     c.innerHTML='<div class="slide-placeholder"><div class="ph-text">[ SCANNING... ]</div></div>';
     const buf = [];
     let renderTimer = null;
@@ -1602,7 +1614,7 @@
 
   async function sendDm() {
     const inp = document.getElementById('dm-msg-input'); const txt = inp.value.trim();
-    if (!txt || !S.dmTarget) return;
+    if (!txt || !S.dmTarget || !S.pubkey) return;
     try {
       // Encrypt with Signal Protocol (Double Ratchet)
       const { ciphertext } = await SignalEngine.encryptMessage(S.dmTarget, txt);
@@ -2518,7 +2530,7 @@
       fill.style.width='100%';
       ptxt.textContent=(aiVerdict?aiVerdict.verdict_emoji+' '+aiVerdict.verdict+' — ':'')+' PUBLISHED ✓';
       toast('BROADCAST COMPLETE'+(aiVerdict?' · AI: '+aiVerdict.verdict:''));
-      setTimeout(()=>{closeUpload();seen[S.uploadCat].add(signed.id);const c=document.getElementById('feed-'+S.uploadCat);const ph=c.querySelector('.slide-placeholder');if(ph)ph.remove();c.insertBefore(mkSlide(signed,vurl,S.uploadCat),c.firstChild);switchSec(S.uploadCat)},1200);
+      setTimeout(()=>{closeUpload();seen[S.uploadCat].add(signed.id);const c=document.getElementById('feed-'+S.uploadCat);if(c){const ph=c.querySelector('.slide-placeholder');if(ph)ph.remove();c.insertBefore(mkSlide(signed,vurl,S.uploadCat),c.firstChild);}switchSec(S.uploadCat)},1200);
     }catch(e){toast('ERROR: '+e.message);ptxt.textContent='FAILED';fill.style.width='0%';btn.disabled=false;btn.textContent='PUBLISH ON NOSTR'}
   }
 
@@ -2794,11 +2806,11 @@
   // NOSTR SIGNING (nostr-tools v2 — uses finalizeEvent, not signEvent)
   async function signEv(event){
     if(S.method==='extension'&&window.nostr)return await window.nostr.signEvent(event);
-    if(S.privkey&&window.NostrTools){
+    if(S.privkey&&window.NostrTools&&window.NostrTools.finalizeEvent){
       const sk=window.NostrTools.hexToBytes?window.NostrTools.hexToBytes(S.privkey):Uint8Array.from(S.privkey.match(/.{2}/g).map(b=>parseInt(b,16)));
       return window.NostrTools.finalizeEvent(event,sk);
     }
-    throw new Error('No signing method');
+    throw new Error(S.privkey?'nostr-tools not loaded':'No signing method');
   }
   function broadcast(ev){Object.values(ws).forEach(r=>{if(r.ok&&r.w.readyState===1)r.w.send(JSON.stringify(['EVENT',ev]))})}
 
@@ -2814,6 +2826,7 @@
     _hlSet = new Set();
     const isMe = pk === S.pubkey;
     const row = document.getElementById('prof-highlights');
+    if(!row)return;
     row.innerHTML = '';
     row.classList.add('hl-hidden');
 

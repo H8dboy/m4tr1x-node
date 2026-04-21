@@ -790,6 +790,64 @@ app.post('/api/v1/profile/post', async (req, res) => {
 
 // âââ Serve nostr-tools bundle da node_modules (evita dipendenza CDN esterna) ââ
 // Cerca il bundle in ordine: build CommonJS â bundle UMD â fallback 404
+// ─── Config ───────────────────────────────────────────────────────────────────
+app.get('/api/v1/config', (req, res) => {
+  res.json({ privateNodeUrl: getPrivateNodeUrl() || null })
+})
+
+// ─── Node Manager API ─────────────────────────────────────────────────────────
+app.get('/api/v1/node/config', (req, res) => {
+  res.json({ config: getNodeConfig() })
+})
+
+app.post('/api/v1/node/declare', async (req, res) => {
+  try {
+    const { capabilities, wsPort } = req.body
+    const cfg = await declareNode(capabilities, wsPort)
+    res.json({ ok: true, config: cfg })
+  } catch (err) {
+    res.status(400).json({ ok: false, error: err.message })
+  }
+})
+
+app.post('/api/v1/node/resign', (req, res) => {
+  resignNode()
+  res.json({ ok: true })
+})
+
+app.get('/api/v1/node/peers', (req, res) => {
+  const { capability } = req.query
+  res.json({ nodes: discoverNodes(capability) })
+})
+
+// ─── Live Streaming API ───────────────────────────────────────────────────────
+app.get('/api/v1/live/streams', (req, res) => {
+  const { category } = req.query
+  res.json({ streams: listStreams(category) })
+})
+
+app.post('/api/v1/live/start', async (req, res) => {
+  try {
+    const { title, category } = req.body
+    const keys = loadSavedKeys()
+    if (!keys) return res.status(401).json({ ok: false, error: 'Not logged in' })
+    const stream = await startStream({ title, category, pubkey: keys.pubkey })
+    res.json({ ok: true, stream })
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message })
+  }
+})
+
+app.post('/api/v1/live/stop', async (req, res) => {
+  try {
+    const { streamId } = req.body
+    await stopStream(streamId)
+    res.json({ ok: true })
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message })
+  }
+})
+
 app.get('/libs/nostr.bundle.js', (req, res) => {
   const candidates = [
     path.join(__dirname, 'node_modules', 'nostr-tools', 'lib', 'nostr.bundle.js'),
