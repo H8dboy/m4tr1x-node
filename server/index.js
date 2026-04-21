@@ -23,8 +23,6 @@ const {
   identityExists, getPublicInfo,
 } = require('./h8identity')
 const {
-const {
-const {
   generateKeys, loadSavedKeys, loadKeys, getCurrentPubkey,
   connectToRelays, getConnectedRelays,
   publishNote, publishVideoAttestation,

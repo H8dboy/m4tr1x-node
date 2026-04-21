@@ -10,7 +10,7 @@
  *    (the actual WebRTC negotiation happens in the browser via the frontend JS)
  */
 
-const { publishNote, sendEncryptedDM, getCurrentPubkey } = require('./nostr')
+const { publishNote, sendEncryptedDM, getCurrentPubkey, loadSavedKeys } = require('./nostr')
 
 const LIVE_TAG   = 'm4tr1x-live'
 const LIVE_KIND  = 1
@@ -24,20 +24,17 @@ async function startStream({ title, category = 'reels', pubkey }) {
   const startedAt = Math.floor(Date.now() / 1000)
 
   // Publish stream announcement to Nostr
-  const content = JSON.stringify({
-    type:     LIVE_TAG,
-    streamId,
-    title:    title || 'Live Stream',
-    category,
-    startedAt,
-  })
-  await publishNote(content, [
-    ['t', LIVE_TAG],
-    ['t', `m4tr1x-live-${category}`],
-    ['stream-id', streamId],
-    ['title', title || 'Live Stream'],
-    ['category', category],
-  ])
+  const content = JSON.stringify({ type: LIVE_TAG, streamId, title: title || 'Live Stream', category, startedAt })
+  const keys = loadSavedKeys()
+  if (keys) {
+    await publishNote(content, keys.privkey, [
+      ['t', LIVE_TAG],
+      ['t', `m4tr1x-live-${category}`],
+      ['stream-id', streamId],
+      ['title', title || 'Live Stream'],
+      ['category', category],
+    ])
+  }
 
   const stream = { streamId, title, category, pubkey, startedAt, viewerCount: 0 }
   activeStreams.set(streamId, stream)
@@ -50,10 +47,13 @@ async function stopStream(streamId) {
   const stream = activeStreams.get(streamId)
   if (!stream) return false
 
-  await publishNote(JSON.stringify({ type: 'm4tr1x-live-end', streamId }), [
-    ['t', 'm4tr1x-live-end'],
-    ['stream-id', streamId],
-  ])
+  const keys = loadSavedKeys()
+  if (keys) {
+    await publishNote(JSON.stringify({ type: 'm4tr1x-live-end', streamId }), keys.privkey, [
+      ['t', 'm4tr1x-live-end'],
+      ['stream-id', streamId],
+    ])
+  }
 
   activeStreams.delete(streamId)
   console.log(`[LIVE] Stream stopped: ${streamId}`)

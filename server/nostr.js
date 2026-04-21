@@ -283,6 +283,15 @@ function cleanup () {
   _connectedRelays = []
 }
 
+// ── Subscribe to feed (server-side, persistent) ───────────────────────────────
+function subscribeToFilter (filter, onEvent) {
+  const pool = getPool()
+  const sub = pool.subscribeMany(DEFAULT_RELAYS, [filter], {
+    onevent (e) { try { onEvent(e) } catch {} }
+  })
+  return () => { try { sub.close() } catch {} }
+}
+
 // ── Exports ───────────────────────────────────────────────────────────────────
 module.exports = {
   generateKeys,
@@ -298,6 +307,7 @@ module.exports = {
   publishVideoAttestation,
   publishProfile,
   fetchFeed,
+  subscribeToFilter,
   sendEncryptedDM,
   decryptDM,
   fetchDMs,

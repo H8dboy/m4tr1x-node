@@ -190,7 +190,7 @@ Press GO LIVE above.</div></div>';return;}
     <button class="bnav post-nav" onclick="openUpload()"><span class="bicon">＋</span><span class="bnav-label">POST</span></button>
     <button class="bnav music-nav" id="bnav-music" onclick="switchSec('music')"><span class="bicon">🎵</span><span class="bnav-label">MUSIC</span></button>
     <button class="bnav shop-nav" id="bnav-shop" onclick="switchSec('shop')"><span class="bicon">🛍️</span><span class="bnav-label">SHOP</span></button>
-    <button class="bnav live-nav" id="bnav-live" onclick="switchSec('live')"><span class="bicon">🔴</span><span class="bnav-label">LIVE</span></button>
+    <button class="bnav live-nav" id="bnav-live" onclick="switchSec('live')" style="position:relative"><span class="bicon">🔴</span><span class="bnav-label">LIVE</span><span id="live-count-badge" style="display:none;position:absolute;top:4px;right:4px;background:var(--red);color:#fff;font-size:0.5em;font-family:var(--font-mono);border-radius:8px;padding:1px 5px;min-width:16px;text-align:center;letter-spacing:0"></span></button>
     <button class="bnav dm-nav" id="bnav-dm" onclick="switchSec('dm')" style="position:relative"><span class="bicon">💬</span><span class="bnav-label">DM</span><span id="dm-unread-badge" style="display:none;position:absolute;top:4px;right:4px;background:var(--red);color:#fff;font-size:0.5em;font-family:var(--font-mono);border-radius:8px;padding:1px 5px;min-width:16px;text-align:center;letter-spacing:0"></span></button>
   </div>
   <button class="forum-new-btn" id="forum-fab" onclick="openForumModal()">＋</button>
@@ -813,8 +813,26 @@ Press GO LIVE above.</div></div>';return;}
   })();
 
   window.addEventListener('load',()=>{
+    // Load private node URL then initialize wallet
+    fetch('/api/v1/config').then(r=>r.json()).then(cfg=>{
+      if(cfg.privateNodeUrl) S.privateNodeUrl=cfg.privateNodeUrl;
+    }).catch(()=>{});
+
+    // Live badge polling every 30s
+    function pollLiveBadge(){
+      fetch('/api/v1/live/streams').then(r=>r.json()).then(d=>{
+        const badge=document.getElementById('live-count-badge');
+        if(!badge)return;
+        const n=(d.streams||[]).length;
+        if(n>0){badge.textContent=n;badge.style.display='block';}
+        else badge.style.display='none';
+      }).catch(()=>{});
+    }
+    setTimeout(pollLiveBadge,2000);
+    setInterval(pollLiveBadge,30000);
+
     // Carica H8 address e stato wallet in sessione
-    fetch('http://localhost:8080/api/v1/h8/wallet/status').then(r=>r.json()).then(d=>{
+    fetch((S.privateNodeUrl||'')+'/api/v1/h8/wallet/status').then(r=>r.json()).then(d=>{
       if(d?.address) S.h8address=d.address;
       if(d?.balance !== undefined) { S.tokenBalance=d.balance; updateTopbarH8(d.balance); }
       if(d?.locked===false && d?.balance > 0) {
@@ -909,7 +927,7 @@ Press GO LIVE above.</div></div>';return;}
     let scores = {};
     try {
       const ids = items.map(i => i.ev.id).join(',');
-      scores = await fetch('http://localhost:8080/api/v1/h8/boost/batch?ids=' + encodeURIComponent(ids))
+      scores = await fetch((S.privateNodeUrl||'')+'/api/v1/h8/boost/batch?ids=' + encodeURIComponent(ids))
         .then(r => r.json());
     } catch(e) {}
     // Boosted content first, then newest
@@ -1488,6 +1506,10 @@ Press GO LIVE above.</div></div>';return;}
   // ========== SHOP / MARKETPLACE ==========
   function loadShop(){
     const grid=document.getElementById('shop-grid');
+    if(!S.privateNodeUrl){
+      grid.innerHTML='<div class="slide-placeholder" style="grid-column:span 2"><div class="ph-text" style="color:rgba(255,154,60,0.4);line-height:2">[ MARKETPLACE ]\n\nConnected to M4TR1X network.\nShop and payments are managed\nby the official M4TR1X node.\n\n<span style="font-size:0.8em;opacity:0.5">node.m4tr1x.app</span></div></div>';
+      return;
+    }
     grid.innerHTML='<div class="slide-placeholder" style="grid-column:span 2"><div class="ph-text">[ LOADING MARKETPLACE... ]</div></div>';
     Object.entries(ws).forEach(([url,r])=>{
       if(!r.ok)return;
@@ -1543,8 +1565,9 @@ Press GO LIVE above.</div></div>';return;}
     closeTokenModal();
   }
   async function refreshH8Balance(){
+    if(!S.privateNodeUrl){updateTopbarH8('—');return;}
     try{
-      const r=await fetch('http://localhost:8080/api/v1/h8/balance');
+      const r=await fetch(S.privateNodeUrl+'/api/v1/h8/balance');
       if(r.ok){
         const d=await r.json();
         S.tokenBalance=d.balance||0;
@@ -2013,7 +2036,7 @@ Press GO LIVE above.</div></div>';return;}
     // Check wallet status
     let walletLocked = true;
     try {
-      const wstatus = await fetch('http://localhost:8080/api/v1/h8/wallet/status').then(r=>r.json());
+      const wstatus = await fetch((S.privateNodeUrl||'')+'/api/v1/h8/wallet/status').then(r=>r.json());
       walletLocked = wstatus.locked;
       const bal = wstatus.balance || 0;
       document.getElementById('zap-balance-display').textContent = bal;
@@ -2035,7 +2058,7 @@ Press GO LIVE above.</div></div>';return;}
     if(btn){btn.disabled=true;btn.textContent='INVIO...'}
     try{
       const creatorAddress=S.zapCreatorH8Id||('nostr_'+S.zapPubkey.substring(0,38));
-      const r=await fetch('http://localhost:8080/api/v1/h8/tip',{
+      const r=await fetch((S.privateNodeUrl||'')+'/api/v1/h8/tip',{
         method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({creatorAddress,amount,contentId:S.zapEventId||''})
       });
@@ -2064,12 +2087,12 @@ Press GO LIVE above.</div></div>';return;}
     document.querySelectorAll('.boost-btn').forEach(b=>b.style.borderColor='rgba(255,209,102,0.25)');
     // Show current boost score
     try {
-      const sc = await fetch('http://localhost:8080/api/v1/h8/boost/'+eid).then(r=>r.json());
+      const sc = await fetch((S.privateNodeUrl||'')+'/api/v1/h8/boost/'+eid).then(r=>r.json());
       const lbl = document.getElementById('bstlbl-'+eid);
       if(lbl && sc.score > 0) lbl.textContent = sc.score+' H8';
     } catch(e) {}
     try {
-      const wstatus = await fetch('http://localhost:8080/api/v1/h8/wallet/status').then(r=>r.json());
+      const wstatus = await fetch((S.privateNodeUrl||'')+'/api/v1/h8/wallet/status').then(r=>r.json());
       document.getElementById('boost-balance').textContent = wstatus.locked ? 'LOCKED' : (wstatus.balance||0);
       if(wstatus.locked){toast('H8 WALLET BLOCCATO — sblocca prima di boostare');openWalletModal();return}
     } catch(e) {}
@@ -2087,7 +2110,7 @@ Press GO LIVE above.</div></div>';return;}
     if(!amount||amount<=0){toast('SELEZIONA UN IMPORTO');return}
     if(!_boostTarget){closeBoostModal();return}
     try{
-      const r=await fetch('http://localhost:8080/api/v1/h8/boost',{
+      const r=await fetch((S.privateNodeUrl||'')+'/api/v1/h8/boost',{
         method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({contentId:_boostTarget,amount})
       });
@@ -2113,7 +2136,7 @@ Press GO LIVE above.</div></div>';return;}
 
   async function refreshWalletModal() {
     try {
-      const ws = await fetch('http://localhost:8080/api/v1/h8/wallet/status').then(r=>r.json()); // local scope intentional
+      const ws = await fetch((S.privateNodeUrl||'')+'/api/v1/h8/wallet/status').then(r=>r.json()); // local scope intentional
       if(!ws.exists){
         document.getElementById('wallet-status-block').style.display='none';
         document.getElementById('wallet-unlock-form').style.display='none';
@@ -2152,7 +2175,7 @@ Press GO LIVE above.</div></div>';return;}
       document.getElementById('wallet-pw-input').focus();
     } else {
       // Lock
-      fetch('http://localhost:8080/api/v1/h8/wallet/lock',{method:'POST'})
+      fetch((S.privateNodeUrl||'')+'/api/v1/h8/wallet/lock',{method:'POST'})
         .then(()=>{toast('🔒 Wallet bloccato');refreshWalletModal();refreshH8Balance();updateTopbarH8(0)})
         .catch(e=>toast('Errore: '+e.message));
     }
@@ -2163,7 +2186,7 @@ Press GO LIVE above.</div></div>';return;}
     if(!pw){document.getElementById('wallet-pw-error').style.display='block';document.getElementById('wallet-pw-error').textContent='Inserisci la password';return}
     const errEl = document.getElementById('wallet-pw-error');
     try{
-      const r = await fetch('http://localhost:8080/api/v1/h8/wallet/unlock',{
+      const r = await fetch((S.privateNodeUrl||'')+'/api/v1/h8/wallet/unlock',{
         method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({password:pw})
       });
@@ -2194,7 +2217,7 @@ Press GO LIVE above.</div></div>';return;}
     if(!pw1||pw1.length<8){errEl.style.display='block';errEl.textContent='Password troppo corta (min 8 caratteri)';return}
     if(pw1!==pw2){errEl.style.display='block';errEl.textContent='Le password non corrispondono';return}
     try{
-      const r = await fetch('http://localhost:8080/api/v1/h8/wallet/create',{
+      const r = await fetch((S.privateNodeUrl||'')+'/api/v1/h8/wallet/create',{
         method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({password:pw1})
       });
@@ -2205,7 +2228,7 @@ Press GO LIVE above.</div></div>';return;}
       errEl.style.display='none';
       toast('⚡ Wallet H8 creato! Indirizzo: '+d.address.substring(0,16)+'…');
       // Auto-unlock
-      await fetch('http://localhost:8080/api/v1/h8/wallet/unlock',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:pw1})});
+      await fetch((S.privateNodeUrl||'')+'/api/v1/h8/wallet/unlock',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:pw1})});
       refreshWalletModal();
     } catch(e){errEl.style.display='block';errEl.textContent=e.message}
   }
@@ -2215,10 +2238,10 @@ Press GO LIVE above.</div></div>';return;}
     if(!el) return;
     el.innerHTML = '<div style="color:rgba(0,255,136,0.3);letter-spacing:2px;padding:8px 0;animation:pulse 1s infinite">CARICAMENTO...</div>';
     try{
-      const r = await fetch('http://localhost:8080/api/v1/h8/history?limit=20');
+      const r = await fetch((S.privateNodeUrl||'')+'/api/v1/h8/history?limit=20');
       const txs = await r.json();
       if(!Array.isArray(txs)||!txs.length){el.innerHTML='<div style="color:rgba(0,255,136,0.2);letter-spacing:1px;padding:8px 0;font-size:0.9em">Nessuna transazione</div>';return}
-      const info = await fetch('http://localhost:8080/api/v1/h8/wallet/status').then(r=>r.json());
+      const info = await fetch((S.privateNodeUrl||'')+'/api/v1/h8/wallet/status').then(r=>r.json());
       const myAddr = info.address||'';
       el.innerHTML = txs.map(tx=>{
         const isIn = tx.to_id === myAddr;
@@ -2332,7 +2355,7 @@ Press GO LIVE above.</div></div>';return;}
           ptForm.append('description',document.getElementById('up-caption')?.value||'');
           const tagStr=document.getElementById('up-tags')?.value||'';
           ptForm.append('tags','m4tr1x m4tr1x-film'+(filmGenre?' '+filmGenre:'')+(tagStr?' '+tagStr:''));
-          const ptRes=await fetch('http://localhost:8080/api/v1/peertube/upload',{method:'POST',body:ptForm});
+          const ptRes=await fetch('/api/v1/peertube/upload',{method:'POST',body:ptForm});
           if(ptRes.ok){
             const ptData=await ptRes.json();
             peertubeUrl=ptData.watch_url;
@@ -2525,7 +2548,7 @@ Press GO LIVE above.</div></div>';return;}
       toast('✅ PROFILE UPDATED');
       // Propaga il profilo aggiornato su tutti i protocolli collegati
       if (S.h8address) {
-        fetch('http://localhost:8080/api/v1/profile/sync', {
+        fetch('/api/v1/profile/sync', {
           method: 'POST',
           headers: {'Content-Type':'application/json'},
           body: JSON.stringify({ h8address: S.h8address, name: name||'', bio: about||'', picture: picture||'' })
@@ -2970,11 +2993,11 @@ Press GO LIVE above.</div></div>';return;}
   let _composeH8Address = null;
 
   async function openCompose() {
-    const info = await fetch('http://localhost:8080/api/v1/h8/wallet/status').then(r=>r.json()).catch(()=>null);
+    const info = await fetch((S.privateNodeUrl||'')+'/api/v1/h8/wallet/status').then(r=>r.json()).catch(()=>null);
     if (!info?.address) { toast('H8 WALLET LOCKED — unlock first'); return; }
     _composeH8Address = info.address;
     // Load connected protocols
-    const protocols = await fetch('http://localhost:8080/api/v1/profile/protocols?h8address=' + encodeURIComponent(info.address))
+    const protocols = await fetch('/api/v1/profile/protocols?h8address=' + encodeURIComponent(info.address))
       .then(r=>r.json()).catch(()=>[]);
     const protoMap = {};
     protocols.forEach(p => { protoMap[p.protocol] = p; });
@@ -3014,7 +3037,7 @@ Press GO LIVE above.</div></div>';return;}
     const resultsEl = document.getElementById('compose-results');
     resultsEl.innerHTML = '<span style="color:rgba(0,170,255,0.5);animation:pulse 1s infinite">BROADCASTING...</span>';
     try {
-      const r = await fetch('http://localhost:8080/api/v1/profile/post', {
+      const r = await fetch('/api/v1/profile/post', {
         method: 'POST',
         headers: {'Content-Type':'application/json'},
         body: JSON.stringify({ h8address: _composeH8Address, text, tags })
@@ -3037,7 +3060,7 @@ Press GO LIVE above.</div></div>';return;}
 
   // ========== PROTOCOL ACCOUNTS MANAGEMENT ==========
   async function openProtoConnect() {
-    const info = await fetch('http://localhost:8080/api/v1/h8/wallet/status').then(r=>r.json()).catch(()=>null);
+    const info = await fetch((S.privateNodeUrl||'')+'/api/v1/h8/wallet/status').then(r=>r.json()).catch(()=>null);
     if (!info?.address) { toast('H8 WALLET LOCKED'); return; }
     _composeH8Address = info.address;
     await renderConnectedAccounts();
@@ -3051,7 +3074,7 @@ Press GO LIVE above.</div></div>';return;}
 
   async function renderConnectedAccounts() {
     if (!_composeH8Address) return;
-    const protocols = await fetch('http://localhost:8080/api/v1/profile/protocols?h8address=' + encodeURIComponent(_composeH8Address))
+    const protocols = await fetch('/api/v1/profile/protocols?h8address=' + encodeURIComponent(_composeH8Address))
       .then(r=>r.json()).catch(()=>[]);
     const list = document.getElementById('proto-connected-list');
     if (!protocols.length) {
@@ -3071,7 +3094,7 @@ Press GO LIVE above.</div></div>';return;}
 
   async function disconnectProto(protocol) {
     if (!_composeH8Address) return;
-    await fetch('http://localhost:8080/api/v1/profile/protocols/' + protocol + '?h8address=' + encodeURIComponent(_composeH8Address), { method: 'DELETE' });
+    await fetch('/api/v1/profile/protocols/' + protocol + '?h8address=' + encodeURIComponent(_composeH8Address), { method: 'DELETE' });
     toast(protocol.toUpperCase() + ' DISCONNECTED');
     renderConnectedAccounts();
   }
@@ -3083,7 +3106,7 @@ Press GO LIVE above.</div></div>';return;}
     const token    = document.getElementById('proto-token').value.trim();
     const username = document.getElementById('proto-username').value.trim();
     if (!instance || !token) { toast('INSTANCE E TOKEN RICHIESTI'); return; }
-    const r = await fetch('http://localhost:8080/api/v1/profile/protocols/connect', {
+    const r = await fetch('/api/v1/profile/protocols/connect', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
       body: JSON.stringify({ h8address: _composeH8Address, protocol, instance, accessToken: token, username: username || null })
@@ -3116,7 +3139,7 @@ Press GO LIVE above.</div></div>';return;}
     syncEl.innerHTML = '<span style="color:rgba(0,255,65,0.4);animation:pulse 1s infinite">SYNCING...</span>';
     const profile = getMyProfile();
     try {
-      const r = await fetch('http://localhost:8080/api/v1/profile/sync', {
+      const r = await fetch('/api/v1/profile/sync', {
         method: 'POST',
         headers: {'Content-Type':'application/json'},
         body: JSON.stringify({ h8address: _composeH8Address, ...profile })
@@ -3189,7 +3212,7 @@ Press GO LIVE above.</div></div>';return;}
     const price    = parseInt(priceStr);
     if(isNaN(price)||price<=0) { toast('PREZZO NON VALIDO'); return; }
     let wstatus;
-    try { wstatus = await fetch('http://localhost:8080/api/v1/h8/wallet/status').then(r=>r.json()); }
+    try { wstatus = await fetch((S.privateNodeUrl||'')+'/api/v1/h8/wallet/status').then(r=>r.json()); }
     catch(e) { toast('WALLET OFFLINE'); return; }
     if(wstatus.locked) { toast('WALLET BLOCCATO'); openWalletModal(); return; }
     if((wstatus.balance||0) < price) { toast('SALDO INSUFFICIENTE — hai '+(wstatus.balance||0)+' H8'); return; }
@@ -3198,7 +3221,7 @@ Press GO LIVE above.</div></div>';return;}
     btn.textContent = 'ACQUISTO IN CORSO...';
     try {
       const sellerAddr = 'nostr_' + _shopItem.pubkey.substring(0,38);
-      const r = await fetch('http://localhost:8080/api/v1/h8/tip', {
+      const r = await fetch((S.privateNodeUrl||'')+'/api/v1/h8/tip', {
         method: 'POST',
         headers: { 'Content-Type':'application/json' },
         body: JSON.stringify({ creatorAddress: sellerAddr, amount: price, contentId: _shopItem.id })
@@ -3223,7 +3246,7 @@ Press GO LIVE above.</div></div>';return;}
   async function syncProfileToOne(protocol) {
     if (!_composeH8Address) return;
     const profile = getMyProfile();
-    fetch('http://localhost:8080/api/v1/profile/sync/' + protocol, {
+    fetch('/api/v1/profile/sync/' + protocol, {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
       body: JSON.stringify({ h8address: _composeH8Address, ...profile })

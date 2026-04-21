@@ -7,7 +7,7 @@
 
 const path = require('path')
 const fs   = require('fs')
-const { publishNote, getCurrentPubkey, wsSub } = require('./nostr')
+const { publishNote, getCurrentPubkey, loadSavedKeys, subscribeToFilter } = require('./nostr')
 
 const NODE_KIND    = 30078
 const NODE_TAG     = 'm4tr1x-node'
@@ -44,14 +44,18 @@ async function declareNode(capabilities, wsPort = 4848) {
   saveNodeConfig(cfg)
 
   // Publish to Nostr so other peers discover this node
-  await publishNote(
-    JSON.stringify({ type: NODE_TAG, capabilities: validCaps, port: wsPort }),
-    [
-      ['t', NODE_TAG],
-      ['caps', validCaps.join(',')],
-      ['port', String(wsPort)],
-    ]
-  )
+  const keys = loadSavedKeys()
+  if (keys) {
+    await publishNote(
+      JSON.stringify({ type: NODE_TAG, capabilities: validCaps, port: wsPort }),
+      keys.privkey,
+      [
+        ['t', NODE_TAG],
+        ['caps', validCaps.join(',')],
+        ['port', String(wsPort)],
+      ]
+    )
+  }
 
   nodeRegistry.set(pubkey, { pubkey, capabilities: validCaps, wsPort, ts: Date.now() })
   console.log(`[NODE] Declared as node: ${validCaps.join(', ')}`)
@@ -79,7 +83,7 @@ function discoverNodes(capability) {
 // ─── Subscribe to node announcements from the Nostr relay ────────────────────
 function startNodeDiscovery() {
   const since = Math.floor(Date.now() / 1000) - 600  // last 10 min
-  wsSub('nodes', { kinds: [1], '#t': [NODE_TAG], since }, ev => {
+  subscribeToFilter({ kinds: [1], '#t': [NODE_TAG], since }, ev => {
     try {
       const data = JSON.parse(ev.content)
       if (data.type !== NODE_TAG) return
