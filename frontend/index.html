@@ -19,6 +19,81 @@
       };
       document.head.appendChild(s);
     })();
+
+  // NODE MANAGER
+  async function openNodeModal(){
+    document.getElementById('node-modal').style.display='flex';
+    const r=await fetch('/api/v1/node/config').then(r=>r.json()).catch(()=>({config:null}));
+    const st=document.getElementById('node-current-status');
+    if(r.config){
+      st.innerHTML='<div style="background:rgba(0,255,136,0.08);border:1px solid rgba(0,255,136,0.2);border-radius:10px;padding:10px;font-size:0.72em">⚡ NODE ACTIVE: <strong>'+r.config.capabilities.join(', ').toUpperCase()+'</strong></div>';
+      r.config.capabilities.forEach(cap=>{const cb=document.querySelector('#node-caps-grid input[value="'+cap+'"]');if(cb)cb.checked=true;});
+    }else{
+      st.innerHTML='<div style="font-size:0.72em;opacity:0.4">[ CLIENT-ONLY MODE ]</div>';
+    }
+  }
+  function closeNodeModal(){document.getElementById('node-modal').style.display='none';}
+  async function saveNodeConfig(){
+    const caps=[...document.querySelectorAll('#node-caps-grid input:checked')].map(cb=>cb.value);
+    if(!caps.length){toast('SELECT AT LEAST ONE CAPABILITY');return;}
+    const r=await fetch('/api/v1/node/declare',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({capabilities:caps})}).then(r=>r.json()).catch(e=>({error:e.message}));
+    if(r.ok){toast('NODE ACTIVATED: '+caps.join(', ').toUpperCase());closeNodeModal();}
+    else toast('ERROR: '+r.error);
+  }
+  async function resignNode(){
+    await fetch('/api/v1/node/resign',{method:'POST'});
+    document.querySelectorAll('#node-caps-grid input').forEach(cb=>cb.checked=false);
+    toast('NODE DEACTIVATED');closeNodeModal();
+  }
+  // LIVE STREAMING
+  let _liveStream=null,_liveMedia=null;
+  async function loadLiveStreams(){
+    const list=document.getElementById('live-streams-list');
+    if(!list)return;
+    const r=await fetch('/api/v1/live/streams').then(r=>r.json()).catch(()=>({streams:[]}));
+    if(!r.streams.length){list.innerHTML='<div class="slide-placeholder"><div class="ph-text" style="color:rgba(255,0,68,0.3)">[ NO LIVE STREAMS ]
+
+Be the first to go live.
+Press GO LIVE above.</div></div>';return;}
+    list.innerHTML='';
+    r.streams.forEach(s=>{
+      const div=document.createElement('div');div.className='live-card';
+      div.innerHTML='<div class="live-card-badge">● LIVE</div><div class="live-card-info"><div class="live-card-title">'+esc(s.title)+'</div><div class="live-card-meta">'+esc(s.category.toUpperCase())+' · '+shortenKey(s.pubkey)+'</div></div>';
+      div.onclick=()=>joinLiveStream(s);list.appendChild(div);
+    });
+  }
+  function openGoLive(){document.getElementById('golive-modal').style.display='flex';}
+  function closeGoLive(){
+    document.getElementById('golive-modal').style.display='none';
+    if(_liveMedia){_liveMedia.getTracks().forEach(t=>t.stop());_liveMedia=null;}
+    document.getElementById('live-preview-wrap').style.display='none';
+  }
+  async function startGoLive(){
+    if(!S.pubkey){toast('LOGIN FIRST');return;}
+    try{
+      _liveMedia=await navigator.mediaDevices.getUserMedia({video:true,audio:true});
+      document.getElementById('live-preview-video').srcObject=_liveMedia;
+      document.getElementById('live-preview-wrap').style.display='block';
+      const title=document.getElementById('live-title-input').value||'Live Stream';
+      const category=document.getElementById('live-cat-select').value;
+      const r=await fetch('/api/v1/live/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,category})}).then(r=>r.json());
+      if(r.ok){_liveStream=r.stream;toast('YOU ARE LIVE: '+title);closeGoLive();switchSec('live');loadLiveStreams();}
+      else toast('ERROR: '+r.error);
+    }catch(e){toast('CAMERA ERROR: '+e.message);}
+  }
+  async function stopGoLive(){
+    if(!_liveStream)return;
+    await fetch('/api/v1/live/stop',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({streamId:_liveStream.streamId})});
+    if(_liveMedia){_liveMedia.getTracks().forEach(t=>t.stop());_liveMedia=null;}
+    _liveStream=null;toast('STREAM ENDED');loadLiveStreams();
+  }
+  function joinLiveStream(s){
+    document.getElementById('liveview-modal').style.display='flex';
+    document.getElementById('liveview-title').textContent=s.title;
+    document.getElementById('liveview-author').textContent=shortenKey(s.pubkey)+' · '+s.category.toUpperCase();
+    if(_liveMedia)document.getElementById('liveview-video').srcObject=_liveMedia;
+  }
+  function closeLiveView(){document.getElementById('liveview-modal').style.display='none';}
   </script>
   <link rel="stylesheet" href="m4tr1x.css">
   <link rel="stylesheet" href="comfort.css">
@@ -36,6 +111,7 @@
         <button class="top-btn" onclick="openNotifDrawer()" title="Notifications">🔔</button>
         <div class="notif-dot" id="notif-dot"></div>
       </div>
+      <button class="top-btn" onclick="openNodeModal()" title="Node Settings" style="font-size:0.8em">⚡</button>
       <div id="user-avatar-top" onclick="openMyProfile()" title="My Profile">👤</div>
     </div>
   </div>
@@ -46,6 +122,7 @@
     <button class="sec-tab forum-tab" onclick="switchSec('forum')">🏛️</button>
     <button class="sec-tab shop-tab desktop-only" onclick="switchSec('shop')">🛍️</button>
     <button class="sec-tab dm-tab" onclick="switchSec('dm')">💬</button>
+    <button class="sec-tab live-tab" onclick="switchSec('live')">🔴</button>
   </div>
   <div class="section-banner" id="banner-film">
     <span class="banner-icon">🎬</span>
@@ -67,6 +144,7 @@
     <span class="banner-icon">💬</span>
     <div class="banner-text"><strong>PRIVATE MESSAGES</strong>Signal Protocol in-app · Double Ratchet + X3DH · No phone number <span class="integration-status live">E2E ENCRYPTED</span></div>
   </div>
+  <div class="section-banner" id="banner-live"><span class="banner-icon">🔴</span><div class="banner-text"><strong>LIVE STREAMS</strong> WebRTC P2P via Nostr signaling <span class="integration-status live">P2P LIVE</span></div></div>
   <button id="mute-btn" onclick="toggleMute()">🔇</button>
   <div id="feed-wrap">
     <div class="section-feed active" id="feed-signal"><div class="slide-placeholder"><div class="ph-text">[ CONNECTING TO RELAYS... ]</div></div></div>
@@ -112,6 +190,7 @@
     <button class="bnav post-nav" onclick="openUpload()"><span class="bicon">＋</span><span class="bnav-label">POST</span></button>
     <button class="bnav music-nav" id="bnav-music" onclick="switchSec('music')"><span class="bicon">🎵</span><span class="bnav-label">MUSIC</span></button>
     <button class="bnav shop-nav" id="bnav-shop" onclick="switchSec('shop')"><span class="bicon">🛍️</span><span class="bnav-label">SHOP</span></button>
+    <button class="bnav live-nav" id="bnav-live" onclick="switchSec('live')"><span class="bicon">🔴</span><span class="bnav-label">LIVE</span></button>
     <button class="bnav dm-nav" id="bnav-dm" onclick="switchSec('dm')" style="position:relative"><span class="bicon">💬</span><span class="bnav-label">DM</span><span id="dm-unread-badge" style="display:none;position:absolute;top:4px;right:4px;background:var(--red);color:#fff;font-size:0.5em;font-family:var(--font-mono);border-radius:8px;padding:1px 5px;min-width:16px;text-align:center;letter-spacing:0"></span></button>
   </div>
   <button class="forum-new-btn" id="forum-fab" onclick="openForumModal()">＋</button>
@@ -714,7 +793,7 @@
     }
   };
   // ========== STATE ==========
-  const S={pubkey:window._pk,method:window._method,privkey:window._priv,muted:true,section:'signal',loaded:{signal:false,film:false,music:false,forum:false,shop:false,dm:false},cmtEventId:null,zapEventId:null,zapPubkey:null,zapCreatorH8Id:null,file:null,uploadCat:'signal',tokenBalance:0,tokenAmount:0,dmTarget:null,fwPlaying:null,h8address:null};
+  const S={pubkey:window._pk,method:window._method,privkey:window._priv,muted:true,section:'signal',loaded:{signal:false,film:false,music:false,forum:false,shop:false,dm:false,live:false},cmtEventId:null,zapEventId:null,zapPubkey:null,zapCreatorH8Id:null,file:null,uploadCat:'signal',tokenBalance:0,tokenAmount:0,dmTarget:null,fwPlaying:null,h8address:null};
   const RELAYS=CONFIG.relays;
   const BLOSSOM=CONFIG.blossom;
   const CAT_TAG={signal:'m4tr1x-signal',film:'m4tr1x-film',music:'m4tr1x-music'};
@@ -3153,5 +3232,40 @@
     }).catch(() => {});
   }
   </script>
+  <div class="modal-overlay" id="node-modal" onclick="if(event.target===this)closeNodeModal()" style="display:none">
+  <div class="modal-box" style="max-height:85vh;overflow-y:auto">
+  <div class="modal-title">⚡ BECOME A NODE</div>
+  <div id="node-current-status" style="margin-bottom:16px"></div>
+  <div class="node-caps-grid" id="node-caps-grid">
+  <label class="node-cap-item"><input type="checkbox" value="reels"> <span>📹 REELS</span></label>
+  <label class="node-cap-item"><input type="checkbox" value="film"> <span>🎬 FILM</span></label>
+  <label class="node-cap-item"><input type="checkbox" value="music"> <span>🎵 MUSIC</span></label>
+  <label class="node-cap-item"><input type="checkbox" value="topic"> <span>🏛️ TOPIC</span></label>
+  <label class="node-cap-item"><input type="checkbox" value="shop"> <span>🛍️ SHOP</span></label>
+  <label class="node-cap-item"><input type="checkbox" value="crypto"> <span>💰 CRYPTO</span></label>
+  </div>
+  <div style="display:flex;gap:10px;margin-top:20px">
+  <button class="btn-pub" style="flex:1" onclick="saveNodeConfig()">ACTIVATE</button>
+  <button class="btn-pub" style="flex:1;background:rgba(255,68,85,0.15)!important;color:var(--red)!important" onclick="resignNode()">DEACTIVATE</button>
+  </div>
+  <button class="modal-close" onclick="closeNodeModal()">✕</button>
+  </div></div>
+  <div class="modal-overlay" id="golive-modal" onclick="if(event.target===this)closeGoLive()" style="display:none">
+  <div class="modal-box">
+  <div class="modal-title">🔴 GO LIVE</div>
+  <div class="field"><label>TITLE</label><input id="live-title-input" placeholder="What are you streaming?"></div>
+  <div class="field"><label>CATEGORY</label><select id="live-cat-select"><option value="reels">📹 Reels</option><option value="film">🎬 Film</option><option value="music">🎵 Music</option><option value="topic">🏛️ Topic</option></select></div>
+  <div id="live-preview-wrap" style="display:none;margin:12px 0;border-radius:12px;overflow:hidden;background:#000;aspect-ratio:9/16;max-height:280px"><video id="live-preview-video" autoplay muted playsinline style="width:100%;height:100%;object-fit:cover"></video></div>
+  <button class="btn-pub" style="width:100%;margin-bottom:10px" onclick="startGoLive()">🎥 START CAMERA + GO LIVE</button>
+  <button class="modal-close" onclick="closeGoLive()">✕</button>
+  </div></div>
+  <div class="modal-overlay" id="liveview-modal" onclick="if(event.target===this)closeLiveView()" style="display:none">
+  <div class="modal-box" style="padding:0;overflow:hidden;border-radius:16px">
+  <div style="position:relative;background:#000;aspect-ratio:9/16;max-height:70vh">
+  <video id="liveview-video" autoplay playsinline style="width:100%;height:100%;object-fit:cover"></video>
+  <div style="position:absolute;bottom:0;left:0;right:0;padding:16px;background:linear-gradient(transparent,rgba(0,0,0,0.8))"><div id="liveview-title" style="font-size:0.9em;font-weight:700;color:#fff"></div><div id="liveview-author" style="font-size:0.7em;color:rgba(255,255,255,0.6)"></div></div>
+  <button onclick="closeLiveView()" style="position:absolute;top:12px;right:12px;background:rgba(0,0,0,0.5);border:none;color:#fff;width:32px;height:32px;border-radius:50%;font-size:1em;cursor:pointer">✕</button>
+  <div style="position:absolute;top:12px;left:12px;background:var(--red);color:#fff;font-size:0.65em;font-family:var(--font-mono);padding:3px 8px;border-radius:6px;letter-spacing:2px">● LIVE</div>
+  </div></div></div>
 </body>
 </html>

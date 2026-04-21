@@ -55,6 +55,9 @@ const {
   approveRequest, rejectRequest, getUserRequest,
 } = require('./badges')
 
+const { declareNode, resignNode, discoverNodes, startNodeDiscovery, getNodeConfig, pickNode, VALID_CAPS } = require('./node_manager')
+const { startStream, stopStream, sendSignal, listStreams, registerRemoteStream, removeRemoteStream } = require('./livestream')
+
 // âââ Embedded Nostr Relay âââââââââââââââââââââââââââââââââââââââââââââââââââââ
 // Avviato in processo figlio per evitare che EADDRINUSE faccia crashare il server
 const _net = require('net')
@@ -977,6 +980,7 @@ function startServer(port = 8080) {
   initBadgeDb()
   // Check for model updates at startup (background, non-blocking)
   setTimeout(() => checkAndUpdateModel().catch(() => {}), 5000)
+  setTimeout(() => startNodeDiscovery(), 2000)
   return new Promise((resolve, reject) => {
     server = app.listen(port, '127.0.0.1', () => {
       console.log(`[SERVER] M4TR1X API in ascolto su http://localhost:${port}`)

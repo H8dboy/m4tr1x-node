@@ -276,3 +276,86 @@
   background: linear-gradient(var(--bg),var(--bg)) padding-box,
               linear-gradient(135deg, var(--green) 0%, rgba(0,204,255,0.5) 100%) border-box !important;
 }
+
+/* ─── LIVE STREAMING ─────────────────────────────────────────────────────────── */
+.live-top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 16px 8px;
+}
+.live-title {
+  font-size: 0.85em;
+  font-family: var(--font-mono);
+  letter-spacing: 3px;
+  color: var(--red, #ff4455);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+.go-live-btn {
+  background: var(--red, #ff4455);
+  color: #fff;
+  border: none;
+  border-radius: 20px;
+  padding: 8px 18px;
+  font-family: var(--font-mono);
+  font-size: 0.72em;
+  letter-spacing: 2px;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(255,68,85,0.4);
+  transition: all 0.2s;
+}
+.go-live-btn:hover { box-shadow: 0 4px 24px rgba(255,68,85,0.7); transform: translateY(-1px); }
+.live-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.live-card:hover { background: rgba(255,68,85,0.04); }
+.live-card-badge {
+  background: var(--red, #ff4455);
+  color: #fff;
+  font-size: 0.6em;
+  font-family: var(--font-mono);
+  padding: 3px 8px;
+  border-radius: 6px;
+  letter-spacing: 1px;
+  flex-shrink: 0;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+.live-card-title { font-size: 0.82em; font-weight: 600; }
+.live-card-meta  { font-size: 0.68em; opacity: 0.5; font-family: var(--font-mono); margin-top: 2px; }
+.live-powered {
+  text-align: center;
+  font-size: 0.55em;
+  font-family: var(--font-mono);
+  letter-spacing: 2px;
+  opacity: 0.2;
+  padding: 12px;
+}
+.bnav.live-nav.active::after { background: var(--red, #ff4455); box-shadow: 0 0 10px var(--red, #ff4455); }
+
+/* ─── NODE SETTINGS ──────────────────────────────────────────────────────────── */
+.node-caps-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.node-cap-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 12px;
+  cursor: pointer;
+  font-size: 0.78em;
+  font-family: var(--font-mono);
+  letter-spacing: 1px;
+  transition: all 0.2s;
+}
+.node-cap-item:hover { background: rgba(0,255,136,0.04); border-color: rgba(0,255,136,0.2); }
+.node-cap-item input { accent-color: var(--green); }
