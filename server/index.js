@@ -55,7 +55,7 @@ const {
   approveRequest, rejectRequest, getUserRequest,
 } = require('./badges')
 
-const { declareNode, resignNode, discoverNodes, startNodeDiscovery, getNodeConfig, pickNode, VALID_CAPS } = require('./node_manager')
+const { declareNode, resignNode, discoverNodes, startNodeDiscovery, getNodeConfig, pickNode, getPrivateNodeUrl, VALID_CAPS } = require('./node_manager')
 const { startStream, stopStream, sendSignal, listStreams, registerRemoteStream, removeRemoteStream } = require('./livestream')
 
 // âââ Embedded Nostr Relay âââââââââââââââââââââââââââââââââââââââââââââââââââââ

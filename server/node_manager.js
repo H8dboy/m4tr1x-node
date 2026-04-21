@@ -1,19 +1,21 @@
 /**
  * M4TR1X — Node Manager
- * Each M4TR1X installation can declare itself a specialized node.
- * Node types: film | music | reels | topic | shop | crypto
- * Nodes publish their role on Nostr (kind 30078) and serve content
- * for their declared type. Shop/crypto payments route exclusively
- * through nodes that declared the 'crypto' capability.
+ * Public nodes: film | music | reels | topic  (community-run)
+ * Shop + crypto run exclusively on the private M4TR1X node (PRIVATE_NODE_URL).
+ * This prevents any third party from intercepting payments or token transfers.
  */
 
 const path = require('path')
 const fs   = require('fs')
 const { publishNote, getCurrentPubkey, wsSub } = require('./nostr')
 
-const NODE_KIND    = 30078  // NIP-78 app-specific data
+const NODE_KIND    = 30078
 const NODE_TAG     = 'm4tr1x-node'
-const VALID_CAPS   = new Set(['film', 'music', 'reels', 'topic', 'shop', 'crypto'])
+// shop and crypto are intentionally excluded — handled by the private node only
+const VALID_CAPS   = new Set(['film', 'music', 'reels', 'topic'])
+
+// Private M4TR1X node URL — all shop/crypto calls route here
+const PRIVATE_NODE_URL = process.env.PRIVATE_NODE_URL || null
 
 // ─── Persist node config in userData ─────────────────────────────────────────
 const DATA_DIR  = process.env.M4TR1X_DATA_DIR || process.cwd()
@@ -106,6 +108,11 @@ function pickNode(capability) {
   return nodes.sort((a, b) => b.ts - a.ts)[0]
 }
 
+// Returns the private node URL for shop/crypto calls
+function getPrivateNodeUrl() {
+  return PRIVATE_NODE_URL
+}
+
 module.exports = {
   declareNode,
   resignNode,
@@ -113,5 +120,6 @@ module.exports = {
   startNodeDiscovery,
   getNodeConfig,
   pickNode,
+  getPrivateNodeUrl,
   VALID_CAPS: [...VALID_CAPS],
 }
