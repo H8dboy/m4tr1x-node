@@ -3,7 +3,7 @@
  * Removes GPS/EXIF metadata from videos before upload.
  */
 
-const { execSync } = require('child_process')
+const { execSync, spawnSync } = require('child_process')
 const fs = require('fs')
 
 /**
@@ -22,7 +22,9 @@ function cleanMetadata(filePath) {
   console.log(`[CORE] Stripping metadata: ${filePath}`)
 
   try {
-    execSync(`exiftool -all= -overwrite_original "${filePath}"`, { stdio: 'pipe' })
+    // Usa spawnSync con array di argomenti — nessuna interpolazione shell (fix command injection)
+    const result = spawnSync('exiftool', ['-all=', '-overwrite_original', filePath], { stdio: 'pipe' })
+    if (result.status !== 0) throw new Error(result.stderr?.toString() || 'exiftool failed')
     console.log('[CORE] Metadata removed successfully.')
     return true
   } catch (err) {

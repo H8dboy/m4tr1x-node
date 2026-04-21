@@ -32,7 +32,7 @@ try {
 }
 
 // ─── Costanti (identiche a ai_detector.py) ───────────────────────────────────
-const CONFIDENCE_THRESHOLD = 0.65
+const CONFIDENCE_THRESHOLD = 0.55   // lowered: model biased towards REAL, accept 55%+ confidence
 const MAX_FRAMES = 16
 const FRAME_SIZE = 224
 
@@ -172,17 +172,20 @@ async function analyzeFrame(imagePath) {
   }
 }
 
-// ─── Hash SHA-256 del file video ──────────────────────────────────────────────
+// ─── Hash SHA-256 del file video (stream — evita OOM con file grandi) ─────────
 function computeVideoHash(videoPath) {
-  const hash   = crypto.createHash('sha256')
-  const buffer = fs.readFileSync(videoPath)
-  hash.update(buffer)
-  return hash.digest('hex')
+  return new Promise((resolve, reject) => {
+    const hash   = crypto.createHash('sha256')
+    const stream = fs.createReadStream(videoPath)
+    stream.on('data', chunk => hash.update(chunk))
+    stream.on('end',  () => resolve(hash.digest('hex')))
+    stream.on('error', reject)
+  })
 }
 
 // ─── Pipeline completa (uguale a analyze_video in Python) ─────────────────────
 async function analyzeVideo(videoPath) {
-  const videoHash = computeVideoHash(videoPath)
+  const videoHash = await computeVideoHash(videoPath)
   let frameResults = []
   let tempDir      = null
 

@@ -1,36 +1,156 @@
 {
   "name": "m4tr1x",
-  "version": "2.0.0",
-  "description": "M4TR1X — The Unfiltered Eye. Decentralized social network for authentic video documentation.",
-  "author": "H8dboy",
+  "version": "2.2.4",
+  "description": "M4TR1X \u2014 The Unfiltered Eye. Decentralized social network for authentic video documentation.",
+  "author": {
+    "name": "H8dboy",
+    "email": "h8dboy@protonmail.com"
+  },
   "license": "MIT",
+  "main": "main.js",
   "scripts": {
-    "dev":           "tauri dev",
-    "build":         "tauri build",
-    "build:android": "tauri android build",
-    "build:ios":     "tauri ios build",
-    "android:dev":   "tauri android dev",
-    "ios:dev":       "tauri ios dev",
-    "server":        "node server/index.js"
+    "start": "electron .",
+    "dev": "electron . --inspect",
+    "build": "electron-builder --linux",
+    "build:win": "electron-builder --win",
+    "build:mac": "electron-builder --mac",
+    "server": "node server/index.js",
+    "build:linux": "electron-builder --linux deb"
+  },
+  "build": {
+    "appId": "com.h8dboy.m4tr1x",
+    "productName": "M4TR1X",
+    "copyright": "Copyright \u00a9 2026 H8dboy",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "frontend/**/*",
+      "server/**/*",
+      "assets/**/*",
+      "models/**/*",
+      "node_modules/**/*",
+      "!node_modules/**/*.{exe,bat,cmd}",
+      "!**/node_modules/ffmpeg-static/ffmpeg.exe",
+      "!**/node_modules/ffprobe-static/bin/win32/**",
+      "!.env",
+      "!*.db",
+      "!uploads/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "models/",
+        "to": "models/",
+        "filter": [
+          "**/*.onnx"
+        ]
+      }
+    ],
+    "linux": {
+      "icon": "frontend/icons",
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        },
+        {
+          "target": "deb",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "snap",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "category": "Network",
+      "description": "Decentralized social network for authentic video documentation"
+    },
+    "win": {
+      "icon": "assets/icon.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "publisherName": "H8dboy"
+    },
+    "mac": {
+      "icon": "assets/icon-mac.png",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
+      "category": "public.app-category.social-networking",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    },
+    "snap": {
+      "publish": [
+        {
+          "provider": "snapStore",
+          "channels": [
+            "stable"
+          ]
+        }
+      ]
+    }
   },
   "dependencies": {
-    "@tauri-apps/api":    "^2",
-    "better-sqlite3":     "^9.4.0",
-    "cors":               "^2.8.5",
-    "dotenv":             "^16.4.0",
-    "express":            "^4.18.3",
+    "@noble/post-quantum": "^0.6.0",
+    "better-sqlite3": "^12.8.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.0",
+    "express": "^4.18.3",
     "express-rate-limit": "^7.2.0",
-    "ffmpeg-static":      "^5.2.0",
-    "ffprobe-static":     "^3.1.0",
-    "multer":             "^1.4.5-lts.1",
-    "onnxruntime-node":   "^1.17.3",
-    "sharp":              "^0.33.2",
-    "uuid":               "^9.0.0",
-    "monero-javascript":  "^0.8.4",
-    "nostr-tools":        "^2.3.1",
-    "ws":                 "^8.16.0"
+    "ffmpeg-static": "^5.2.0",
+    "ffprobe-static": "^3.1.0",
+    "multer": "^1.4.5-lts.1",
+    "nostr-tools": "^2.3.1",
+    "onnxruntime-node": "^1.17.3",
+    "sharp": "^0.33.2",
+    "uuid": "^9.0.0",
+    "ws": "^8.16.0"
   },
   "devDependencies": {
-    "@tauri-apps/cli": "^2"
+    "electron": "^32.3.3",
+    "electron-builder": "^25.1.8"
   }
 }

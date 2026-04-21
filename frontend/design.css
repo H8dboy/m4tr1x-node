@@ -1,0 +1,278 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   M4TR1X — DESIGN v2  ·  Modern Dark UI
+   Sovrascrive elementi specifici per un look 2024
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ─── LOGO — gradient text ────────────────────────────────────────────────── */
+.logo {
+  background: linear-gradient(135deg, #00ff88 0%, #00ccff 60%, #b388ff 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  text-shadow: none;
+  filter: drop-shadow(0 0 18px rgba(0,255,136,0.35));
+}
+
+/* ─── TOPBAR — stronger glass ─────────────────────────────────────────────── */
+#topbar {
+  background: linear-gradient(
+    to bottom,
+    rgba(6,8,16,0.96) 0%,
+    rgba(6,8,16,0.82) 100%
+  );
+  border-bottom: 1px solid rgba(0,255,136,0.08);
+  box-shadow: 0 1px 0 rgba(255,255,255,0.03), 0 8px 32px rgba(0,0,0,0.4);
+}
+
+/* ─── BOTTOM NAV — active indicator bar ──────────────────────────────────── */
+#bottom-nav {
+  background: linear-gradient(
+    to top,
+    rgba(4,6,14,0.98) 0%,
+    rgba(6,8,16,0.90) 100%
+  );
+  border-top: 1px solid rgba(255,255,255,0.05);
+  box-shadow: 0 -8px 32px rgba(0,0,0,0.5);
+}
+
+/* Active indicator: glowing line above the active tab */
+.bnav { position: relative; overflow: hidden }
+.bnav::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 50%;
+  transform: translateX(-50%) scaleX(0);
+  width: 28px; height: 2px;
+  border-radius: 0 0 4px 4px;
+  background: var(--green);
+  box-shadow: 0 0 10px var(--green), 0 0 20px rgba(0,255,136,0.4);
+  transition: transform 0.25s cubic-bezier(.34,1.56,.64,1), background 0.2s, box-shadow 0.2s;
+}
+.bnav.active::after { transform: translateX(-50%) scaleX(1) }
+.bnav.film-nav.active::after  { background: var(--blue);   box-shadow: 0 0 10px var(--blue),   0 0 20px rgba(56,182,255,0.4) }
+.bnav.music-nav.active::after { background: var(--yellow); box-shadow: 0 0 10px var(--yellow), 0 0 20px rgba(255,209,102,0.4) }
+.bnav.forum-nav.active::after { background: var(--purple); box-shadow: 0 0 10px var(--purple), 0 0 20px rgba(179,136,255,0.4) }
+.bnav.shop-nav.active::after  { background: var(--orange); box-shadow: 0 0 10px var(--orange), 0 0 20px rgba(255,154,60,0.4) }
+.bnav.dm-nav.active::after    { background: var(--green);  box-shadow: 0 0 10px var(--green),  0 0 20px rgba(0,255,136,0.4) }
+
+/* POST button — più prominente, pill shape */
+.bnav.post-nav .bicon {
+  background: linear-gradient(135deg, #00ff88 0%, #00ddaa 100%);
+  box-shadow: 0 0 0 1px rgba(0,255,136,0.3), 0 4px 20px rgba(0,255,136,0.4), 0 0 0 0 rgba(0,255,136,0.2);
+  animation: postPulse 3s ease-in-out infinite;
+}
+@keyframes postPulse {
+  0%, 100% { box-shadow: 0 0 0 1px rgba(0,255,136,0.3), 0 4px 20px rgba(0,255,136,0.4) }
+  50%       { box-shadow: 0 0 0 1px rgba(0,255,136,0.5), 0 4px 28px rgba(0,255,136,0.6) }
+}
+.bnav.post-nav:hover .bicon {
+  animation: none;
+  box-shadow: 0 0 0 1px rgba(0,255,136,0.6), 0 6px 32px rgba(0,255,136,0.7);
+}
+
+/* ─── INPUTS — premium feel ───────────────────────────────────────────────── */
+.field input, .field textarea, .field select,
+.forum-field input, .forum-field textarea,
+.sell-field input, .sell-field textarea, .sell-field select,
+#badge-modal input, #badge-modal select, #badge-modal textarea,
+#edit-profile-modal input, #edit-profile-modal select, #edit-profile-modal textarea,
+#compose-modal input, #compose-modal select, #compose-modal textarea,
+.zap-input,
+.dm-chat-input input, #cmt-input {
+  background: rgba(255,255,255,0.03) !important;
+  border: 1px solid rgba(255,255,255,0.08) !important;
+  border-radius: 12px !important;
+  color: var(--text) !important;
+  transition: border-color 0.2s, background 0.2s, box-shadow 0.2s !important;
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.3) !important;
+}
+.field input:focus, .field textarea:focus, .field select:focus,
+.forum-field input:focus, .forum-field textarea:focus,
+.sell-field input:focus, .sell-field textarea:focus,
+#badge-modal input:focus, #edit-profile-modal input:focus,
+#compose-modal input:focus, #compose-modal textarea:focus,
+#badge-modal textarea:focus, #edit-profile-modal textarea:focus,
+.zap-input:focus,
+.dm-chat-input input:focus, #cmt-input:focus {
+  background: rgba(0,255,136,0.03) !important;
+  border-color: rgba(0,255,136,0.4) !important;
+  box-shadow: 0 0 0 3px rgba(0,255,136,0.08), inset 0 1px 3px rgba(0,0,0,0.2) !important;
+}
+
+/* ─── BOTTOM SHEETS — drag handle + better shadow ────────────────────────── */
+.upload-sheet::before, .forum-sheet::before, .sell-sheet::before,
+.zap-sheet::before, .token-sheet::before, .boost-sheet::before {
+  content: '';
+  display: block;
+  width: 36px; height: 4px;
+  background: rgba(255,255,255,0.15);
+  border-radius: 2px;
+  margin: 10px auto 0;
+  flex-shrink: 0;
+}
+.upload-sheet, .forum-sheet, .sell-sheet, .zap-sheet, .token-sheet {
+  box-shadow: 0 -20px 60px rgba(0,0,0,0.6), 0 -2px 0 rgba(255,255,255,0.04) !important;
+}
+
+/* ─── BUTTONS — gradient + depth ─────────────────────────────────────────── */
+.btn-pub, .btn-forum-post, .btn-sell, .btn-buy-token, .btn-zap,
+.prof-follow-btn:not(.following) {
+  background: linear-gradient(135deg, #00ff88 0%, #00cc77 100%) !important;
+  color: #000 !important;
+  box-shadow: 0 2px 0 rgba(0,0,0,0.3), 0 4px 16px rgba(0,255,136,0.3) !important;
+  border: none !important;
+  position: relative;
+  overflow: hidden;
+}
+.btn-pub::after, .btn-forum-post::after, .btn-sell::after, .btn-buy-token::after, .btn-zap::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, rgba(255,255,255,0.12) 0%, transparent 50%);
+  pointer-events: none;
+}
+.btn-pub:hover, .btn-forum-post:hover, .btn-sell:hover, .btn-buy-token:hover, .btn-zap:hover {
+  box-shadow: 0 2px 0 rgba(0,0,0,0.3), 0 6px 24px rgba(0,255,136,0.5) !important;
+  transform: translateY(-1px);
+}
+.btn-pub:active, .btn-forum-post:active, .btn-sell:active {
+  transform: translateY(1px);
+  box-shadow: 0 1px 0 rgba(0,0,0,0.3), 0 2px 8px rgba(0,255,136,0.2) !important;
+}
+
+/* ─── FORUM CARDS — gradient accent border ────────────────────────────────── */
+.forum-post {
+  border: none !important;
+  background: linear-gradient(var(--surface), var(--surface)) padding-box,
+              linear-gradient(135deg, rgba(179,136,255,0.18) 0%, rgba(255,255,255,0.04) 50%, rgba(179,136,255,0.06) 100%) border-box !important;
+  border: 1px solid transparent !important;
+  position: relative;
+}
+.forum-post:hover {
+  background: linear-gradient(var(--surface2), var(--surface2)) padding-box,
+              linear-gradient(135deg, rgba(179,136,255,0.4) 0%, rgba(255,255,255,0.08) 50%, rgba(179,136,255,0.2) 100%) border-box !important;
+}
+
+/* ─── VIDEO SLIDE ACTIONS — refined icons ─────────────────────────────────── */
+.sact-icon {
+  background: rgba(0,0,0,0.5) !important;
+  backdrop-filter: blur(16px) saturate(1.4) !important;
+  border: 1px solid rgba(255,255,255,0.1) !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.06) !important;
+  transition: all 0.2s cubic-bezier(.34,1.56,.64,1) !important;
+}
+
+/* ─── PROFILE PANEL — stronger glass ────────────────────────────────────────*/
+#profile-inner {
+  background: rgba(13,16,32,0.97) !important;
+  backdrop-filter: blur(40px) saturate(1.6) !important;
+  box-shadow: -8px 0 40px rgba(0,0,0,0.5) !important;
+}
+
+/* ─── FUNKWHALE TRACKS — subtle gradient border ──────────────────────────── */
+.fw-track-item {
+  background: rgba(255,209,102,0.02) !important;
+  border: 1px solid rgba(255,255,255,0.05) !important;
+  transition: all 0.2s !important;
+}
+.fw-track-item:hover {
+  background: rgba(255,209,102,0.05) !important;
+  border-color: rgba(255,209,102,0.25) !important;
+  box-shadow: 0 4px 20px rgba(255,209,102,0.08) !important;
+}
+.fw-track-item.playing {
+  background: rgba(255,209,102,0.07) !important;
+  border-color: rgba(255,209,102,0.35) !important;
+  box-shadow: 0 0 0 1px rgba(255,209,102,0.15), inset 0 0 20px rgba(255,209,102,0.04) !important;
+}
+
+/* ─── TOAST — glass pill ──────────────────────────────────────────────────── */
+#toast {
+  background: rgba(10,12,24,0.92) !important;
+  backdrop-filter: blur(20px) saturate(1.5) !important;
+  border: 1px solid rgba(0,255,136,0.18) !important;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.03) !important;
+}
+
+/* ─── SHOP ITEMS — card with glow on hover ────────────────────────────────── */
+.shop-item {
+  background: rgba(255,255,255,0.02) !important;
+  border: 1px solid rgba(255,255,255,0.06) !important;
+  transition: all 0.22s cubic-bezier(.34,1.56,.64,1) !important;
+}
+.shop-item:hover {
+  background: rgba(255,154,60,0.04) !important;
+  border-color: rgba(255,154,60,0.3) !important;
+  box-shadow: 0 8px 32px rgba(255,154,60,0.1), 0 0 0 1px rgba(255,154,60,0.1) !important;
+  transform: translateY(-3px) !important;
+}
+
+/* ─── DM ITEMS ────────────────────────────────────────────────────────────── */
+.dm-item {
+  border-bottom: 1px solid rgba(255,255,255,0.04) !important;
+  transition: background 0.15s, padding-left 0.2s !important;
+}
+.dm-item:hover {
+  background: rgba(0,255,136,0.03) !important;
+}
+
+/* ─── SECTION PILL — minimal ──────────────────────────────────────────────── */
+#section-pill {
+  background: rgba(0,0,0,0.4) !important;
+  border: 1px solid rgba(255,255,255,0.07) !important;
+  backdrop-filter: blur(20px) !important;
+  letter-spacing: 4px;
+}
+
+/* ─── PROGRESS BAR — more visible ────────────────────────────────────────── */
+.vid-prog { height: 3px; background: rgba(255,255,255,0.06) }
+.vid-prog-fill {
+  box-shadow: 0 0 8px var(--green), 0 0 16px rgba(0,255,136,0.3) !important;
+}
+
+/* ─── SECTION BANNERS — more refined ──────────────────────────────────────── */
+.section-banner {
+  backdrop-filter: blur(20px) saturate(1.5) !important;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.3) !important;
+}
+
+/* ─── NOTIF DRAWER ────────────────────────────────────────────────────────── */
+#notif-drawer {
+  background: rgba(10,12,24,0.97) !important;
+  backdrop-filter: blur(30px) saturate(1.5) !important;
+  box-shadow: -6px 0 30px rgba(0,0,0,0.5) !important;
+}
+
+/* ─── COMMENTS DRAWER ─────────────────────────────────────────────────────── */
+#comments-drawer {
+  background: rgba(8,10,20,0.97) !important;
+  box-shadow: 0 -10px 40px rgba(0,0,0,0.6) !important;
+}
+
+/* ─── UPLOAD SHEET DRAG INDICATOR ────────────────────────────────────────── */
+.drop-zone {
+  background: rgba(0,255,136,0.01) !important;
+  border: 2px dashed rgba(0,255,136,0.14) !important;
+  transition: all 0.2s !important;
+}
+.drop-zone:hover, .drop-zone.drag {
+  background: rgba(0,255,136,0.04) !important;
+  border-color: rgba(0,255,136,0.4) !important;
+  box-shadow: 0 0 30px rgba(0,255,136,0.06) inset !important;
+}
+
+/* ─── AI BADGE — glow ─────────────────────────────────────────────────────── */
+.ai-badge.human   { box-shadow: 0 0 12px rgba(0,255,136,0.22), inset 0 0 8px rgba(0,255,136,0.05) !important }
+.ai-badge.ai-gen  { box-shadow: 0 0 12px rgba(255,68,85,0.22),  inset 0 0 8px rgba(255,68,85,0.05)  !important }
+
+/* ─── AVATAR RINGS ────────────────────────────────────────────────────────── */
+.slide-av {
+  border: 2px solid transparent !important;
+  background: linear-gradient(var(--bg),var(--bg)) padding-box,
+              linear-gradient(135deg, rgba(255,255,255,0.8) 0%, rgba(0,255,136,0.5) 100%) border-box !important;
+}
+.dm-av {
+  border: 2px solid transparent !important;
+  background: linear-gradient(var(--bg),var(--bg)) padding-box,
+              linear-gradient(135deg, var(--green) 0%, rgba(0,204,255,0.5) 100%) border-box !important;
+}

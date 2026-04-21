@@ -1,61 +1,163 @@
 # Security Policy
 
+## Supported Versions
+
+| Version | Supported |
+|---------|-----------|
+| 2.x (latest) | ✅ Active support |
+| 1.x (Python) | ❌ End of life — migrate to v2 |
+
+---
+
 ## Reporting a Vulnerability
 
-If you find a security vulnerability in M4TR1X, **do not open a public issue**.
+**Do NOT open a public GitHub issue for security vulnerabilities.**
 
-Report it privately via Nostr DM to the maintainer's npub, or via email if listed in the repository.
+M4TR1X is used by journalists, activists, and people in high-risk environments. A public disclosure before a patch is ready could put real users in danger.
 
-We will acknowledge the report within 48 hours and release a patch as soon as possible.
+### How to report
 
-## Security Design
+**Preferred — GitHub Private Security Advisory:**
+Use GitHub's built-in private reporting:
+👉 [Report a vulnerability](https://github.com/H8dboy/m4tr1x-electron/security/advisories/new)
 
-M4TR1X is built with the following security principles:
+**Alternative — Nostr encrypted DM (NIP-44):**
+Send an encrypted DM to the maintainer's npub (see profile). Use a burner Nostr key if you need anonymity.
 
-**No central server.** Everything runs locally on the user's device. There is no M4TR1X server that can be seized, hacked, or compelled to hand over data.
+**Alternative — Email:**
+`security [at] h8group [dot] net` *(PGP key available on request via Nostr DM)*
 
-**Tor-first.** If Tor Browser or tor daemon is running, M4TR1X automatically routes all traffic through it. No manual configuration required.
+### What to include
 
-**Keys never leave the device.** Nostr private keys and Monero wallet seeds are stored only on the user's machine, never transmitted anywhere.
+- Description of the vulnerability and its impact
+- - Steps to reproduce (proof of concept if possible)
+  - - Affected version(s) and platform (Windows / macOS / Linux)
+    - - Your assessment of severity (see matrix below)
+      - - Whether you want credit in the release notes (or prefer anonymity)
+       
+        - ### Response timeline
+       
+        - | Stage | Target time |
+        - |-------|-------------|
+        - | Acknowledgement | ≤ 48 hours |
+        - | Severity assessment | ≤ 5 business days |
+        - | Patch for Critical/High | ≤ 14 days |
+        - | Patch for Medium/Low | ≤ 60 days |
+        - | Public disclosure | After patch release + 7 days |
+       
+        - We follow **coordinated disclosure**. If you give us a reasonable timeline and we miss it, you are free to publish.
+       
+        - ---
 
-**End-to-end encrypted DMs.** Direct messages use NIP-44 (ChaCha20-Poly1305 + ECDH secp256k1). No server can read them.
+        ## Severity Matrix
 
-**Metadata stripped.** Every video is passed through ExifTool before publishing to remove GPS coordinates, device identifiers, and other metadata that could identify the user.
+        | Severity | Examples |
+        |----------|---------|
+        | **Critical** | Remote code execution, private key extraction, identity deanonymization |
+        | **High** | Local privilege escalation, bypass of Electron sandbox, Tor leak |
+        | **Medium** | XSS in renderer (with CSP bypass), CSRF on local API, metadata not stripped |
+        | **Low** | Information disclosure without sensitive data, non-exploitable crash |
+        | **Informational** | Hardening suggestions, defense-in-depth improvements |
 
-**Video encryption.** Videos can be encrypted with AES-256-GCM before storage or transmission.
+        ---
 
-**Electron hardening:**
-- `contextIsolation: true` — renderer process cannot access Node.js APIs
-- `nodeIntegration: false` — no Node.js in the frontend
-- `sandbox: true` — Chromium sandbox active
-- Content Security Policy on all renderer responses
-- Navigation to external URLs blocked (opens system browser instead)
+        ## Scope
 
-## Verifying Releases
+        ### In scope
+        - `main.js` — Electron main process, IPC handlers, CSP configuration
+        - - `preload.js` — contextBridge surface, IPC exposure
+          - - `server/` — Express API, authentication, H8 identity/token logic
+            - - `frontend/` — XSS, injection, insecure data handling in the renderer
+              - - `server/h8identity.js` — key management, encryption/decryption
+                - - `server/h8token.js` — ledger integrity, transaction signing
+                  - - Tor proxy bypass or traffic leakage
+                    - - ONNX model integrity (supply-chain attack on the model file)
+                     
+                      - ### Out of scope
+                      - - Vulnerabilities in Nostr relays, PeerTube instances, or Mastodon servers (report to them directly)
+                        - - Physical device seizure (documented in threat model)
+                          - - Attacks requiring the user to already have an unlocked session and physical access
+                            - - Denial of service against the local API (it's local — the user controls it)
+                              - - Issues in outdated or end-of-life versions
+                               
+                                - ---
 
-Every release includes SHA-256 checksums generated by GitHub Actions. To verify:
+                                ## Security Design
 
-```bash
-# Linux
-sha256sum --check checksums-linux.txt
+                                M4TR1X is built for the worst-case scenario: a user in an authoritarian country, on a seized network, whose device may be inspected.
 
-# macOS
-shasum -a 256 --check checksums-mac.txt
+                                **No central server.** Everything runs locally. There is no M4TR1X cloud that can be seized, subpoenaed, or compelled to hand over data.
 
-# Windows (PowerShell)
-Get-FileHash m4tr1x-setup.exe -Algorithm SHA256
-```
+                                **Tor-first networking.** If Tor Browser or the tor daemon is running at launch, M4TR1X automatically routes all outbound traffic through SOCKS5. No manual configuration required.
 
-The build pipeline is fully open — you can inspect `.github/workflows/build.yml` to verify the binaries are built directly from the source code without modification.
+                                **Post-quantum identity (ML-DSA65 / CRYSTALS-Dilithium).** Every H8 identity uses NIST FIPS-204 key pairs. The secret key is encrypted at rest with AES-256-GCM + scrypt and never leaves the device. In-session keys live in memory only and are wiped on app close.
 
-## Threat Model
+                                **End-to-end encrypted DMs.** Direct messages use Nostr NIP-44 (ChaCha20-Poly1305 + ECDH secp256k1). No relay can read them.
 
-M4TR1X is designed to protect:
-- Journalists and activists publishing video evidence in conflict zones
-- Users in countries with internet censorship (Iran, Belarus, etc.)
-- Anyone who needs to share information without algorithmic suppression
+                                **Metadata scrubbing.** Every video passes through ExifTool before analysis or publishing to strip GPS coordinates, device identifiers, timestamps, and other identifying metadata.
 
-M4TR1X does **not** protect against:
-- Device seizure (if your device is confiscated, the local wallet and keys may be accessible)
-- Screen recording or physical surveillance
-- A compromised Nostr relay (content is still signed and verifiable, but may be censored on that relay — use multiple relays)
+                                **Electron hardening:**
+                                - `contextIsolation: true` — renderer process cannot access Node.js APIs
+                                - - `nodeIntegration: false` — no Node.js in the frontend
+                                  - - `sandbox: true` — Chromium sandbox enforced
+                                    - - `webSecurity: true` — same-origin policy enforced
+                                      - - CSP via `onHeadersReceived` — blocks XSS and inline script injection
+                                        - - `setWindowOpenHandler` — all external links open in the system browser, never in-app
+                                          - - Navigation to external URLs is intercepted and blocked
+                                           
+                                            - **Admin API protection.** Admin endpoints are protected by `localhostOnly` middleware + `ADMIN_KEY` secret. They are never exposed on the network interface.
+                                           
+                                            - ---
+
+                                            ## Threat Model
+
+                                            ### Protects against
+                                            - Network surveillance and traffic analysis (via Tor)
+                                            - - Metadata-based device fingerprinting (via ExifTool)
+                                              - - Content injection and XSS (via CSP + context isolation)
+                                                - - Future quantum computer attacks on identity (via ML-DSA65)
+                                                  - - Centralized censorship and deplatforming (via Nostr/PeerTube/Funkwhale federation)
+                                                    - - AI-generated disinformation (via ONNX detection + crowd voting)
+                                                     
+                                                      - ### Does NOT protect against
+                                                      - - **Device seizure.** If your device is confiscated with an unlocked session, keys in memory may be accessible. Lock the app (wallet lock button) before any risky situation.
+                                                        - - **Screen recording or physical observation** of the device.
+                                                          - - **A compromised Nostr relay** selectively censoring content. Use multiple relays and verify content signatures.
+                                                            - - **A compromised build pipeline.** Verify release checksums (see below) to confirm binaries match the published source.
+                                                              - - **Malware on the host system** with elevated privileges.
+                                                               
+                                                                - ---
+
+                                                                ## Verifying Release Integrity
+
+                                                                Every release is built by GitHub Actions from the public source code. The workflow file is at `.github/workflows/build.yml` — you can inspect it to verify no modification happens between source and binary.
+
+                                                                SHA-256 checksums are published with every release.
+
+                                                                ```bash
+                                                                # Linux
+                                                                sha256sum --check checksums-linux.txt
+
+                                                                # macOS
+                                                                shasum -a 256 --check checksums-mac.txt
+
+                                                                # Windows (PowerShell)
+                                                                Get-FileHash m4tr1x-setup.exe -Algorithm SHA256
+                                                                ```
+
+                                                                Compare the output against the checksums listed in the GitHub Release notes.
+
+                                                                ---
+
+                                                                ## Known Issues & Accepted Risks
+
+                                                                | Issue | Status | Rationale |
+                                                                |-------|--------|-----------|
+                                                                | `script-src 'unsafe-inline'` in CSP | ⚠️ Accepted temporarily | Required by inline event handlers in current frontend. Tracked for removal in v3.0 with full nonce-based CSP. |
+                                                                | Git history contains old `h8identity.enc` | ⚠️ Remediation pending | File removed from HEAD. Full history purge requires `git filter-repo`. Instructions in commit `7ce7647`. |
+                                                                | H8 Token ledger is local-only | ℹ️ By design | Trustless cross-user token transfer requires a consensus layer. Planned for v3.x. |
+
+                                                                ---
+
+                                                                *"In the age of synthetic reality, authenticity is the new resistance."*
+                                                                *For the Truth. 👁️*

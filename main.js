@@ -13,7 +13,37 @@
 
 const { app, BrowserWindow, ipcMain, shell, Menu, session } = require('electron')
 const path   = require('path')
+const fs     = require('fs')
+const crypto = require('crypto')
 const { setupTorIfAvailable } = require('./server/tor')
+
+// ─── Generazione automatica segreti al primo avvio ───────────────────────────
+// In produzione .env non è nel bundle; le chiavi vengono generate e salvate
+// in userData (cartella privata dell'app, fuori dal .asar).
+function ensureSecrets() {
+  const userDataPath = app.getPath('userData')
+  const envPath      = path.join(userDataPath, '.env.runtime')
+  if (!fs.existsSync(envPath)) {
+    const secret    = crypto.randomBytes(32).toString('hex')
+    const adminKey  = crypto.randomBytes(32).toString('hex')
+    fs.writeFileSync(envPath, `APP_SECRET=${secret}\nADMIN_KEY=${adminKey}\n`, { mode: 0o600 })
+    console.log('[M4TR1X] Secrets generated at first launch →', envPath)
+  }
+  // Carica nel processo
+  const raw = fs.readFileSync(envPath, 'utf8')
+  raw.split('\n').forEach(line => {
+    const [k, ...v] = line.split('=')
+    if (k && v.length) process.env[k.trim()] = v.join('=').trim()
+  })
+}
+
+// Carica .env locale se presente (dev), altrimenti genera in userData (prod)
+const localEnv = path.join(__dirname, '.env')
+if (fs.existsSync(localEnv)) {
+  require('dotenv').config({ path: localEnv })
+} else {
+  ensureSecrets()
+}
 
 let mainWindow
 let torStatus = { torEnabled: false, port: null, source: null }
@@ -33,7 +63,7 @@ function setupCSP() {
             "font-src 'self' https://fonts.gstatic.com",
             "img-src 'self' data: https:",
             "media-src 'self' https:",
-            "connect-src 'self' http://localhost:8080 wss: https:",
+            "connect-src 'self' http://localhost:8080 ws://localhost:4848 wss: https:",
             "frame-src https:",
             "object-src 'none'",
             "base-uri 'self'",

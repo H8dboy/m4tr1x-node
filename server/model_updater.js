@@ -194,19 +194,39 @@ async function checkAndUpdateModel() {
 
 // ─── Ricerca versioni su Nostr ────────────────────────────────────────────────
 
+// Pubkey Nostr autorizzate a pubblicare aggiornamenti modello.
+// Imposta TRUSTED_MODEL_PUBKEYS=pubkey1,pubkey2 nelle env vars.
+// Se non impostato, gli aggiornamenti automatici via Nostr sono disabilitati.
+const TRUSTED_MODEL_PUBKEYS = (() => {
+  const raw = process.env.TRUSTED_MODEL_PUBKEYS || ''
+  return new Set(raw.split(',').map(s => s.trim()).filter(Boolean))
+})()
+
 /**
  * Cerca eventi di tipo "m4tr1x-model-update" sui relay Nostr
- * e li registra nel DB locale.
+ * e li registra nel DB locale — solo da publisher fidati.
  */
 async function syncModelVersionFromNostr() {
+  if (TRUSTED_MODEL_PUBKEYS.size === 0) {
+    console.warn('[MODEL] TRUSTED_MODEL_PUBKEYS non impostata — aggiornamenti Nostr disabilitati.')
+    console.warn('[MODEL] Imposta TRUSTED_MODEL_PUBKEYS=<pubkey1>,<pubkey2> per abilitarli.')
+    return
+  }
+
   try {
     const { getConnectedRelays, connectToRelays, fetchFeed } = require('./nostr')
     if (!getConnectedRelays().length) await connectToRelays()
 
     const events = await fetchFeed({ tags: ['m4tr1x', 'model-update'], limit: 10 })
 
+    let accepted = 0
     for (const event of events) {
-      const dTag       = event.tags.find(t => t[0] === 'd')
+      // Verifica che il publisher sia in lista fidata
+      if (!TRUSTED_MODEL_PUBKEYS.has(event.pubkey)) {
+        console.warn(`[MODEL] Evento ignorato — pubkey non fidata: ${event.pubkey?.substring(0, 16)}...`)
+        continue
+      }
+
       const urlTag     = event.tags.find(t => t[0] === 'url')
       const versionTag = event.tags.find(t => t[0] === 'version')
       const hashTag    = event.tags.find(t => t[0] === 'hash_model')
@@ -216,16 +236,17 @@ async function syncModelVersionFromNostr() {
       if (!urlTag || !versionTag || !hashTag) continue
 
       registerModelVersion({
-        version:     versionTag[1],
-        url:         urlTag[1],
-        hashModel:   hashTag[1],
-        accuracy:    accTag     ? parseFloat(accTag[1])  : null,
-        samples:     sampTag    ? parseInt(sampTag[1])   : null,
+        version:      versionTag[1],
+        url:          urlTag[1],
+        hashModel:    hashTag[1],
+        accuracy:     accTag  ? parseFloat(accTag[1])  : null,
+        samples:      sampTag ? parseInt(sampTag[1])   : null,
         nostrEventId: event.id,
       })
+      accepted++
     }
 
-    console.log(`[MODEL] ${events.length} eventi modello trovati su Nostr.`)
+    console.log(`[MODEL] ${events.length} eventi trovati, ${accepted} accettati (publisher fidati).`)
   } catch (err) {
     console.warn('[MODEL] Impossibile sincronizzare da Nostr:', err.message)
   }

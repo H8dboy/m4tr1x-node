@@ -1,38 +1,65 @@
 /**
- * M4TR1X - Nostr Protocol Integration
- *
- * Il cuore dell'app. Nostr è un protocollo aperto e decentralizzato:
- * nessun server centrale, nessun account da registrare, nessuno può
- * bannare o silenziare nessuno. Ogni messaggio è firmato con la
- * chiave privata dell'utente — prova crittografica che è autentico.
- *
- * NIPs implementati:
- *  NIP-01 — Protocollo base (eventi, sottoscrizioni, relay)
- *  NIP-44 — DM cifrati (ChaCha20-Poly1305 + ECDH secp256k1)
- *  NIP-19 — Encoding bech32 (npub, nsec)
- *
- * FIX applicati rispetto alla prima versione:
- *  - nip44 e nip19 importati come submodule separati (nostr-tools v2)
- *  - Rimosso memory leak: listener WebSocket ora vengono rimossi dopo l'uso
- *  - Rimossa variabile 'originalOnMessage' inutilizzata
- *  - Gestione robusta delle connessioni con cleanup automatico
+ * M4TR1X - Nostr Module (server/nostr.js)
+ * NIP-01, NIP-04, NIP-44, NIP-19
+ * Fixed: localhost:4848 priority, reconnect, timeouts, error handling
  */
 
-const {
-  generateSecretKey,
-  getPublicKey,
-  finalizeEvent,
-  verifyEvent,
-} = require('nostr-tools')
+const { SimplePool, finalizeEvent, generateSecretKey, getPublicKey,
+  nip04, nip44, nip19 } = require('nostr-tools')
+const { webcrypto } = require('crypto')
+const path  = require('path')
+const fs    = require('fs')
+const os    = require('os')
+const WS    = require('ws')
 
-// In nostr-tools v2, nip44 e nip19 sono submodule separati
-const nip44 = require('nostr-tools/nip44')
-const nip19 = require('nostr-tools/nip19')
+// Polyfill WebCrypto for nostr-tools in Node
+if (!globalThis.crypto) globalThis.crypto = webcrypto
 
-const WebSocket = require('ws')
+// ── Key storage ───────────────────────────────────────────────────────────────
+const DATA_DIR  = process.env.M4TR1X_DATA_DIR || path.join(os.homedir(), '.m4tr1x')
+const KEYS_FILE = path.join(DATA_DIR, 'nostr_keys.json')
 
-// ─── Relay pubblici ───────────────────────────────────────────────────────────
+function getKeysPath () { return KEYS_FILE }
+
+function generateKeys () {
+  const sk = generateSecretKey()
+  const pk = getPublicKey(sk)
+  return {
+    privkey: Buffer.from(sk).toString('hex'),
+    pubkey:  pk,
+    npub:    nip19.npubEncode(pk),
+    nsec:    nip19.nsecEncode(sk)
+  }
+}
+
+function saveKeys (keys) {
+  if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true })
+  fs.writeFileSync(KEYS_FILE, JSON.stringify(keys, null, 2), { mode: 0o600 })
+}
+
+function loadSavedKeys () {
+  if (!fs.existsSync(KEYS_FILE)) return null
+  try { return JSON.parse(fs.readFileSync(KEYS_FILE, 'utf8')) } catch { return null }
+}
+
+function loadKeys (privkeyHex) {
+  const sk = Buffer.from(privkeyHex, 'hex')
+  const pk = getPublicKey(sk)
+  const keys = { privkey: privkeyHex, pubkey: pk,
+    npub: nip19.npubEncode(pk), nsec: nip19.nsecEncode(sk) }
+  saveKeys(keys)
+  return keys
+}
+
+function getCurrentPubkey () {
+  const k = loadSavedKeys()
+  return k ? k.pubkey : null
+}
+
+// ── Relay pool ────────────────────────────────────────────────────────────────
+// ws://localhost:4848 is FIRST — the embedded M4TR1X relay has priority
 const DEFAULT_RELAYS = [
+  'ws://localhost:4848',
   'wss://relay.damus.io',
   'wss://nos.lol',
   'wss://relay.nostr.band',
@@ -42,256 +69,238 @@ const DEFAULT_RELAYS = [
   'wss://nostr.mom',
 ]
 
-// ─── Stato interno ────────────────────────────────────────────────────────────
-let userPrivKey = null
-let userPubKey  = null
-let connections = {}   // url → WebSocket
+let _pool            = null
+let _connectedRelays = []
+let _reconnectTimer  = null
+let _reconnectDelay  = 1000   // ms — doubles on each failure, capped at 30s
+const MAX_RECONNECT  = 30000
 
-// ─── Gestione chiavi ─────────────────────────────────────────────────────────
-
-function generateKeys() {
-  const privkey = generateSecretKey()
-  const pubkey  = getPublicKey(privkey)
-  return {
-    privkey: Buffer.from(privkey).toString('hex'),
-    pubkey,
-    npub: nip19.npubEncode(pubkey),
-    nsec: nip19.nsecEncode(privkey),
-  }
+function getPool () {
+  if (!_pool) _pool = new SimplePool()
+  return _pool
 }
 
-function loadKeys(privkeyHex) {
-  userPrivKey = Uint8Array.from(Buffer.from(privkeyHex, 'hex'))
-  userPubKey  = getPublicKey(userPrivKey)
-  console.log(`[NOSTR] Chiavi caricate: ${userPubKey.substring(0, 16)}...`)
-}
+/**
+ * Probe each relay URL with a bare WebSocket.
+ * Returns the list of URLs that accepted the connection.
+ * Also schedules auto-reconnect for the local relay if it is down.
+ */
+async function connectToRelays (relayUrls) {
+  const urls = relayUrls || DEFAULT_RELAYS
+  _connectedRelays = []
 
-function getCurrentPubkey() { return userPubKey }
-
-// ─── Connessione relay ────────────────────────────────────────────────────────
-
-async function connectToRelays(relays = DEFAULT_RELAYS) {
-  const connected = []
-
-  await Promise.allSettled(relays.map(url => new Promise((resolve) => {
-    if (connections[url]?.readyState === WebSocket.OPEN) {
-      connected.push(url); return resolve()
-    }
-
-    const ws      = new WebSocket(url)
-    const timeout = setTimeout(() => { ws.terminate(); resolve() }, 5000)
-
-    ws.on('open', () => {
-      clearTimeout(timeout)
-      connections[url] = ws
-      connected.push(url)
-      console.log(`[NOSTR] Connesso: ${url}`)
-      resolve()
+  await Promise.allSettled(urls.map(url =>
+    new Promise(resolve => {
+      const timer = setTimeout(() => resolve(), 5000)
+      let ws
+      try {
+        ws = new WS(url)
+        ws.on('open', () => {
+          clearTimeout(timer)
+          _connectedRelays.push(url)
+          _reconnectDelay = 1000        // reset backoff on any success
+          ws.close()
+          resolve()
+        })
+        ws.on('error', () => { clearTimeout(timer); resolve() })
+        ws.on('close', () => resolve())
+      } catch { clearTimeout(timer); resolve() }
     })
-    ws.on('error', () => { clearTimeout(timeout); resolve() })
-    ws.on('close', () => { delete connections[url] })
-  })))
+  ))
 
-  console.log(`[NOSTR] ${connected.length}/${relays.length} relay attivi`)
-  return connected
+  // If local relay is not reachable, schedule a reconnect attempt
+  if (!_connectedRelays.includes('ws://localhost:4848')) {
+    _scheduleReconnect()
+  }
+
+  return _connectedRelays
 }
 
-function getConnectedRelays() {
-  return Object.keys(connections).filter(
-    url => connections[url]?.readyState === WebSocket.OPEN
-  )
+function _scheduleReconnect () {
+  if (_reconnectTimer) return
+  _reconnectTimer = setTimeout(async () => {
+    _reconnectTimer = null
+    console.log('[nostr] Reconnecting local relay (ws://localhost:4848)...')
+    await connectToRelays(['ws://localhost:4848'])
+    _reconnectDelay = Math.min(_reconnectDelay * 2, MAX_RECONNECT)
+  }, _reconnectDelay)
 }
 
-// ─── Pubblicazione eventi ─────────────────────────────────────────────────────
+function getConnectedRelays () {
+  // Always return at least the local relay URL so callers have something to work with
+  return _connectedRelays.length > 0 ? _connectedRelays : ['ws://localhost:4848']
+}
 
-async function publishEvent(eventTemplate) {
-  if (!userPrivKey) throw new Error('Keys not loaded. Call loadKeys() first.')
+// ── Publish helpers ───────────────────────────────────────────────────────────
+async function publishEvent (template, privkeyHex) {
+  const sk    = Buffer.from(privkeyHex, 'hex')
+  const event = finalizeEvent(template, sk)
+  const pool  = getPool()
+  try {
+    await Promise.any(pool.publish(DEFAULT_RELAYS, event))
+    return event
+  } catch (err) {
+    console.error('[nostr] publishEvent failed:', err.message)
+    throw err
+  }
+}
 
-  const event = finalizeEvent({
-    ...eventTemplate,
-    pubkey:     userPubKey,
+async function publishNote (content, privkeyHex, tags = []) {
+  return publishEvent({
+    kind: 1,
     created_at: Math.floor(Date.now() / 1000),
-  }, userPrivKey)
-
-  if (!getConnectedRelays().length) await connectToRelays()
-
-  const message = JSON.stringify(['EVENT', event])
-  for (const url of getConnectedRelays()) {
-    try { connections[url].send(message) }
-    catch (err) { console.warn(`[NOSTR] Errore invio a ${url}: ${err.message}`) }
-  }
-
-  console.log(`[NOSTR] Evento pubblicato (kind ${event.kind}): ${event.id.substring(0, 12)}...`)
-  return event
+    tags,
+    content
+  }, privkeyHex)
 }
 
-async function publishNote(content, tags = []) {
-  return publishEvent({ kind: 1, content, tags })
-}
-
-async function publishVideoAttestation(analysisResult, content = '') {
+async function publishVideoAttestation (videoHash, meta, privkeyHex) {
   return publishEvent({
-    kind:    30078,
-    content: content || `M4TR1X Attestation: ${analysisResult.verdict}`,
+    kind: 1,
+    created_at: Math.floor(Date.now() / 1000),
     tags: [
-      ['d',          `m4tr1x-${analysisResult.id}`],
-      ['verdict',    analysisResult.verdict],
-      ['hash',       analysisResult.video_hash_sha256],
-      ['confidence', JSON.stringify(analysisResult.confidence)],
-      ['t',          'm4tr1x'],
-      ['t',          'verification'],
-      ['t',          analysisResult.verdict.toLowerCase()],
+      ['t', 'm4tr1x'],
+      ['t', 'video-attestation'],
+      ['m4tr1x-hash', videoHash],
+      ['m4tr1x-ai',   meta.aiResult   || 'UNCERTAIN'],
+      ['m4tr1x-conf', String(meta.confidence || 0)],
     ],
-  })
+    content: meta.description || ''
+  }, privkeyHex)
 }
 
-async function publishProfile(profile) {
-  return publishEvent({ kind: 0, content: JSON.stringify(profile), tags: [] })
-}
-
-// ─── Sottoscrizioni con cleanup corretto ──────────────────────────────────────
-// FIX: ogni chiamata registra il listener e lo RIMUOVE al termine,
-// eliminando il memory leak della versione precedente.
-
-function subscribeOnce(relay, filter, onEvent, onEose, timeoutMs = 8000) {
-  const subId   = `sub_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`
-  let   settled = false
-
-  function cleanup() {
-    if (!settled) {
-      settled = true
-      relay.removeListener('message', onMessage)
-      try { relay.send(JSON.stringify(['CLOSE', subId])) } catch (_) {}
-    }
-  }
-
-  const timer = setTimeout(cleanup, timeoutMs)
-
-  function onMessage(raw) {
-    if (settled) return
-    try {
-      const msg = JSON.parse(raw.toString())
-      if (msg[0] === 'EVENT' && msg[1] === subId) {
-        onEvent(msg[2])
-      } else if (msg[0] === 'EOSE' && msg[1] === subId) {
-        clearTimeout(timer)
-        cleanup()
-        onEose()
-      }
-    } catch (_) {}
-  }
-
-  relay.on('message', onMessage)
-  relay.send(JSON.stringify(['REQ', subId, filter]))
-
-  return { close: cleanup }
-}
-
-// ─── Feed ─────────────────────────────────────────────────────────────────────
-
-async function fetchFeed({ authors, tags, limit = 50, since } = {}) {
-  if (!getConnectedRelays().length) await connectToRelays()
-
-  const filter = {
-    kinds: [1],
-    limit,
-    since: since || Math.floor(Date.now() / 1000) - 86400,
-  }
-  if (authors?.length) filter.authors = authors
-  if (tags?.length)    filter['#t']   = tags
-
-  const relays = getConnectedRelays()
-  if (!relays.length) return []
-
-  const relay  = connections[relays[0]]
-  const events = []
-
-  return new Promise((resolve) => {
-    subscribeOnce(
-      relay,
-      filter,
-      (event) => { if (verifyEvent(event)) events.push(event) },
-      ()      => resolve(events.sort((a, b) => b.created_at - a.created_at)),
-      8000,
-    )
-  })
-}
-
-// ─── DM cifrati (NIP-44) ──────────────────────────────────────────────────────
-
-async function sendEncryptedDM(recipientPubkey, message) {
-  if (!userPrivKey) throw new Error('Keys not loaded')
-
-  const conversationKey = nip44.getConversationKey(userPrivKey, recipientPubkey)
-  const encrypted       = nip44.encrypt(message, conversationKey)
-
+async function publishProfile (profileData, privkeyHex) {
   return publishEvent({
-    kind:    14,
-    content: encrypted,
-    tags:    [['p', recipientPubkey]],
-  })
+    kind: 0,
+    created_at: Math.floor(Date.now() / 1000),
+    tags:    [],
+    content: JSON.stringify(profileData)
+  }, privkeyHex)
 }
 
-function decryptDM(senderPubkey, encryptedContent) {
-  if (!userPrivKey) throw new Error('Keys not loaded')
-  const conversationKey = nip44.getConversationKey(userPrivKey, senderPubkey)
-  return nip44.decrypt(encryptedContent, conversationKey)
-}
+// ── Feed ──────────────────────────────────────────────────────────────────────
+/**
+ * Fetch the public feed (kind:1 notes).
+ * Races against an 8-second timeout so the API never hangs.
+ * Falls back to [] on any error — caller shows empty state.
+ */
+async function fetchFeed (opts = {}) {
+  const { limit = 50, since, tags = [] } = opts
+  const pool   = getPool()
+  const filter = { kinds: [1], limit }
+  if (since)       filter.since  = since
+  if (tags.length) filter['#t'] = tags
 
-async function fetchDMs(otherPubkey) {
-  if (!getConnectedRelays().length) await connectToRelays()
-
-  const filter = {
-    kinds:   [14],
-    limit:   100,
-    authors: [userPubKey, otherPubkey],
-    '#p':    [userPubKey, otherPubkey],
+  try {
+    const events = await Promise.race([
+      new Promise(resolve => {
+        const collected = []
+        const sub = pool.subscribeMany(DEFAULT_RELAYS, [filter], {
+          onevent (e) { collected.push(e) },
+          oneose  ()  { sub.close(); resolve(collected) }
+        })
+      }),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('feed timeout after 8s')), 8000)
+      )
+    ])
+    return events.sort((a, b) => b.created_at - a.created_at)
+  } catch (err) {
+    console.warn('[nostr] fetchFeed:', err.message)
+    return []
   }
-
-  const relays = getConnectedRelays()
-  if (!relays.length) return []
-
-  const relay  = connections[relays[0]]
-  const events = []
-
-  const raw = await new Promise((resolve) => {
-    subscribeOnce(
-      relay,
-      filter,
-      (event) => { if (verifyEvent(event)) events.push(event) },
-      ()      => resolve(events),
-      8000,
-    )
-  })
-
-  return raw.map(event => {
-    try {
-      const plaintext = decryptDM(event.pubkey, event.content)
-      return {
-        id:         event.id,
-        from:       event.pubkey,
-        to:         event.tags.find(t => t[0] === 'p')?.[1],
-        text:       plaintext,
-        created_at: event.created_at,
-        mine:       event.pubkey === userPubKey,
-      }
-    } catch { return null }
-  }).filter(Boolean).sort((a, b) => a.created_at - b.created_at)
 }
 
+// ── Direct Messages (NIP-44 with NIP-04 fallback) ─────────────────────────────
+async function sendEncryptedDM (recipientPubkey, content, privkeyHex) {
+  try {
+    const sk = Buffer.from(privkeyHex, 'hex')
+    const ck = nip44.v2.utils.getConversationKey(sk, recipientPubkey)
+    const encrypted = nip44.v2.encrypt(content, ck)
+    return publishEvent({
+      kind: 14,
+      created_at: Math.floor(Date.now() / 1000),
+      tags: [['p', recipientPubkey]],
+      content: encrypted
+    }, privkeyHex)
+  } catch (err) {
+    console.error('[nostr] sendEncryptedDM error:', err.message)
+    throw err
+  }
+}
+
+async function decryptDM (event, privkeyHex, senderPubkey) {
+  const sk = Buffer.from(privkeyHex, 'hex')
+  // Try NIP-44 first, fall back to NIP-04, fall back to placeholder
+  try {
+    const ck = nip44.v2.utils.getConversationKey(sk, senderPubkey)
+    return nip44.v2.decrypt(event.content, ck)
+  } catch { /* fall through */ }
+  try {
+    return await nip04.decrypt(privkeyHex, senderPubkey, event.content)
+  } catch { /* fall through */ }
+  return '[encrypted message]'
+}
+
+async function fetchDMs (myPubkey, peerPubkey, privkeyHex, limit = 50) {
+  const pool = getPool()
+  const filterIn  = { kinds: [14, 4], limit, '#p': [myPubkey],   authors: [peerPubkey] }
+  const filterOut = { kinds: [14, 4], limit, '#p': [peerPubkey], authors: [myPubkey]   }
+
+  try {
+    const events = await Promise.race([
+      new Promise(resolve => {
+        const collected = []
+        let eoseCount = 0
+        const sub = pool.subscribeMany(DEFAULT_RELAYS, [filterIn, filterOut], {
+          onevent (e) { collected.push(e) },
+          oneose  ()  { if (++eoseCount >= 2) { sub.close(); resolve(collected) } }
+        })
+      }),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('DM fetch timeout')), 8000)
+      )
+    ])
+
+    const decrypted = await Promise.all(events.map(async e => {
+      const sender = e.pubkey
+      const peer   = sender === myPubkey ? peerPubkey : sender
+      const text   = await decryptDM(e, privkeyHex, peer)
+      return { ...e, decryptedContent: text }
+    }))
+
+    return decrypted.sort((a, b) => a.created_at - b.created_at)
+  } catch (err) {
+    console.warn('[nostr] fetchDMs:', err.message)
+    return []
+  }
+}
+
+// ── Cleanup ───────────────────────────────────────────────────────────────────
+function cleanup () {
+  if (_reconnectTimer) { clearTimeout(_reconnectTimer); _reconnectTimer = null }
+  if (_pool) { try { _pool.close(DEFAULT_RELAYS) } catch {} _pool = null }
+  _connectedRelays = []
+}
+
+// ── Exports ───────────────────────────────────────────────────────────────────
 module.exports = {
   generateKeys,
   loadKeys,
+  saveKeys,
+  loadSavedKeys,
+  getKeysPath,
   getCurrentPubkey,
   connectToRelays,
   getConnectedRelays,
+  publishEvent,
   publishNote,
   publishVideoAttestation,
-  publishEvent,
   publishProfile,
   fetchFeed,
   sendEncryptedDM,
   decryptDM,
   fetchDMs,
   DEFAULT_RELAYS,
+  cleanup,
 }

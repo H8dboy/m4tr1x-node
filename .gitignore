@@ -1,52 +1,99 @@
-# Dependencies
+# ─── Dependencies ────────────────────────────────────────────────────────────
 node_modules/
 
-# Environment variables (contain secrets)
+# ─── Environment & secrets (NEVER commit these) ───────────────────────────────
 .env
+.env.local
+.env.*.local
+.env.runtime
+*.secret
+*.secrets
+secrets/
+secrets.json
+secrets.yaml
+secrets.yml
 
-# Database files (generated at runtime)
+# ─── Identity & key files (NEVER commit these) ────────────────────────────────
+*.enc
+*.key
+*.pem
+*.p12
+*.pfx
+*.seed
+*.keystore
+h8identity.enc
+nexus.key
+wallet.dat
+
+# ─── Database files (generated at runtime) ───────────────────────────────────
 *.db
 *.db-shm
 *.db-wal
+*.sqlite
+*.sqlite3
 
-# Uploaded videos (temp files)
+# ─── Uploaded content (temp files, user data) ────────────────────────────────
 uploads/
 tmp/
 temp/
+badge_docs/
 
-# Encryption keys (NEVER commit these)
-*.key
-nexus.key
-
-# AI models (downloaded automatically at runtime)
+# ─── AI models (large binaries, downloaded/generated at runtime) ─────────────
 models/*.onnx
 models/*.onnx.backup_*
+models/*.pt
+models/*.bin
 
-# Tauri build output
-src-tauri/target/
-
-# Electron build output
+# ─── Build output ─────────────────────────────────────────────────────────────
+# Electron
 dist/
 dist-electron/
 release/
+out/
 
-# OS files
+# Tauri
+src-tauri/target/
+
+# ─── OS files ────────────────────────────────────────────────────────────────
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
 Thumbs.db
 desktop.ini
+ehthumbs.db
 
-# Editor
+# ─── Editor & IDE ─────────────────────────────────────────────────────────────
 .vscode/
 .idea/
 *.swp
 *.swo
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.cursor/
 
-# Logs
+# ─── Logs ────────────────────────────────────────────────────────────────────
 *.log
 npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+logs/
 
-# Temporary git files
+# ─── Temporary & misc ────────────────────────────────────────────────────────
 *.orig
+*.bak
+*.patch
+coverage/
+.nyc_output/
+.eslintcache
 
-# Claude Code
+# ─── Claude / AI assistant workspace files ────────────────────────────────────
 .claude/
+.aider*
+.copilot/

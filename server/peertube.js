@@ -169,6 +169,90 @@ function normalizeVideo(v, instance) {
   }
 }
 
+// ─── Upload autenticato ───────────────────────────────────────────────────────
+
+/**
+ * Ottieni l'ID del canale principale dell'utente autenticato.
+ */
+async function getMyChannelId(instance, token) {
+  const res = await fetch(`https://${instance}/api/v1/users/me`, {
+    headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' },
+  })
+  if (!res.ok) throw new Error(`PeerTube /users/me error ${res.status}`)
+  const data = await res.json()
+  const channel = data.videoChannels?.[0]
+  if (!channel) throw new Error('Nessun canale PeerTube trovato')
+  return channel.id
+}
+
+/**
+ * Carica un video su PeerTube (direct upload, max ~4GB).
+ *
+ * @param {string} instance    - Istanza PeerTube (es. "kolektiva.media")
+ * @param {string} token       - Bearer token OAuth
+ * @param {string} videoPath   - Path locale del file video
+ * @param {object} meta
+ *   @param {string}   meta.name        - Titolo del video (obbligatorio)
+ *   @param {string}   [meta.description]
+ *   @param {string[]} [meta.tags]       - Array di tag (max 5 per PeerTube)
+ *   @param {number}   [meta.privacy]    - 1=public 2=unlisted 3=private (default 1)
+ *   @param {string}   [meta.language]   - es. "it", "en"
+ * @returns {{ uuid, watch_url, embed_url }}
+ */
+async function uploadVideo(instance, token, videoPath, meta = {}) {
+  const { Blob } = require('buffer')
+  const fs       = require('fs')
+  const path     = require('path')
+
+  const channelId = await getMyChannelId(instance, token)
+
+  const fileBuffer = fs.readFileSync(videoPath)
+  // Use original filename (with extension) for mime detection; multer temp files have no extension
+  const origName   = meta.originalname || path.basename(videoPath)
+  const mimeType   = origName.match(/\.mov$/i)  ? 'video/quicktime'
+                   : origName.match(/\.webm$/i) ? 'video/webm'
+                   : 'video/mp4'
+  const ext        = mimeType === 'video/quicktime' ? '.mov'
+                   : mimeType === 'video/webm'      ? '.webm'
+                   : '.mp4'
+  // Ensure filename sent to PeerTube has an extension (required by PeerTube validator)
+  const baseName   = path.basename(videoPath)
+  const fileName   = baseName.includes('.') ? baseName : baseName + ext
+
+  const blob = new Blob([fileBuffer], { type: mimeType })
+
+  const form = new FormData()
+  form.append('videofile', blob, fileName)
+  form.append('channelId', String(channelId))
+  form.append('name', meta.name || fileName)
+  if (meta.description) form.append('description', meta.description)
+  form.append('privacy', String(meta.privacy || 1))
+  form.append('waitTranscoding', 'true')
+  if (meta.language) form.append('language', meta.language)
+  // PeerTube accetta max 5 tag
+  const tags = (meta.tags || []).slice(0, 5)
+  tags.forEach(t => form.append('tags[]', t))
+
+  const res = await fetch(`https://${instance}/api/v1/videos/upload`, {
+    method:  'POST',
+    headers: { 'Authorization': `Bearer ${token}` },
+    body:    form,
+  })
+
+  if (!res.ok) {
+    const errText = await res.text().catch(() => res.status)
+    throw new Error(`PeerTube upload error ${res.status}: ${errText}`)
+  }
+
+  const data = await res.json()
+  const uuid = data.video?.uuid
+  return {
+    uuid,
+    watch_url: `https://${instance}/videos/watch/${uuid}`,
+    embed_url: getEmbedUrl(instance, uuid),
+  }
+}
+
 module.exports = {
   DEFAULT_INSTANCES,
   searchVideos,
@@ -177,4 +261,5 @@ module.exports = {
   getVideo,
   getEmbedUrl,
   discoverInstances,
+  uploadVideo,
 }

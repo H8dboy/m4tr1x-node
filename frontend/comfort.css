@@ -1,0 +1,465 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   M4TR1X — COMFORT LAYER
+   Priorità: leggibilità, touch targets, spaziatura umana, scorrimento fluido
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ─── TOKEN UPGRADE ──────────────────────────────────────────────────────── */
+:root {
+  --topbar: 60px;
+  --bottom: 74px;
+  --r:   16px;
+  --rsm: 10px;
+  --rlg: 26px;
+  --fs-base: 15px;   /* base font — tutto si scala da qui */
+}
+
+html { font-size: var(--fs-base) }
+
+/* ─── SMOOTH SCROLL + OVERSCROLL ─────────────────────────────────────────── */
+.section-feed {
+  scroll-behavior: smooth;
+  overscroll-behavior-y: contain;
+}
+.dm-chat-msgs, .notif-list, .prof-grid,
+.forum-container, .shop-container, .dm-list,
+.funkwhale-track, #cmt-list, .userlist-body,
+#prof-highlights, #profile-inner {
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ─── TOPBAR ─────────────────────────────────────────────────────────────── */
+#topbar { height: var(--topbar) }
+.logo { font-size: 1.15em; letter-spacing: 6px }
+#session-timer { font-size: 0.72em }
+
+/* ─── BOTTOM NAV ─────────────────────────────────────────────────────────── */
+#bottom-nav { height: var(--bottom); padding: 0 2px 6px }
+.bnav {
+  padding: 7px 10px 5px;
+  min-width: 50px;
+  min-height: 54px;
+  font-size: 0.62em;
+  letter-spacing: 0.5px;
+  gap: 4px;
+}
+.bnav .bicon { font-size: 1.55em }
+.bnav-label { font-size: 0.75em; letter-spacing: 0.5px; line-height: 1 }
+.bnav.post-nav .bicon {
+  width: 44px; height: 44px;
+  border-radius: 14px;
+  font-size: 1.6em;
+}
+/* Unread badge */
+#dm-unread-badge {
+  font-size: 0.68em !important;
+  min-width: 18px !important;
+  padding: 2px 6px !important;
+  border-radius: 10px !important;
+}
+
+/* ─── MUTE BUTTON ────────────────────────────────────────────────────────── */
+#mute-btn {
+  top: calc(var(--topbar) + 10px);
+  width: 38px; height: 38px; font-size: 1em;
+}
+
+/* ─── VIDEO SLIDE INFO — più grande, più leggibile ───────────────────────── */
+.slide-info {
+  bottom: calc(var(--bottom) + 24px);
+  left: 16px;
+  max-width: calc(100% - 80px);
+}
+.slide-av { width: 42px; height: 42px; border-width: 2.5px }
+.slide-name { font-size: 0.88em; letter-spacing: 1.5px }
+.slide-time { font-size: 0.7em }
+.slide-meta { font-size: 0.9em; margin-bottom: 6px }
+.slide-caption { font-size: 0.9em; line-height: 1.6; margin-bottom: 7px }
+.slide-tags { font-size: 0.8em }
+.slide-genre { font-size: 0.8em }
+
+/* Slide actions — touch targets più grandi */
+.slide-actions {
+  right: 14px;
+  bottom: calc(var(--bottom) + 28px);
+  gap: 20px;
+}
+.sact-icon {
+  width: 52px; height: 52px;
+  font-size: 1.35em;
+  border-width: 1.5px;
+}
+.sact-label { font-size: 0.65em; letter-spacing: 0.5px }
+
+/* Boost badge */
+.boost-badge { top: calc(var(--topbar) + 10px) }
+
+/* AI badge */
+.ai-badge { font-size: 0.6em; padding: 4px 12px }
+
+/* ─── SEZIONE BANNER ─────────────────────────────────────────────────────── */
+.section-banner {
+  top: var(--topbar);
+  font-size: 0.7em;
+  padding: 6px 16px;
+}
+.banner-text strong { font-size: 1.1em }
+
+/* ─── PLACEHOLDER ─────────────────────────────────────────────────────────── */
+.ph-text { font-size: 0.82em; letter-spacing: 3px }
+
+/* ─── FORUM — più spazio, font leggibile ─────────────────────────────────── */
+.forum-container {
+  padding-top: calc(var(--topbar) + 48px);
+  padding-bottom: calc(var(--bottom) + 30px);
+}
+.forum-post { padding: 18px; margin-bottom: 12px; border-radius: 18px }
+.forum-post-av { width: 38px; height: 38px; font-size: 0.95em }
+.forum-post-name { font-size: 0.78em }
+.forum-post-time { font-size: 0.65em }
+.forum-post-title { font-size: 0.9em; margin-bottom: 8px }
+.forum-post-body { font-size: 0.85em; line-height: 1.7; margin-bottom: 12px }
+.forum-act { font-size: 0.75em; gap: 5px; padding: 4px 0; min-height: 30px }
+.forum-post-source { font-size: 0.6em }
+
+.forum-field label { font-size: 0.7em; margin-bottom: 7px }
+.forum-field input, .forum-field textarea {
+  font-size: 0.9em; padding: 12px 14px;
+}
+.btn-forum-post { padding: 16px; font-size: 0.82em; letter-spacing: 2px }
+.forum-sheet-head { padding: 20px 20px }
+.forum-new-btn { width: 56px; height: 56px; font-size: 1.6em }
+
+/* ─── DM — chat più comoda ────────────────────────────────────────────────── */
+.dm-container { padding-top: calc(var(--topbar) + 10px) }
+.dm-av { width: 50px; height: 50px }
+.dm-name { font-size: 0.82em }
+.dm-preview { font-size: 0.78em }
+.dm-time { font-size: 0.65em }
+.dm-item { padding: 16px 0; gap: 14px }
+.dm-encryption-badge { font-size: 0.65em; padding: 10px 16px; gap: 10px }
+.dm-msg-bubble { font-size: 0.85em; padding: 11px 16px }
+.dm-chat-input input { font-size: 0.9em; padding: 12px 18px }
+.dm-chat-input button { font-size: 0.75em; padding: 0 22px }
+.dm-chat-name { font-size: 0.82em; letter-spacing: 1.5px }
+
+/* ─── SHOP ────────────────────────────────────────────────────────────────── */
+.shop-container {
+  padding-top: calc(var(--topbar) + 48px);
+  padding-bottom: calc(var(--bottom) + 30px);
+}
+.shop-item { padding: 14px; border-radius: 18px }
+.shop-item-img { border-radius: 12px; margin-bottom: 12px }
+.shop-item-name { font-size: 0.75em }
+.shop-item-price { font-size: 0.82em }
+.shop-item-seller { font-size: 0.65em }
+.shop-balance { font-size: 0.82em }
+.shop-balance-amount { padding: 6px 14px; font-size: 0.95em }
+.shop-buy-tokens { font-size: 0.65em; padding: 9px 16px }
+.shop-grid { gap: 14px }
+.shop-sell-btn { width: 56px; height: 56px; font-size: 1.6em }
+
+/* Sell sheet */
+.sell-field label { font-size: 0.68em; margin-bottom: 6px }
+.sell-field input, .sell-field textarea, .sell-field select {
+  font-size: 0.9em; padding: 12px 14px;
+}
+.btn-sell { padding: 16px; font-size: 0.82em; letter-spacing: 2px }
+.sell-img-zone { padding: 30px }
+
+/* ─── TOKEN MODAL ─────────────────────────────────────────────────────────── */
+.token-title { font-size: 0.95em; margin-bottom: 22px }
+.token-btn { font-size: 0.88em; padding: 13px 3px; min-height: 48px }
+.token-info { font-size: 0.72em }
+.btn-buy-token { padding: 16px; font-size: 0.88em }
+.token-cancel { font-size: 0.8em; padding: 12px }
+
+/* ─── UPLOAD MODAL ────────────────────────────────────────────────────────── */
+.up-head { padding: 20px 20px }
+.up-title { font-size: 0.85em }
+.up-cats { gap: 12px; padding: 18px 20px 0 }
+.up-cat { padding: 16px 4px; font-size: 1.5em; border-radius: 12px }
+.up-body { padding: 18px 20px }
+.drop-zone { padding: 40px 16px; border-radius: 18px }
+.dz-icon { font-size: 2.6em; margin-bottom: 12px }
+.drop-zone strong { font-size: 0.95em }
+.drop-zone p { font-size: 0.82em; margin-top: 5px }
+.field label { font-size: 0.68em; margin-bottom: 6px }
+.field input, .field textarea, .field select {
+  font-size: 0.9em; padding: 12px 14px;
+}
+.btn-pub { padding: 17px; font-size: 0.82em; letter-spacing: 2px; border-radius: 12px }
+.prog-txt { font-size: 0.72em }
+.up-disc { font-size: 0.75em; padding: 12px 16px }
+
+/* ─── ZAP / H8 TIP ────────────────────────────────────────────────────────── */
+.zap-title { font-size: 0.95em; margin-bottom: 22px }
+.sat-btn { font-size: 0.88em; padding: 13px 3px; min-height: 48px }
+.zap-input { font-size: 0.95em; padding: 12px 16px }
+.btn-zap { padding: 16px; font-size: 0.88em }
+.zap-cancel { font-size: 0.8em; padding: 12px }
+
+/* ─── COMMENTS ────────────────────────────────────────────────────────────── */
+.drawer-bar { padding: 16px 20px }
+.drawer-bar-title { font-size: 0.8em; letter-spacing: 1.5px }
+.cmt-item { font-size: 0.85em; padding: 10px 0; line-height: 1.65 }
+.cmt-author { font-size: 0.88em }
+#cmt-input { font-size: 0.9em; padding: 12px 18px }
+#cmt-send { font-size: 0.75em; padding: 0 22px }
+#cmt-input-bar { padding: 12px 16px; gap: 10px }
+
+/* ─── FUNKWHALE ───────────────────────────────────────────────────────────── */
+.funkwhale-track {
+  padding-top: calc(var(--topbar) + 48px);
+  padding-bottom: calc(var(--bottom) + 30px);
+}
+.fw-track-item { padding: 14px 16px; border-radius: 16px; margin-bottom: 10px }
+.fw-cover { width: 56px; height: 56px; border-radius: 12px; font-size: 1.7em }
+.fw-title { font-size: 0.82em; margin-bottom: 5px }
+.fw-artist { font-size: 0.72em }
+.fw-duration { font-size: 0.68em }
+#fw-player { padding: 12px 18px }
+.fw-player-title { font-size: 0.78em }
+.fw-player-btn { width: 38px; height: 38px; font-size: 1.1em }
+
+/* ─── TOAST ───────────────────────────────────────────────────────────────── */
+#toast {
+  top: calc(var(--topbar) + 12px);
+  font-size: 0.72em; padding: 10px 26px;
+}
+
+/* ─── PROFILE PANEL — più comodo ─────────────────────────────────────────── */
+/* Su schermi piccoli si apre dal basso come uno sheet */
+#profile-inner { width: min(460px, 100%) }
+
+.prof-ident { width: 56px; height: 56px }
+.prof-name { font-size: 0.9em; letter-spacing: 1.5px }
+.prof-key { font-size: 0.58em }
+.prof-bio { font-size: 0.78em; line-height: 1.75; margin-top: 12px }
+.prof-head { padding: 20px 18px 16px }
+
+.prof-follow-btn { padding: 12px; font-size: 0.72em; letter-spacing: 1.5px; border-radius: 12px }
+.prof-dm-btn { padding: 12px 18px; font-size: 0.7em; border-radius: 12px }
+.prof-actions { margin-top: 16px; gap: 10px }
+
+.prof-stat-n { font-size: 1.0em }
+.prof-stat-l { font-size: 0.55em; letter-spacing: 1.5px }
+.prof-stats { padding: 16px 18px }
+
+.hl-circle { width: 64px; height: 64px; border-width: 2.5px }
+.hl-label { font-size: 0.45em }
+.hl-wrap { gap: 6px }
+#prof-highlights { padding: 16px 18px 14px; gap: 16px }
+
+.prof-edit-btn { font-size: 0.72em; padding: 9px 16px; border-radius: 10px }
+#prof-own-actions { gap: 10px; margin-top: 10px }
+/* Style the inline buttons in prof-own-actions */
+#prof-own-actions button {
+  border-radius: 10px !important;
+  padding: 9px 14px !important;
+  font-size: 0.72em !important;
+  letter-spacing: 1px !important;
+  transition: 0.2s !important;
+}
+
+/* ─── GRID TABS ───────────────────────────────────────────────────────────── */
+#gtab-posts, #gtab-reposts {
+  font-size: 0.72em !important;
+  padding: 12px !important;
+  letter-spacing: 1.5px !important;
+}
+
+/* ─── NOTIFICATIONS ───────────────────────────────────────────────────────── */
+.notif-head { padding: 20px 18px }
+.notif-title { font-size: 0.82em; letter-spacing: 2px }
+.notif-item { padding: 14px 18px }
+.notif-type { font-size: 0.62em; letter-spacing: 1.5px }
+.notif-content { font-size: 0.78em; line-height: 1.6 }
+.notif-time { font-size: 0.62em }
+.notif-empty { font-size: 0.72em; letter-spacing: 2px }
+
+/* ─── USER LIST ───────────────────────────────────────────────────────────── */
+.userlist-head { padding: 20px 18px }
+.userlist-title { font-size: 0.85em; letter-spacing: 2px }
+.userlist-item { padding: 14px 18px; gap: 14px }
+.userlist-av { width: 44px; height: 44px; font-size: 1.1em }
+.userlist-name { font-size: 0.78em }
+.userlist-key { font-size: 0.6em }
+
+/* ─── BADGE / EDIT / COMPOSE / PROTO — form sizes ────────────────────────── */
+#badge-modal input,   #badge-modal select,   #badge-modal textarea,
+#edit-profile-modal input, #edit-profile-modal select, #edit-profile-modal textarea,
+#compose-modal input,  #compose-modal select,  #compose-modal textarea,
+#proto-modal input,    #proto-modal select,    #proto-modal textarea {
+  font-size: 0.9em !important;
+  padding: 12px 14px !important;
+}
+/* Inline labels in those modals */
+#badge-modal label, #edit-profile-modal label,
+#compose-modal label, #proto-modal label {
+  font-size: 0.72em !important;
+  margin-bottom: 7px !important;
+}
+/* Submit buttons */
+#badge-modal button[onclick*="submit"],
+#badge-modal button[onclick*="save"],
+#edit-profile-modal button[onclick*="save"],
+#compose-modal button[onclick*="post"],
+#proto-modal button[onclick*="save"] {
+  padding: 15px !important;
+  font-size: 0.82em !important;
+  letter-spacing: 2px !important;
+  border-radius: 12px !important;
+}
+
+/* ─── SECTION INDICATOR PILL (in topbar, shows active section) ───────────── */
+#section-pill {
+  position: fixed;
+  top: calc(var(--topbar) / 2);
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.1);
+  backdrop-filter: blur(8px);
+  border-radius: 20px;
+  padding: 4px 16px;
+  font-family: var(--font-display);
+  font-size: 0.72em;
+  font-weight: 700;
+  letter-spacing: 3px;
+  color: var(--green);
+  pointer-events: none;
+  z-index: 201;
+  transition: color 0.3s, border-color 0.3s;
+  white-space: nowrap;
+}
+#section-pill.film-pill   { color: var(--blue);   border-color: rgba(56,182,255,0.25) }
+#section-pill.music-pill  { color: var(--yellow); border-color: rgba(255,209,102,0.25) }
+#section-pill.forum-pill  { color: var(--purple); border-color: rgba(179,136,255,0.25) }
+#section-pill.shop-pill   { color: var(--orange); border-color: rgba(255,154,60,0.25) }
+#section-pill.dm-pill     { color: var(--green);  border-color: rgba(0,255,136,0.25) }
+
+/* ─── SLIDE CARD — info più leggibile ────────────────────────────────────── */
+/* Wrap slide-info in a subtle frosted card for readability */
+.slide-info-card {
+  background: linear-gradient(
+    to right,
+    rgba(0,0,0,0.55) 0%,
+    rgba(0,0,0,0.15) 100%
+  );
+  backdrop-filter: blur(4px);
+  border-radius: 16px;
+  padding: 14px 16px 12px;
+  margin-top: 6px;
+}
+
+/* ─── SCROLL SNAP SMOOTH ─────────────────────────────────────────────────── */
+.section-feed { scroll-snap-type: y mandatory }
+.video-slide {
+  scroll-snap-align: start;
+  scroll-snap-stop: always;   /* forza stop su ogni slide */
+}
+
+/* ─── RIPPLE / TAP FEEDBACK ─────────────────────────────────────────────── */
+.bnav, .sact, .top-btn,
+.prof-follow-btn, .prof-dm-btn,
+.forum-post, .shop-item, .dm-item, .fw-track-item,
+.userlist-item, .notif-item {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+/* ─── FOCUS RING (accessibilità) ────────────────────────────────────────── */
+:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 2px;
+}
+input:focus-visible, textarea:focus-visible, select:focus-visible {
+  outline: none; /* handled by border-color transition */
+}
+
+/* ─── MEDIA QUERY — tablet/desktop più spazio ────────────────────────────── */
+@media (min-width: 600px) {
+  :root { --fs-base: 16px }
+  .slide-info { left: 20px; max-width: calc(100% - 90px) }
+  .forum-container, .shop-container, .funkwhale-track, .dm-container {
+    max-width: 680px; margin: 0 auto;
+  }
+  .shop-grid { grid-template-columns: repeat(3, 1fr) }
+  #profile-inner { width: 420px }
+}
+
+/* ─── POWERED STRIP (ridotto, meno invadente) ───────────────────────────── */
+.powered-strip { display: none }  /* nascosto — info è nel profilo/about */
+
+/* ─── SKELETON LOADING ───────────────────────────────────────────────────── */
+@keyframes skeleton {
+  0%   { background-position: -200% 0 }
+  100% { background-position:  200% 0 }
+}
+.skel {
+  background: linear-gradient(
+    90deg,
+    var(--surface) 25%,
+    var(--surface2) 50%,
+    var(--surface) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeleton 1.5s infinite;
+  border-radius: var(--rsm);
+}
+
+/* ─── EMPTY STATES ────────────────────────────────────────────────────────── */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 24px;
+  gap: 16px;
+  text-align: center;
+}
+.empty-state-icon { font-size: 3.5em; opacity: 0.4 }
+.empty-state-title {
+  font-family: var(--font-display);
+  font-size: 0.82em;
+  color: var(--text-dim);
+  letter-spacing: 2px;
+}
+.empty-state-sub { font-size: 0.72em; color: var(--text-muted); line-height: 1.7 }
+
+/* ─── TOPBAR H8 WALLET BUTTON ────────────────────────────────────────────── */
+.h8-wallet-btn {
+  min-width: 48px !important;
+  border-radius: 20px !important;
+  border: 1px solid rgba(0,255,136,0.2) !important;
+  background: rgba(0,255,136,0.04) !important;
+  transition: background 0.2s, border-color 0.2s !important;
+}
+.h8-wallet-btn:hover, .h8-wallet-btn:active {
+  background: rgba(0,255,136,0.10) !important;
+  border-color: rgba(0,255,136,0.4) !important;
+}
+
+/* ─── BOOST LABEL (dynamic score on slide action) ────────────────────────── */
+.boost-act .sact-label { color: var(--yellow); transition: color 0.2s }
+
+/* ─── WALLET MODAL FORMS ─────────────────────────────────────────────────── */
+#wallet-modal input[type="password"] {
+  background: rgba(0,255,136,0.03) !important;
+  border-radius: var(--rsm) !important;
+}
+#wallet-modal input[type="password"]:focus {
+  border-color: rgba(0,255,136,0.5) !important;
+}
+#wallet-unlock-form button,
+#wallet-create-section button[onclick*="doWallet"] {
+  border-radius: 12px;
+}
+
+/* ─── ZAP MODAL — balance row ────────────────────────────────────────────── */
+.zap-sheet .sats-row button { min-height: 44px; flex: 1; border-radius: 10px }
+
+/* ─── BOOST MODAL BUTTONS ────────────────────────────────────────────────── */
+#boost-modal input { border-radius: var(--rsm) }
+#boost-amount:focus { border-color: rgba(255,209,102,0.5) !important }

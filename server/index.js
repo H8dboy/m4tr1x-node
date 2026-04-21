@@ -11,6 +11,7 @@ const multer     = require('multer')
 const rateLimit  = require('express-rate-limit')
 const path       = require('path')
 const fs         = require('fs')
+const crypto     = require('crypto')
 const { v4: uuidv4 } = require('uuid')
 require('dotenv').config()
 
@@ -18,16 +19,22 @@ const { analyzeVideo }           = require('./ai_detector')
 const { cleanMetadata, isExifToolAvailable } = require('./core')
 const { initDb, saveResult, loadResult, listResults } = require('./db')
 const {
-  createWallet, restoreWallet, openWallet, walletExists,
-  syncWallet, getBalance, getPrimaryAddress,
-} = require('./monero')
+  generateIdentity, unlockIdentity, lockIdentity,
+  identityExists, getPublicInfo,
+} = require('./h8identity')
+const {
+  initH8Db, getBalance: h8Balance, getHistory: h8History,
+  getBoostScore, verifyChain,
+  mint: h8Mint, transfer: h8Transfer, tip: h8Tip,
+  boost: h8Boost, registerPubkey,
+} = require('./h8token')
 const {
   initShopDb, createListing, getListings, getListing,
-  deactivateListing, initiateOrder, verifyOrderPayment,
+  deactivateListing, buyListing,
   getOrder, getSellerOrders, getBuyerOrders,
 } = require('./shop')
 const {
-  generateKeys, loadKeys, getCurrentPubkey,
+  generateKeys, loadSavedKeys, loadKeys, getCurrentPubkey,
   connectToRelays, getConnectedRelays,
   publishNote, publishVideoAttestation,
   fetchFeed, sendEncryptedDM, fetchDMs, publishProfile,
@@ -48,7 +55,22 @@ const {
   approveRequest, rejectRequest, getUserRequest,
 } = require('./badges')
 
-// ─── Config ───────────────────────────────────────────────────────────────────
+// âââ Embedded Nostr Relay âââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// Avviato in processo figlio per evitare che EADDRINUSE faccia crashare il server
+const { spawn: _spawnRelay } = require('child_process')
+const _net = require('net')
+const _sock = _net.createConnection(4848, '127.0.0.1')
+_sock.once('connect', () => { _sock.destroy(); console.log('[RELAY] Already running on :4848') })
+_sock.once('error', () => {
+  const rp = _spawnRelay(process.execPath, [require('path').join(__dirname, 'relay.js')], {
+    stdio: 'inherit', env: { ...process.env }
+  })
+  rp.on('error', e => console.error('[RELAY] Error:', e.message))
+  process.on('exit', () => rp.kill())
+  console.log('[M4TR1X] Embedded Nostr relay starting on ws://localhost:4848')
+})
+
+// âââ Config âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 const MAX_FILE_MB      = parseInt(process.env.MAX_FILE_SIZE_MB || '100')
 const API_KEY          = process.env.M4TR1X_API_KEY || ''
 const ALLOWED_ORIGINS  = (process.env.ALLOWED_ORIGINS || 'http://localhost:8080').split(',')
@@ -58,30 +80,37 @@ const DATA_DIR      = process.env.M4TR1X_DATA_DIR || process.cwd()
 const UPLOAD_DIR    = path.join(DATA_DIR, 'uploads')
 if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true })
 
-const ADMIN_KEY      = process.env.ADMIN_KEY || 'admin123'
+const ADMIN_KEY = (() => {
+  if (process.env.ADMIN_KEY) return process.env.ADMIN_KEY
+  const generated = crypto.randomBytes(32).toString('hex')
+  console.warn('[SECURITY] â ï¸  ADMIN_KEY non impostata! Chiave temporanea (solo questa sessione):')
+  console.warn(`[SECURITY]     ${generated}`)
+  console.warn('[SECURITY]     Imposta ADMIN_KEY=<valore> nelle variabili d\'ambiente per una chiave fissa.')
+  return generated
+})()
 const BADGE_DOCS_DIR = path.join(DATA_DIR, 'badge_docs')
 if (!fs.existsSync(BADGE_DOCS_DIR)) fs.mkdirSync(BADGE_DOCS_DIR, { recursive: true })
 
-// ─── App ──────────────────────────────────────────────────────────────────────
+// âââ App ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 const app = express()
 
-// CORS — accetta localhost (Electron) + origini configurate
+// CORS â accetta localhost (Electron) + origini configurate
 app.use(cors({
   origin: [...ALLOWED_ORIGINS, 'http://localhost:8080', 'http://127.0.0.1:8080'],
   credentials: false,
-  methods: ['GET', 'POST'],
+  methods: ['GET', 'POST', 'DELETE'],
   allowedHeaders: ['X-Nostr-Pubkey', 'X-API-Key', 'X-Admin-Key', 'Content-Type'],
 }))
 
 app.use(express.json())
 
-// ─── Multer (upload file) ─────────────────────────────────────────────────────
+// âââ Multer (upload file) âââââââââââââââââââââââââââââââââââââââââââââââââââââ
 const upload = multer({
   dest: UPLOAD_DIR,
   limits: { fileSize: MAX_FILE_MB * 1024 * 1024 },
 })
 
-// Badge document upload (PDF, JPG, PNG — max 10MB)
+// Badge document upload (PDF, JPG, PNG â max 10MB)
 const badgeUpload = multer({
   dest: BADGE_DOCS_DIR,
   limits: { fileSize: 10 * 1024 * 1024 },
@@ -92,7 +121,7 @@ const badgeUpload = multer({
   },
 })
 
-// ─── Rate limiting ────────────────────────────────────────────────────────────
+// âââ Rate limiting ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 const analyzeLimit = rateLimit({
   windowMs: 60 * 1000,
   max: 10,
@@ -101,7 +130,16 @@ const analyzeLimit = rateLimit({
   message: { error: 'Troppe richieste. Riprova tra un minuto.' },
 })
 
-// ─── API Key middleware ───────────────────────────────────────────────────────
+// Rate limit per operazioni di pagamento (10 al minuto)
+const paymentLimit = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Troppe transazioni. Riprova tra un minuto.' },
+})
+
+// âââ API Key middleware âââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 function verifyApiKey(req, res, next) {
   if (API_KEY && req.headers['x-api-key'] !== API_KEY) {
     return res.status(401).json({ error: 'Invalid or missing API key' })
@@ -109,7 +147,7 @@ function verifyApiKey(req, res, next) {
   next()
 }
 
-// ─── Routes ───────────────────────────────────────────────────────────────────
+// âââ Routes âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
 // Health check
 app.get('/health', (req, res) => {
@@ -193,75 +231,140 @@ app.get('/api/v1/analyses', verifyApiKey, (req, res) => {
   res.json(listResults(limit))
 })
 
-// ─── Routes: Wallet XMR ───────────────────────────────────────────────────────
+// âââ Routes: H8 Wallet ââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
-// Stato wallet (esiste? saldo?)
-app.get('/api/v1/wallet/status', verifyApiKey, async (req, res) => {
+// Stato wallet H8 (esiste? saldo? address?)
+app.get('/api/v1/h8/wallet/status', verifyApiKey, (req, res) => {
   try {
-    const exists = walletExists()
+    const exists = identityExists()
     if (!exists) return res.json({ exists: false })
-    const balance = await getBalance()
-    const address = await getPrimaryAddress()
-    res.json({ exists: true, address, balance })
+    const info = getPublicInfo()
+    const balance = info ? h8Balance(info.address) : 0
+    res.json({ exists: true, address: info?.address, balance, locked: !require('./h8identity').getUnlockedIdentity() })
   } catch (err) {
     res.status(500).json({ error: err.message })
   }
 })
 
-// Crea nuovo wallet
-app.post('/api/v1/wallet/create', verifyApiKey, async (req, res) => {
+// Crea nuova identitÃ  H8
+app.post('/api/v1/h8/wallet/create', verifyApiKey, async (req, res) => {
   try {
     const { password } = req.body
     if (!password) return res.status(400).json({ error: 'Password richiesta' })
-    const result = await createWallet(password)
-    // IMPORTANTE: il seed viene mostrato solo qui, una volta sola
-    res.json({
-      address: result.address,
-      seed:    result.seed,
-      warning: 'SALVA IL SEED ORA. Non verrà mostrato di nuovo.',
-    })
+    if (identityExists()) return res.status(409).json({ error: 'IdentitÃ  H8 giÃ  esistente' })
+    const result = await generateIdentity(password)
+    registerPubkey(result.address, result.publicKey)
+    res.status(201).json({ address: result.address, message: 'H8 identity creata. Salva la tua password.' })
   } catch (err) {
     res.status(500).json({ error: err.message })
   }
 })
 
-// Ripristina wallet da seed
-app.post('/api/v1/wallet/restore', verifyApiKey, async (req, res) => {
-  try {
-    const { seed, password, restoreHeight } = req.body
-    if (!seed || !password) return res.status(400).json({ error: 'seed e password richiesti' })
-    const result = await restoreWallet(seed, password, restoreHeight || 0)
-    res.json({ address: result.address })
-  } catch (err) {
-    res.status(500).json({ error: err.message })
-  }
-})
-
-// Apri wallet esistente (sblocco con password)
-app.post('/api/v1/wallet/open', verifyApiKey, async (req, res) => {
+// Sblocca wallet (password â secret key in memoria per la sessione)
+app.post('/api/v1/h8/wallet/unlock', verifyApiKey, async (req, res) => {
   try {
     const { password } = req.body
-    if (!password) return res.status(400).json({ error: 'Password required' })
-    const ok = await openWallet(password)
-    if (!ok) return res.status(404).json({ error: 'Wallet not found' })
-    res.json({ status: 'opened' })
+    if (!password) return res.status(400).json({ error: 'Password richiesta' })
+    const result = await unlockIdentity(password)
+    const balance = h8Balance(result.address)
+    res.json({ status: 'unlocked', address: result.address, balance })
   } catch (err) {
-    res.status(500).json({ error: err.message })
+    res.status(401).json({ error: err.message })
   }
 })
 
-// Sync wallet (aggiorna saldo)
-app.post('/api/v1/wallet/sync', verifyApiKey, async (req, res) => {
+// Blocca wallet
+app.post('/api/v1/h8/wallet/lock', verifyApiKey, (req, res) => {
+  lockIdentity()
+  res.json({ status: 'locked' })
+})
+
+// Saldo + storico
+app.get('/api/v1/h8/balance', verifyApiKey, (req, res) => {
   try {
-    await syncWallet()
-    const balance = await getBalance()
-    res.json({ status: 'synced', balance })
+    const { address } = req.query
+    const info = address ? { address } : getPublicInfo()
+    if (!info) return res.status(404).json({ error: 'Wallet non trovato' })
+    res.json({ address: info.address, balance: h8Balance(info.address) })
   } catch (err) {
     res.status(500).json({ error: err.message })
   }
 })
 
-// ─── Routes: Shop ─────────────────────────────────────────────────────────────
+app.get('/api/v1/h8/history', verifyApiKey, (req, res) => {
+  try {
+    const info = getPublicInfo()
+    if (!info) return res.status(404).json({ error: 'Wallet non trovato' })
+    res.json(h8History(info.address, parseInt(req.query.limit || '50')))
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// Trasferimento diretto
+app.post('/api/v1/h8/transfer', verifyApiKey, paymentLimit, async (req, res) => {
+  try {
+    const { toAddress, amount, note } = req.body
+    if (!toAddress || !amount) return res.status(400).json({ error: 'toAddress e amount richiesti' })
+    const amt = parseInt(amount)
+    if (isNaN(amt) || amt <= 0) return res.status(400).json({ error: 'amount deve essere un intero positivo' })
+    if (amt > 1_000_000) return res.status(400).json({ error: 'amount supera il massimo consentito (1.000.000 H8)' })
+    const hash = await h8Transfer(toAddress, amt, note || '')
+    res.json({ status: 'confirmed', txHash: hash })
+  } catch (err) {
+    res.status(400).json({ error: err.message })
+  }
+})
+
+// Tip a creator (split 50/20/30)
+app.post('/api/v1/h8/tip', verifyApiKey, paymentLimit, async (req, res) => {
+  try {
+    const { creatorAddress, amount, contentId } = req.body
+    if (!creatorAddress || !amount) return res.status(400).json({ error: 'creatorAddress e amount richiesti' })
+    const amt = parseInt(amount)
+    if (isNaN(amt) || amt <= 0) return res.status(400).json({ error: 'amount deve essere un intero positivo' })
+    if (amt > 100_000) return res.status(400).json({ error: 'tip supera il massimo consentito (100.000 H8)' })
+    const result = await h8Tip(creatorAddress, amt, contentId || '')
+    res.json({ status: 'confirmed', ...result })
+  } catch (err) {
+    res.status(400).json({ error: err.message })
+  }
+})
+
+// Boost visibilitÃ  contenuto
+app.post('/api/v1/h8/boost', verifyApiKey, paymentLimit, async (req, res) => {
+  try {
+    const { contentId, amount } = req.body
+    if (!contentId || !amount) return res.status(400).json({ error: 'contentId e amount richiesti' })
+    const amt = parseInt(amount)
+    if (isNaN(amt) || amt <= 0) return res.status(400).json({ error: 'amount deve essere un intero positivo' })
+    if (amt > 100_000) return res.status(400).json({ error: 'boost supera il massimo consentito (100.000 H8)' })
+    const hash = await h8Boost(contentId, amt)
+    res.json({ status: 'confirmed', txHash: hash, boostScore: getBoostScore(contentId) })
+  } catch (err) {
+    res.status(400).json({ error: err.message })
+  }
+})
+
+// Boost score di un contenuto
+// Batch boost scores â { id1: score1, id2: score2, ... }  â DEVE stare prima di /:contentId
+app.get('/api/v1/h8/boost/batch', (req, res) => {
+  const ids = (req.query.ids || '').split(',').map(s => s.trim()).filter(Boolean).slice(0, 100)
+  const scores = {}
+  ids.forEach(id => { scores[id] = getBoostScore(id) })
+  res.json(scores)
+})
+
+app.get('/api/v1/h8/boost/:contentId', (req, res) => {
+  res.json({ contentId: req.params.contentId, score: getBoostScore(req.params.contentId) })
+})
+
+// Verifica integritÃ  catena
+app.get('/api/v1/h8/chain/verify', verifyApiKey, (req, res) => {
+  res.json(verifyChain())
+})
+
+// âââ Routes: Shop âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
 // Lista prodotti
 app.get('/api/v1/shop/listings', async (req, res) => {
@@ -280,13 +383,13 @@ app.get('/api/v1/shop/listings/:id', async (req, res) => {
   res.json(item)
 })
 
-// Crea prodotto
+// Crea prodotto (prezzo in H8)
 app.post('/api/v1/shop/listings', verifyApiKey, async (req, res) => {
   try {
-    const { sellerPubkey, title, description, priceXMR, category, imageEmoji } = req.body
-    if (!sellerPubkey || !title || !priceXMR)
-      return res.status(400).json({ error: 'sellerPubkey, title e priceXMR richiesti' })
-    const id = createListing({ sellerPubkey, title, description, priceXMR, category, imageEmoji })
+    const { sellerPubkey, title, description, priceH8, category, imageEmoji } = req.body
+    if (!sellerPubkey || !title || !priceH8)
+      return res.status(400).json({ error: 'sellerPubkey, title e priceH8 richiesti' })
+    const id = createListing({ sellerPubkey, title, description, priceH8: parseInt(priceH8), category, imageEmoji })
     res.status(201).json({ id })
   } catch (err) {
     res.status(500).json({ error: err.message })
@@ -300,25 +403,15 @@ app.delete('/api/v1/shop/listings/:id', verifyApiKey, async (req, res) => {
   res.json({ status: 'deactivated' })
 })
 
-// Start purchase (generates XMR address for payment)
+// Acquisto con H8 token (pagamento istantaneo)
 app.post('/api/v1/shop/orders', async (req, res) => {
   try {
-    const { listingId, buyerPubkey } = req.body
+    const { listingId, buyerH8Id } = req.body
     if (!listingId) return res.status(400).json({ error: 'listingId richiesto' })
-    const order = await initiateOrder(listingId, buyerPubkey)
-    res.status(201).json(order)
+    const result = await buyListing(listingId, buyerH8Id || '')
+    res.status(201).json(result)
   } catch (err) {
-    res.status(500).json({ error: err.message })
-  }
-})
-
-// Verifica pagamento ordine
-app.get('/api/v1/shop/orders/:id/verify', async (req, res) => {
-  try {
-    const result = await verifyOrderPayment(req.params.id)
-    res.json(result)
-  } catch (err) {
-    res.status(500).json({ error: err.message })
+    res.status(400).json({ error: err.message })
   }
 })
 
@@ -329,7 +422,7 @@ app.get('/api/v1/shop/orders/:id', async (req, res) => {
   res.json(order)
 })
 
-// ─── Routes: Nostr ────────────────────────────────────────────────────────────
+// âââ Routes: Nostr ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
 app.post('/api/v1/nostr/keys', (req, res) => {
   res.json(generateKeys())
@@ -361,14 +454,18 @@ app.get('/api/v1/nostr/feed', async (req, res) => {
 app.post('/api/v1/nostr/post', async (req, res) => {
   try {
     const { content, tags } = req.body
-    const event = await publishNote(content, tags || [])
+    const keys = loadSavedKeys()
+    if (!keys) return res.status(401).json({ error: 'Nostr keys not configured' })
+    const event = await publishNote(content, keys.privkey, tags || [])
     res.json(event)
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
 
 app.post('/api/v1/nostr/profile', async (req, res) => {
   try {
-    const event = await publishProfile(req.body)
+    const profKeys = loadSavedKeys()
+    if (!profKeys) return res.status(401).json({ error: 'Nostr keys not configured' })
+    const event = await publishProfile(req.body, profKeys.privkey)
     res.json(event)
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
@@ -376,19 +473,23 @@ app.post('/api/v1/nostr/profile', async (req, res) => {
 app.post('/api/v1/nostr/dm', async (req, res) => {
   try {
     const { recipientPubkey, message } = req.body
-    const event = await sendEncryptedDM(recipientPubkey, message)
+    const dmKeys = loadSavedKeys()
+    if (!dmKeys) return res.status(401).json({ error: 'Nostr keys not configured' })
+    const event = await sendEncryptedDM(recipientPubkey, message, dmKeys.privkey)
     res.json(event)
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
 
 app.get('/api/v1/nostr/dm/:pubkey', async (req, res) => {
   try {
-    const messages = await fetchDMs(req.params.pubkey)
+    const fetchKeys = loadSavedKeys()
+    if (!fetchKeys) return res.status(401).json({ error: 'Nostr keys not configured' })
+    const messages = await fetchDMs(fetchKeys.pubkey, req.params.pubkey, fetchKeys.privkey)
     res.json(messages)
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
 
-// ─── Routes: Mastodon ─────────────────────────────────────────────────────────
+// âââ Routes: Mastodon âââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
 app.get('/api/v1/mastodon/timeline', async (req, res) => {
   try {
@@ -423,7 +524,7 @@ app.post('/api/v1/mastodon/post', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
 
-// ─── Routes: PeerTube ─────────────────────────────────────────────────────────
+// âââ Routes: PeerTube âââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
 app.get('/api/v1/peertube/videos', async (req, res) => {
   try {
@@ -449,6 +550,35 @@ app.get('/api/v1/peertube/video/:instance/:uuid', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
 
+// Upload video direttamente su PeerTube (usa credenziali salvate per l'h8address)
+app.post('/api/v1/peertube/upload', upload.single('video'), async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'video richiesto' })
+  const tempPath = req.file.path
+  try {
+    const { h8address, name, description, tags, privacy, language } = req.body
+    if (!h8address) { fs.unlinkSync(tempPath); return res.status(400).json({ error: 'h8address richiesto' }) }
+
+    const creds = universal.getProtocolCreds(h8address, 'peertube')
+    if (!creds?.token) { fs.unlinkSync(tempPath); return res.status(403).json({ error: 'PeerTube non connesso per questo profilo' }) }
+
+    const tagList = tags ? tags.split(/[\s,]+/).filter(Boolean) : []
+    const result = await peertube.uploadVideo(creds.instance, creds.token, tempPath, {
+      name:         name || req.file.originalname || 'M4TR1X Video',
+      description:  description || '',
+      tags:         tagList,
+      privacy:      parseInt(privacy || '1'),
+      language:     language || null,
+      originalname: req.file.originalname || '',
+    })
+    res.json({ ok: true, ...result })
+  } catch (err) {
+    console.error('[PEERTUBE] Upload error:', err.message)
+    res.status(500).json({ error: err.message })
+  } finally {
+    if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath)
+  }
+})
+
 app.get('/api/v1/peertube/instances', async (req, res) => {
   try {
     const instances = await peertube.discoverInstances()
@@ -456,7 +586,7 @@ app.get('/api/v1/peertube/instances', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
 
-// ─── Routes: Funkwhale (Musica) ───────────────────────────────────────────────
+// âââ Routes: Funkwhale (Musica) âââââââââââââââââââââââââââââââââââââââââââââââ
 
 app.get('/api/v1/music/tracks', async (req, res) => {
   try {
@@ -498,7 +628,7 @@ app.get('/api/v1/music/instances', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
 
-// ─── Routes: Crowdsourced Training ───────────────────────────────────────────
+// âââ Routes: Crowdsourced Training âââââââââââââââââââââââââââââââââââââââââââ
 
 // Vota un video (REALE o AI)
 app.post('/api/v1/train/vote', async (req, res) => {
@@ -515,7 +645,9 @@ app.post('/api/v1/train/vote', async (req, res) => {
     const result = await submitVote(videoHash, voterPubkey, label, confidence || 1.0)
 
     // Publish to Nostr in background (non-blocking)
-    publishVoteToNostr(videoHash, label, confidence || 1.0).catch(() => {})
+    publishVoteToNostr(videoHash, label, confidence || 1.0).catch(err =>
+      console.warn('[CROWDTRAIN] Nostr publish failed:', err.message)
+    )
 
     res.json({
       success:   true,
@@ -610,7 +742,7 @@ app.post('/api/v1/train/model/update', verifyApiKey, async (req, res) => {
   }
 })
 
-// ─── Routes: Professional Badge System ───────────────────────────────────────
+// âââ Routes: Professional Badge System âââââââââââââââââââââââââââââââââââââââ
 
 // Middleware: solo localhost per endpoint admin
 function localhostOnly(req, res, next) {
@@ -619,16 +751,23 @@ function localhostOnly(req, res, next) {
   return res.status(403).json({ error: 'Admin access restricted to localhost' })
 }
 
-// Middleware: verifica x-admin-key header
+// Middleware: verifica x-admin-key header (timing-safe per prevenire timing attack)
 function verifyAdminKey(req, res, next) {
   const key = req.headers['x-admin-key']
-  if (!key || key !== ADMIN_KEY) {
+  if (!key) return res.status(401).json({ error: 'Invalid or missing admin key' })
+  try {
+    const a = Buffer.from(key.padEnd(ADMIN_KEY.length))
+    const b = Buffer.from(ADMIN_KEY.padEnd(key.length))
+    const valid = key.length === ADMIN_KEY.length &&
+      crypto.timingSafeEqual(Buffer.from(key), Buffer.from(ADMIN_KEY))
+    if (!valid) return res.status(401).json({ error: 'Invalid or missing admin key' })
+  } catch {
     return res.status(401).json({ error: 'Invalid or missing admin key' })
   }
   next()
 }
 
-// POST /api/v1/badge/request — utente invia richiesta con documento
+// POST /api/v1/badge/request â utente invia richiesta con documento
 app.post('/api/v1/badge/request', badgeUpload.single('document'), async (req, res) => {
   try {
     const { pubkey, category } = req.body
@@ -639,16 +778,24 @@ app.post('/api/v1/badge/request', badgeUpload.single('document'), async (req, re
     if (!req.file) {
       return res.status(400).json({ error: 'Documento obbligatorio (PDF, JPG o PNG)' })
     }
-    // Controlla se esiste già una richiesta pending o approvata
+    // Controlla se esiste giÃ  una richiesta pending o approvata
     const existing = getUserRequest(pubkey)
     if (existing && (existing.status === 'pending' || existing.status === 'approved')) {
       fs.unlinkSync(req.file.path)
       return res.status(409).json({
-        error: 'Hai già una richiesta in corso o un badge approvato',
+        error: 'Hai giÃ  una richiesta in corso o un badge approvato',
         status: existing.status,
       })
     }
-    const filename = req.file.filename + path.extname(req.file.originalname).toLowerCase()
+    // Sanitizza: prendi solo la basename e poi solo l'estensione â nessun path traversal
+    const safeName = path.basename(req.file.originalname || '')
+    const ext      = path.extname(safeName).toLowerCase()
+    const allowedExts = new Set(['.pdf', '.jpg', '.jpeg', '.png'])
+    if (!allowedExts.has(ext)) {
+      fs.unlinkSync(req.file.path)
+      return res.status(400).json({ error: 'Estensione non consentita' })
+    }
+    const filename = req.file.filename + ext
     // Rinomina il file con estensione corretta
     fs.renameSync(req.file.path, path.join(BADGE_DOCS_DIR, filename))
     const id = requestBadge(pubkey, category, filename)
@@ -659,7 +806,7 @@ app.post('/api/v1/badge/request', badgeUpload.single('document'), async (req, re
   }
 })
 
-// GET /api/v1/badge/my/:pubkey — stato richiesta dell'utente stesso (must be before /:pubkey)
+// GET /api/v1/badge/my/:pubkey â stato richiesta dell'utente stesso (must be before /:pubkey)
 app.get('/api/v1/badge/my/:pubkey', (req, res) => {
   try {
     const request = getUserRequest(req.params.pubkey)
@@ -670,7 +817,7 @@ app.get('/api/v1/badge/my/:pubkey', (req, res) => {
   }
 })
 
-// GET /api/v1/badge/:pubkey — badge approvato pubblico di un utente
+// GET /api/v1/badge/:pubkey â badge approvato pubblico di un utente
 app.get('/api/v1/badge/:pubkey', (req, res) => {
   try {
     const badge = getApprovedBadge(req.params.pubkey)
@@ -681,7 +828,7 @@ app.get('/api/v1/badge/:pubkey', (req, res) => {
   }
 })
 
-// GET /api/v1/admin/badges — lista tutte le richieste (admin only)
+// GET /api/v1/admin/badges â lista tutte le richieste (admin only)
 app.get('/api/v1/admin/badges', localhostOnly, verifyAdminKey, (req, res) => {
   try {
     const { status } = req.query
@@ -692,7 +839,7 @@ app.get('/api/v1/admin/badges', localhostOnly, verifyAdminKey, (req, res) => {
   }
 })
 
-// POST /api/v1/admin/badge/:id/approve — approva richiesta (admin only)
+// POST /api/v1/admin/badge/:id/approve â approva richiesta (admin only)
 app.post('/api/v1/admin/badge/:id/approve', localhostOnly, verifyAdminKey, (req, res) => {
   try {
     const { category } = req.body
@@ -704,7 +851,7 @@ app.post('/api/v1/admin/badge/:id/approve', localhostOnly, verifyAdminKey, (req,
   }
 })
 
-// POST /api/v1/admin/badge/:id/reject — rifiuta richiesta (admin only)
+// POST /api/v1/admin/badge/:id/reject â rifiuta richiesta (admin only)
 app.post('/api/v1/admin/badge/:id/reject', localhostOnly, verifyAdminKey, (req, res) => {
   try {
     const { notes } = req.body
@@ -715,8 +862,75 @@ app.post('/api/v1/admin/badge/:id/reject', localhostOnly, verifyAdminKey, (req, 
   }
 })
 
-// ─── Serve nostr-tools bundle da node_modules (evita dipendenza CDN esterna) ──
-// Cerca il bundle in ordine: build CommonJS → bundle UMD → fallback 404
+// âââ Routes: Universal Post âââââââââââââââââââââââââââââââââââââââââââââââââââ
+const universal = require('./universal_post')
+universal.initUniversalDb()
+
+// Lista protocolli connessi al profilo H8
+app.get('/api/v1/profile/protocols', (req, res) => {
+  const { h8address } = req.query
+  if (!h8address) return res.status(400).json({ error: 'h8address richiesto' })
+  res.json(universal.getConnectedProtocols(h8address))
+})
+
+// Collega un account esterno (Mastodon, PeerTube, Funkwhale)
+app.post('/api/v1/profile/protocols/connect', (req, res) => {
+  const { h8address, protocol, instance, accessToken, username } = req.body
+  if (!h8address || !protocol) return res.status(400).json({ error: 'h8address e protocol richiesti' })
+  const VALID = new Set(['mastodon', 'peertube', 'funkwhale'])
+  if (!VALID.has(protocol)) return res.status(400).json({ error: 'protocol non valido' })
+  if (!instance) return res.status(400).json({ error: 'instance richiesta' })
+  universal.connectProtocol(h8address, protocol, instance, accessToken, username || null)
+  res.json({ ok: true })
+})
+
+// Scollega un account esterno
+app.delete('/api/v1/profile/protocols/:protocol', (req, res) => {
+  const { h8address } = req.query
+  if (!h8address) return res.status(400).json({ error: 'h8address richiesto' })
+  universal.disconnectProtocol(h8address, req.params.protocol)
+  res.json({ ok: true })
+})
+
+// Sync profilo M4TR1X â tutti i protocolli connessi
+app.post('/api/v1/profile/sync', async (req, res) => {
+  const { h8address, name, bio, picture } = req.body
+  if (!h8address) return res.status(400).json({ error: 'h8address richiesto' })
+  try {
+    const results = await universal.syncAllProfiles(h8address, { name, bio, picture })
+    res.json({ ok: true, results })
+  } catch (err) { res.status(500).json({ error: err.message }) }
+})
+
+// Sync profilo su un singolo protocollo
+app.post('/api/v1/profile/sync/:protocol', async (req, res) => {
+  const { h8address, name, bio, picture } = req.body
+  if (!h8address) return res.status(400).json({ error: 'h8address richiesto' })
+  try {
+    const result = await universal.syncProfileToProtocol(h8address, { name, bio, picture }, req.params.protocol)
+    res.json(result)
+  } catch (err) { res.status(500).json({ error: err.message }) }
+})
+
+// Post universale â pubblica su tutti i protocolli connessi
+app.post('/api/v1/profile/post', async (req, res) => {
+  const { h8address, text, title, tags } = req.body
+  if (!h8address) return res.status(400).json({ error: 'h8address richiesto' })
+  if (!text || !text.trim()) return res.status(400).json({ error: 'text richiesto' })
+  try {
+    const results = await universal.universalPost(h8address, {
+      text:  text.trim(),
+      title: title?.trim() || null,
+      tags:  Array.isArray(tags) ? tags : [],
+    })
+    res.json({ ok: true, results })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// âââ Serve nostr-tools bundle da node_modules (evita dipendenza CDN esterna) ââ
+// Cerca il bundle in ordine: build CommonJS â bundle UMD â fallback 404
 app.get('/libs/nostr.bundle.js', (req, res) => {
   const candidates = [
     path.join(__dirname, 'node_modules', 'nostr-tools', 'lib', 'nostr.bundle.js'),
@@ -743,22 +957,23 @@ if (fs.existsSync(frontendPath)) {
     res.sendFile(path.join(frontendPath, 'safety.html'))
   })
 
-  // Admin panel — solo localhost
+  // Admin panel â solo localhost
   app.get('/admin', localhostOnly, (req, res) => {
     res.sendFile(path.join(frontendPath, 'admin.html'))
   })
 
-  // Fallback SPA — rimanda a index.html per qualsiasi route non trovata
+  // Fallback SPA â rimanda a index.html per qualsiasi route non trovata
   app.get('/app/*', (req, res) => {
     res.sendFile(path.join(frontendPath, 'index.html'))
   })
 }
 
-// ─── Avvio / stop server ──────────────────────────────────────────────────────
+// âââ Avvio / stop server ââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 let server
 
 function startServer(port = 8080) {
   initDb()
+  initH8Db()
   initShopDb()
   initCrowdtrainDb()
   initBadgeDb()
