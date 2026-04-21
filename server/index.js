@@ -23,16 +23,7 @@ const {
   identityExists, getPublicInfo,
 } = require('./h8identity')
 const {
-  initH8Db, getBalance: h8Balance, getHistory: h8History,
-  getBoostScore, verifyChain,
-  mint: h8Mint, transfer: h8Transfer, tip: h8Tip,
-  boost: h8Boost, registerPubkey,
-} = require('./h8token')
 const {
-  initShopDb, createListing, getListings, getListing,
-  deactivateListing, buyListing,
-  getOrder, getSellerOrders, getBuyerOrders,
-} = require('./shop')
 const {
   generateKeys, loadSavedKeys, loadKeys, getCurrentPubkey,
   connectToRelays, getConnectedRelays,
@@ -240,8 +231,7 @@ app.get('/api/v1/h8/wallet/status', verifyApiKey, (req, res) => {
     const exists = identityExists()
     if (!exists) return res.json({ exists: false })
     const info = getPublicInfo()
-    const balance = info ? h8Balance(info.address) : 0
-    res.json({ exists: true, address: info?.address, balance, locked: !require('./h8identity').getUnlockedIdentity() })
+    res.json({ exists: true, address: info?.address, balance: null, locked: !require('./h8identity').getUnlockedIdentity() })
   } catch (err) {
     res.status(500).json({ error: err.message })
   }
@@ -254,7 +244,6 @@ app.post('/api/v1/h8/wallet/create', verifyApiKey, async (req, res) => {
     if (!password) return res.status(400).json({ error: 'Password richiesta' })
     if (identityExists()) return res.status(409).json({ error: 'IdentitÃ  H8 giÃ  esistente' })
     const result = await generateIdentity(password)
-    registerPubkey(result.address, result.publicKey)
     res.status(201).json({ address: result.address, message: 'H8 identity creata. Salva la tua password.' })
   } catch (err) {
     res.status(500).json({ error: err.message })
@@ -267,8 +256,7 @@ app.post('/api/v1/h8/wallet/unlock', verifyApiKey, async (req, res) => {
     const { password } = req.body
     if (!password) return res.status(400).json({ error: 'Password richiesta' })
     const result = await unlockIdentity(password)
-    const balance = h8Balance(result.address)
-    res.json({ status: 'unlocked', address: result.address, balance })
+    res.json({ status: 'unlocked', address: result.address, balance: null })
   } catch (err) {
     res.status(401).json({ error: err.message })
   }
@@ -281,148 +269,20 @@ app.post('/api/v1/h8/wallet/lock', verifyApiKey, (req, res) => {
 })
 
 // Saldo + storico
-app.get('/api/v1/h8/balance', verifyApiKey, (req, res) => {
-  try {
-    const { address } = req.query
-    const info = address ? { address } : getPublicInfo()
-    if (!info) return res.status(404).json({ error: 'Wallet non trovato' })
-    res.json({ address: info.address, balance: h8Balance(info.address) })
-  } catch (err) {
-    res.status(500).json({ error: err.message })
-  }
-})
-
-app.get('/api/v1/h8/history', verifyApiKey, (req, res) => {
-  try {
-    const info = getPublicInfo()
-    if (!info) return res.status(404).json({ error: 'Wallet non trovato' })
-    res.json(h8History(info.address, parseInt(req.query.limit || '50')))
-  } catch (err) {
-    res.status(500).json({ error: err.message })
-  }
-})
-
 // Trasferimento diretto
-app.post('/api/v1/h8/transfer', verifyApiKey, paymentLimit, async (req, res) => {
-  try {
-    const { toAddress, amount, note } = req.body
-    if (!toAddress || !amount) return res.status(400).json({ error: 'toAddress e amount richiesti' })
-    const amt = parseInt(amount)
-    if (isNaN(amt) || amt <= 0) return res.status(400).json({ error: 'amount deve essere un intero positivo' })
-    if (amt > 1_000_000) return res.status(400).json({ error: 'amount supera il massimo consentito (1.000.000 H8)' })
-    const hash = await h8Transfer(toAddress, amt, note || '')
-    res.json({ status: 'confirmed', txHash: hash })
-  } catch (err) {
-    res.status(400).json({ error: err.message })
-  }
-})
-
 // Tip a creator (split 50/20/30)
-app.post('/api/v1/h8/tip', verifyApiKey, paymentLimit, async (req, res) => {
-  try {
-    const { creatorAddress, amount, contentId } = req.body
-    if (!creatorAddress || !amount) return res.status(400).json({ error: 'creatorAddress e amount richiesti' })
-    const amt = parseInt(amount)
-    if (isNaN(amt) || amt <= 0) return res.status(400).json({ error: 'amount deve essere un intero positivo' })
-    if (amt > 100_000) return res.status(400).json({ error: 'tip supera il massimo consentito (100.000 H8)' })
-    const result = await h8Tip(creatorAddress, amt, contentId || '')
-    res.json({ status: 'confirmed', ...result })
-  } catch (err) {
-    res.status(400).json({ error: err.message })
-  }
-})
-
 // Boost visibilitÃ  contenuto
-app.post('/api/v1/h8/boost', verifyApiKey, paymentLimit, async (req, res) => {
-  try {
-    const { contentId, amount } = req.body
-    if (!contentId || !amount) return res.status(400).json({ error: 'contentId e amount richiesti' })
-    const amt = parseInt(amount)
-    if (isNaN(amt) || amt <= 0) return res.status(400).json({ error: 'amount deve essere un intero positivo' })
-    if (amt > 100_000) return res.status(400).json({ error: 'boost supera il massimo consentito (100.000 H8)' })
-    const hash = await h8Boost(contentId, amt)
-    res.json({ status: 'confirmed', txHash: hash, boostScore: getBoostScore(contentId) })
-  } catch (err) {
-    res.status(400).json({ error: err.message })
-  }
-})
-
 // Boost score di un contenuto
 // Batch boost scores â { id1: score1, id2: score2, ... }  â DEVE stare prima di /:contentId
-app.get('/api/v1/h8/boost/batch', (req, res) => {
-  const ids = (req.query.ids || '').split(',').map(s => s.trim()).filter(Boolean).slice(0, 100)
-  const scores = {}
-  ids.forEach(id => { scores[id] = getBoostScore(id) })
-  res.json(scores)
-})
-
-app.get('/api/v1/h8/boost/:contentId', (req, res) => {
-  res.json({ contentId: req.params.contentId, score: getBoostScore(req.params.contentId) })
-})
-
 // Verifica integritÃ  catena
-app.get('/api/v1/h8/chain/verify', verifyApiKey, (req, res) => {
-  res.json(verifyChain())
-})
-
 // âââ Routes: Shop âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
 // Lista prodotti
-app.get('/api/v1/shop/listings', async (req, res) => {
-  try {
-    const { category, limit } = req.query
-    res.json(getListings({ category, limit: parseInt(limit || '50') }))
-  } catch (err) {
-    res.status(500).json({ error: err.message })
-  }
-})
-
 // Dettaglio prodotto
-app.get('/api/v1/shop/listings/:id', async (req, res) => {
-  const item = getListing(req.params.id)
-  if (!item) return res.status(404).json({ error: 'Product not found' })
-  res.json(item)
-})
-
 // Crea prodotto (prezzo in H8)
-app.post('/api/v1/shop/listings', verifyApiKey, async (req, res) => {
-  try {
-    const { sellerPubkey, title, description, priceH8, category, imageEmoji } = req.body
-    if (!sellerPubkey || !title || !priceH8)
-      return res.status(400).json({ error: 'sellerPubkey, title e priceH8 richiesti' })
-    const id = createListing({ sellerPubkey, title, description, priceH8: parseInt(priceH8), category, imageEmoji })
-    res.status(201).json({ id })
-  } catch (err) {
-    res.status(500).json({ error: err.message })
-  }
-})
-
 // Disattiva prodotto
-app.delete('/api/v1/shop/listings/:id', verifyApiKey, async (req, res) => {
-  const { sellerPubkey } = req.body
-  deactivateListing(req.params.id, sellerPubkey)
-  res.json({ status: 'deactivated' })
-})
-
 // Acquisto con H8 token (pagamento istantaneo)
-app.post('/api/v1/shop/orders', async (req, res) => {
-  try {
-    const { listingId, buyerH8Id } = req.body
-    if (!listingId) return res.status(400).json({ error: 'listingId richiesto' })
-    const result = await buyListing(listingId, buyerH8Id || '')
-    res.status(201).json(result)
-  } catch (err) {
-    res.status(400).json({ error: err.message })
-  }
-})
-
 // Dettaglio ordine
-app.get('/api/v1/shop/orders/:id', async (req, res) => {
-  const order = getOrder(req.params.id)
-  if (!order) return res.status(404).json({ error: 'Order not found' })
-  res.json(order)
-})
-
 // âââ Routes: Nostr ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
 app.post('/api/v1/nostr/keys', (req, res) => {
@@ -974,8 +834,6 @@ let server
 
 function startServer(port = 8080) {
   initDb()
-  initH8Db()
-  initShopDb()
   initCrowdtrainDb()
   initBadgeDb()
   // Check for model updates at startup (background, non-blocking)
