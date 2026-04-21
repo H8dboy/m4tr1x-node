@@ -143,7 +143,7 @@ function verifyApiKey(req, res, next) {
 app.get('/health', (req, res) => {
   res.json({
     status: 'online',
-    version: '2.0.0',
+    version: '2.2.6',
     runtime: 'electron+node',
     exiftool_available: isExifToolAvailable(),
   })
