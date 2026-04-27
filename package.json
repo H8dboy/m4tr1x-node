@@ -1,6 +1,6 @@
 {
   "name": "m4tr1x",
-  "version": "2.2.6",
+  "version": "2.3.0",
   "description": "M4TR1X \u2014 The Unfiltered Eye. Decentralized social network for authentic video documentation.",
   "author": {
     "name": "H8dboy",
@@ -15,7 +15,8 @@
     "build:win": "electron-builder --win",
     "build:mac": "electron-builder --mac",
     "server": "node server/index.js",
-    "build:linux": "electron-builder --linux deb"
+    "build:linux": "electron-builder --linux deb",
+    "test:smoke": "node scripts/smoke-test.js"
   },
   "build": {
     "appId": "com.h8dboy.m4tr1x",
