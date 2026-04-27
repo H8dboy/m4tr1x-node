@@ -143,7 +143,7 @@ function verifyApiKey(req, res, next) {
 app.get('/health', (req, res) => {
   res.json({
     status: 'online',
-    version: '2.2.6',
+    version: '2.3.0',
     runtime: 'electron+node',
     exiftool_available: isExifToolAvailable(),
   })
@@ -908,6 +908,31 @@ app.get('/libs/nostr.bundle.js', (req, res) => {
   res.status(404).send('// nostr-tools bundle not found. Run: npm install')
 })
 
+// ─── Frontend compat aliases ────────────────────────────────────────────────
+app.get('/api/v1/timelines/tag/:tag', async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit || '20')
+    const posts = await mastodon.searchHashtag(req.params.tag, undefined, limit)
+    res.json(posts)
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+app.get('/api/v1/videos', async (req, res) => {
+  try {
+    const { instance, limit, sort } = req.query
+    const videos = await peertube.getVideos(instance, parseInt(limit || '30'), sort)
+    res.json(videos)
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+app.get('/api/v1/tracks', async (req, res) => {
+  try {
+    const { instance, limit } = req.query
+    const tracks = await funkwhale.getRecentTracks(instance, parseInt(limit || '30'))
+    res.json(tracks)
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
 // Serve il frontend (HTML statico)
 // In production, Tauri passes the bundled frontend path via env var.
 // In dev, fall back to the local ../frontend directory.
@@ -960,7 +985,8 @@ module.exports = { startServer, stopServer, app }
 
 // Auto-start when run directly (e.g. node index.js)
 if (require.main === module) {
-  startServer().catch(err => {
+  const port = parseInt(process.env.PORT || '8080')
+  startServer(port).catch(err => {
     console.error('[SERVER] Errore avvio:', err)
     process.exit(1)
   })
