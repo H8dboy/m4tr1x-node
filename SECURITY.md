@@ -154,7 +154,6 @@ Send an encrypted DM to the maintainer's npub (see profile). Use a burner Nostr 
                                                                 | Issue | Status | Rationale |
                                                                 |-------|--------|-----------|
                                                                 | `script-src 'unsafe-inline'` in CSP | ⚠️ Accepted temporarily | Required by inline event handlers in current frontend. Tracked for removal in v3.0 with full nonce-based CSP. |
-                                                                | Git history contains old `h8identity.enc` | ⚠️ Remediation pending | File removed from HEAD. Full history purge requires `git filter-repo`. Instructions in commit `7ce7647`. |
                                                                 | H8 Token ledger is local-only | ℹ️ By design | Trustless cross-user token transfer requires a consensus layer. Planned for v3.x. |
 
                                                                 ---
