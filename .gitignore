@@ -93,10 +93,9 @@ coverage/
 .nyc_output/
 .eslintcache
 
-# ─── Private node modules (shop + crypto — NOT open source) ──────────────────
-# These live exclusively on the private M4TR1X server, never in this repo.
+# ─── Private node modules (shop — NOT open source) ───────────────────────────
+# shop.js vive esclusivamente sul server privato M4TR1X.
 server/shop.js
-server/h8token.js
 
 # ─── Claude / AI assistant workspace files ────────────────────────────────────
 .claude/

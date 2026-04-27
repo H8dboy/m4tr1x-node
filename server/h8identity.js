@@ -148,7 +148,7 @@ async function signWithUnlocked(data) {
   const { ml_dsa65 } = await getLib()
   const sk  = Buffer.from(_unlocked.secretKey, 'hex')
   const msg = Buffer.from(typeof data === 'string' ? data : JSON.stringify(data))
-  return Buffer.from(ml_dsa65.sign(sk, msg)).toString('hex')
+  return Buffer.from(ml_dsa65.sign(msg, sk)).toString('hex')
 }
 
 /**
@@ -160,7 +160,7 @@ async function verifySignature(publicKeyHex, data, signatureHex) {
   const msg = Buffer.from(typeof data === 'string' ? data : JSON.stringify(data))
   const sig = Buffer.from(signatureHex, 'hex')
   try {
-    return ml_dsa65.verify(pk, msg, sig)
+    return ml_dsa65.verify(sig, msg, pk)
   } catch {
     return false
   }

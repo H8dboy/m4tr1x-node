@@ -266,21 +266,67 @@ app.post('/api/v1/h8/wallet/lock', verifyApiKey, (req, res) => {
   res.json({ status: 'locked' })
 })
 
-// Saldo + storico
-// Trasferimento diretto
-// Tip a creator (split 50/20/30)
-// Boost visibilitÃ  contenuto
-// Boost score di un contenuto
-// Batch boost scores â { id1: score1, id2: score2, ... }  â DEVE stare prima di /:contentId
-// Verifica integritÃ  catena
-// âââ Routes: Shop âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// ─── H8 Token Economy ────────────────────────────────────────────────────────
+const h8token = require('./h8token')
+h8token.initLedger()
 
-// Lista prodotti
-// Dettaglio prodotto
-// Crea prodotto (prezzo in H8)
-// Disattiva prodotto
-// Acquisto con H8 token (pagamento istantaneo)
-// Dettaglio ordine
+app.get('/api/v1/h8/balance', verifyApiKey, (req, res) => {
+  const addr = req.query.address || require('./h8identity').getUnlockedIdentity()?.address
+  if (!addr) return res.status(400).json({ error: 'address richiesto o wallet bloccato' })
+  res.json({ address: addr, balance: h8token.getBalance(addr) })
+})
+
+app.get('/api/v1/h8/history', verifyApiKey, (req, res) => {
+  const addr = req.query.address || require('./h8identity').getUnlockedIdentity()?.address
+  if (!addr) return res.status(400).json({ error: 'address richiesto o wallet bloccato' })
+  res.json(h8token.getHistory(addr, parseInt(req.query.limit || '50')))
+})
+
+app.post('/api/v1/h8/transfer', paymentLimit, verifyApiKey, async (req, res) => {
+  try {
+    const { toAddress, amount, note } = req.body
+    if (!toAddress || !amount) return res.status(400).json({ error: 'toAddress e amount richiesti' })
+    res.json(await h8token.transfer(toAddress, parseInt(amount), note || ''))
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+app.post('/api/v1/h8/tip', paymentLimit, verifyApiKey, async (req, res) => {
+  try {
+    const { creatorAddress, amount, contentId } = req.body
+    if (!creatorAddress || !amount) return res.status(400).json({ error: 'creatorAddress e amount richiesti' })
+    res.json(await h8token.tip(creatorAddress, parseInt(amount), contentId || ''))
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+app.post('/api/v1/h8/boost', paymentLimit, verifyApiKey, async (req, res) => {
+  try {
+    const { contentId, amount } = req.body
+    if (!contentId || !amount) return res.status(400).json({ error: 'contentId e amount richiesti' })
+    res.json(await h8token.boost(contentId, parseInt(amount)))
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+// IMPORTANTE: batch DEVE stare prima di /:contentId
+app.get('/api/v1/h8/boost/batch', verifyApiKey, (req, res) => {
+  const ids = (req.query.ids || '').split(',').filter(Boolean)
+  res.json(h8token.getBoostScoresBatch(ids))
+})
+
+app.get('/api/v1/h8/boost/:contentId', verifyApiKey, (req, res) => {
+  res.json({ contentId: req.params.contentId, score: h8token.getBoostScore(req.params.contentId) })
+})
+
+app.get('/api/v1/h8/chain/verify', verifyApiKey, (req, res) => {
+  res.json(h8token.verifyChain())
+})
+
+app.post('/api/v1/admin/h8/mint', localhostOnly, verifyAdminKey, async (req, res) => {
+  try {
+    const { toAddress, amount } = req.body
+    if (!toAddress || !amount) return res.status(400).json({ error: 'toAddress e amount richiesti' })
+    res.json(await h8token.mintTokens(toAddress, parseInt(amount)))
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
 // âââ Routes: Nostr ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
 app.post('/api/v1/nostr/keys', (req, res) => {
@@ -792,7 +838,7 @@ app.post('/api/v1/profile/post', async (req, res) => {
 // Cerca il bundle in ordine: build CommonJS â bundle UMD â fallback 404
 // ─── Config ───────────────────────────────────────────────────────────────────
 app.get('/api/v1/config', (req, res) => {
-  res.json({ privateNodeUrl: getPrivateNodeUrl() || null })
+  res.json({ privateNodeUrl: getPrivateNodeUrl() || `http://localhost:${process.env.PORT || 8080}` })
 })
 
 // ─── Node Manager API ─────────────────────────────────────────────────────────
