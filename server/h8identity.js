@@ -43,7 +43,7 @@ function h8AddressFrom(publicKeyHex) {
 
 function encryptSecret(secretKeyHex, password) {
   const salt    = crypto.randomBytes(32)
-  const key     = crypto.scryptSync(password, salt, 32)
+  const key     = crypto.scryptSync(password, salt, 32, { N: 131072, r: 8, p: 1, maxmem: 256 * 1024 * 1024 })
   const iv      = crypto.randomBytes(12)
   const cipher  = crypto.createCipheriv('aes-256-gcm', key, iv)
   const enc     = Buffer.concat([cipher.update(secretKeyHex, 'utf8'), cipher.final()])
@@ -56,7 +56,8 @@ function encryptSecret(secretKeyHex, password) {
 }
 
 function decryptSecret(stored, password) {
-  const key     = crypto.scryptSync(password, Buffer.from(stored.salt, 'hex'), 32)
+  const opts = stored.version === 2 ? { N: 131072, r: 8, p: 1, maxmem: 256 * 1024 * 1024 } : {}
+  const key     = crypto.scryptSync(password, Buffer.from(stored.salt, 'hex'), 32, opts)
   const decipher = crypto.createDecipheriv('aes-256-gcm', key, Buffer.from(stored.iv, 'hex'))
   decipher.setAuthTag(Buffer.from(stored.authTag, 'hex'))
   return decipher.update(Buffer.from(stored.encrypted, 'hex'), null, 'utf8') + decipher.final('utf8')
@@ -76,7 +77,7 @@ async function generateIdentity(password) {
   const address = h8AddressFrom(pubHex)
 
   const stored = {
-    version:   1,
+    version:   2,
     algorithm: 'ML-DSA65',
     address,
     publicKey: pubHex,
@@ -105,6 +106,14 @@ async function unlockIdentity(password) {
   }
 
   _unlocked = { address: stored.address, publicKey: stored.publicKey, secretKey }
+
+  if (stored.version !== 2) {
+    const fresh = encryptSecret(secretKey, password)
+    const upgraded = { ...stored, version: 2, ...fresh }
+    fs.writeFileSync(p, JSON.stringify(upgraded))
+    console.log('[H8] scrypt migrated v1→v2 (N=131072)')
+  }
+
   console.log(`[H8] Wallet sbloccato: ${stored.address}`)
   return { address: stored.address, publicKey: stored.publicKey }
 }
