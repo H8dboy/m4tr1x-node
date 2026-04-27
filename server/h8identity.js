@@ -31,7 +31,8 @@ function getIdentityPath() {
     const { app } = require('electron')
     return path.join(app.getPath('userData'), 'h8identity.enc')
   } catch {
-    return path.join(process.cwd(), 'h8identity.enc')
+    const base = process.env.M4TR1X_DATA_DIR || process.cwd()
+    return path.join(base, 'h8identity.enc')
   }
 }
 
