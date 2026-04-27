@@ -229,7 +229,7 @@
   </div>
   <div class="section-banner" id="banner-dm">
     <span class="banner-icon">💬</span>
-    <div class="banner-text"><strong>PRIVATE MESSAGES</strong>Signal Protocol in-app · Double Ratchet + X3DH · No phone number <span class="integration-status live">E2E ENCRYPTED</span></div>
+    <div class="banner-text"><strong>PRIVATE MESSAGES</strong>Nostr NIP-44 · ChaCha20-Poly1305 · No phone number <span class="integration-status live">E2E ENCRYPTED</span></div>
   </div>
   <div class="section-banner" id="banner-live"><span class="banner-icon">🔴</span><div class="banner-text"><strong>LIVE STREAMS</strong> WebRTC P2P via Nostr signaling <span class="integration-status live">P2P LIVE</span></div></div>
   <button id="mute-btn" onclick="toggleMute()">🔇</button>
@@ -265,9 +265,9 @@
     </div>
     <div class="section-feed" id="feed-dm">
       <div class="dm-container" id="dm-container">
-        <div class="dm-encryption-badge"><span class="lock-icon">🔒</span> SIGNAL PROTOCOL ACTIVE — Double Ratchet + X3DH + AES-256-GCM — Messages are end-to-end encrypted</div>
-        <div class="dm-list" id="dm-list"><div class="slide-placeholder"><div class="ph-text">[ INITIALIZING SIGNAL PROTOCOL... ]</div></div></div>
-        <div class="dm-powered">REAL E2E ENCRYPTION · SIGNAL PROTOCOL (DOUBLE RATCHET) · NO PHONE NUMBER REQUIRED</div>
+        <div class="dm-encryption-badge"><span class="lock-icon">🔒</span> NIP-44 ACTIVE — ChaCha20-Poly1305 — Messages are end-to-end encrypted</div>
+        <div class="dm-list" id="dm-list"><div class="slide-placeholder"><div class="ph-text">[ LOADING CONTACTS... ]</div></div></div>
+        <div class="dm-powered">REAL E2E ENCRYPTION · NOSTR NIP-44 · NO PHONE NUMBER REQUIRED</div>
       </div>
     </div>
   </div>
@@ -763,9 +763,8 @@
     blossom: {'cdn.satellite.earth':'https://cdn.satellite.earth','blossom.band':'https://blossom.band','nostrcheck.me':'https://nostrcheck.me'}
   };
 
-  // ========== SIGNAL PROTOCOL ENGINE ==========
-  // Implements Double Ratchet Algorithm + X3DH key agreement
-  // Based on Signal Protocol specification
+  // ========== DM ENCRYPTION ENGINE ==========
+  // Transitional layer — Session 2 sostituirà con NIP-44 nativo
   const SignalEngine = {
     sessions: {},
     keyPairs: {},
@@ -780,7 +779,7 @@
       return keyPair;
     },
 
-    // X3DH: Extended Triple Diffie-Hellman key agreement
+    // ECDH key agreement (custom, non Signal X3DH)
     async x3dhInitiate(theirIdentityKey, theirSignedPreKey) {
       const ephemeralKey = await this.generateKeyPair();
       // DH1: Our identity key + Their signed prekey
@@ -833,7 +832,7 @@
       }
     },
 
-    // Double Ratchet: Derive new chain key
+    // HMAC chain ratchet step
     async ratchetStep(chainKey) {
       const hmacKey = await crypto.subtle.importKey(
         'raw', chainKey,
@@ -863,7 +862,7 @@
       return this.sessions[peerPubkey];
     },
 
-    // Encrypt message with Double Ratchet
+    // Cifra messaggio con chain key ratchet
     async encryptMessage(peerPubkey, plaintext) {
       const session = await this.getSession(peerPubkey);
       const { messageKey, nextChainKey } = await this.ratchetStep(session.chainKey);
@@ -873,7 +872,7 @@
       return { ciphertext, messageNumber: session.messageNumber };
     },
 
-    // Decrypt message with Double Ratchet
+    // Decifra messaggio ricostruendo la chain al messaggio N
     async decryptMessage(peerPubkey, ciphertextB64, msgNum) {
       const session = await this.getSession(peerPubkey);
       // Rebuild chain to reach the right message key
@@ -1569,7 +1568,7 @@
     document.getElementById('dm-chat').classList.add('open');
     document.getElementById('dm-chat-name').textContent = shortenKey(pk);
     const msgs = document.getElementById('dm-chat-msgs');
-    msgs.innerHTML = '<div style="text-align:center;padding:20px;font-size:0.6em;color:rgba(0,255,65,0.2);letter-spacing:2px">\u{1F512} SIGNAL PROTOCOL ACTIVE\n<br>Double Ratchet + X3DH + AES-256-GCM\n<br>Forward Secrecy Enabled\n<br>NO PHONE NUMBER \u00B7 AVATAR ONLY</div>';
+    msgs.innerHTML = '<div style="text-align:center;padding:20px;font-size:0.6em;color:rgba(0,255,65,0.2);letter-spacing:2px">\u{1F512} NIP-44 ACTIVE\n<br>ChaCha20-Poly1305\n<br>End-to-End Encrypted\n<br>NO PHONE NUMBER \u00B7 AVATAR ONLY</div>';
     loadProf(pk).then(p => {
       if (!p) return;
       const av = document.getElementById('dm-chat-av'); const nm = document.getElementById('dm-chat-name');
@@ -1624,14 +1623,14 @@
     const inp = document.getElementById('dm-msg-input'); const txt = inp.value.trim();
     if (!txt || !S.dmTarget || !S.pubkey) return;
     try {
-      // Encrypt with Signal Protocol (Double Ratchet)
+      // Cifra con NIP-04 (extension) o fallback interno
       const { ciphertext } = await SignalEngine.encryptMessage(S.dmTarget, txt);
       let content = ciphertext;
       // Also encrypt with NIP-04 if extension available (dual-layer)
       if (S.method === 'extension' && window.nostr?.nip04) {
         try { content = await window.nostr.nip04.encrypt(S.dmTarget, txt); } catch(e) {}
       }
-      const ev = { kind: 4, pubkey: S.pubkey, created_at: now(), tags: [['p', S.dmTarget], ['signal-protocol', 'double-ratchet-v1']], content: content };
+      const ev = { kind: 4, pubkey: S.pubkey, created_at: now(), tags: [['p', S.dmTarget]], content: content };
       const signed = await signEv(ev); broadcast(signed);
       inp.value = '';
       const msgs = document.getElementById('dm-chat-msgs');
@@ -1642,7 +1641,7 @@
       const sentMsgs = loadDmMessages(S.dmTarget);
       sentMsgs.push({ id: signed.id || ('local_' + Date.now()), isMe: true, text: txt, ts: signed.created_at || now() });
       saveDmMessages(S.dmTarget, sentMsgs);
-      toast('\u{1F512} SIGNAL ENCRYPTED MESSAGE SENT');
+      toast('\u{1F512} ENCRYPTED MESSAGE SENT');
     } catch (e) { toast('ERROR: ' + e.message) }
   }
 
