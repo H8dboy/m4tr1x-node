@@ -1,251 +1,167 @@
-# M4TR1X v2.0 — Electron
+<div align="center">
 
-> **Decentralized social network for authentic video documentation.**
-> Zero cloud. Zero Python. L'utente scarica l'app e tutto gira in locale.
+# M4TR1X
 
----
+### The Unfiltered Eye
 
-## Stack tecnico
+**Decentralized social network for the liquid individual.**
+*Privacy-first. Post-quantum. Tor-ready. No datacenter.*
 
-| Layer | Tecnologia |
-|---|---|
-| Desktop | Electron + Node.js |
-| AI detection | ONNX Runtime (EfficientNet-B0) |
-| Crittografia | AES-256-GCM + scrypt, ML-DSA65 (post-quantum) |
-| Database | SQLite (better-sqlite3) |
-| Identità | H8 Identity — keypair ML-DSA65 (NIST FIPS-204) |
-| Token | H8 Token — ledger a hash chain locale |
-| Social | Nostr (NIP-01, NIP-44, NIP-19), Mastodon, PeerTube, Funkwhale |
-| Privacy | Tor (auto-detect SOCKS5), pulizia metadati ExifTool |
+[![Release](https://img.shields.io/github/v/release/H8dboy/m4tr1x-electron)](https://github.com/H8dboy/m4tr1x-electron/releases)
+[![License](https://img.shields.io/github/license/H8dboy/m4tr1x-electron)](LICENSE)
+[![Build](https://github.com/H8dboy/m4tr1x-electron/actions/workflows/build.yml/badge.svg)](https://github.com/H8dboy/m4tr1x-electron/actions)
 
----
+> 🇮🇹 [Versione italiana](README.it.md)
 
-## Prerequisiti (sviluppo)
+[Download](https://github.com/H8dboy/m4tr1x-electron/releases/latest) · [Run a Node](docs/NODE_OPERATOR.md) · [Architecture](docs/ARCHITECTURE.md) · [Tokenomics](docs/TOKENOMICS.md) · [Contributing](CONTRIBUTING.md)
 
-- **Node.js** 18+
-- **ffmpeg** — incluso automaticamente via `ffmpeg-static` dopo `npm install`
-- **ExifTool** (opzionale) — pulizia metadati GPS/EXIF → https://exiftool.org
+</div>
 
 ---
 
-## Installazione e avvio
+## Why M4TR1X exists
+
+In 2024, footage of protests in Iran, Belarus, and Hong Kong vanished from Instagram and TikTok within hours. The platforms that monetize attention also have datacenters that governments can compel, subpoena, or shut down. M4TR1X exists because that infrastructure is the wrong infrastructure for documenting truth.
+
+But mainstream social media is broken in another way too. The "liquid individual" of 2026 — the same person is a CNC machinist, a musician, an indie filmmaker, a programmer, a seller of niche products — has to fragment themselves across five platforms. Five algorithms, five 30% revenue cuts, five contradictory profiles. M4TR1X collapses this: one identity, one nickname, one wallet, every form of expression in one place.
+
+The third innovation is economic. The "like" is free, so spam wins. The "tip" costs H8 tokens, so signal wins. The cost itself is the moderation layer — markets filter what algorithms can't, without requiring a Trust & Safety department M4TR1X structurally cannot have.
+
+## What's in v2.3.0 (Developer Preview)
+
+- **Post-quantum identity** — Every account uses ML-DSA65 (NIST FIPS-204). Future quantum computers cannot forge signatures. Secret keys encrypted at rest with AES-256-GCM + scrypt N=131072.
+- **Embedded Nostr relay** on `ws://localhost:4848` — Your client IS a relay. Connect, host, replicate.
+- **H8 token ledger** — SHA3-256 hash chain, ML-DSA65 signed transactions, verifiable by any client. Tip split 50/20/30 (creator / platform / node operator).
+- **Federated content** — Nostr (posts, DMs), PeerTube (videos), Mastodon (forum), Funkwhale (music). All visible from one feed.
+- **Marketplace** — Nostr-native, kind:30402. No central listing server. Listings are Nostr events signed with the seller's key.
+- **Tor-first** — Auto-detects Tor Browser (port 9150) or tor daemon (port 9050) at launch. Bundled obfs4, Snowflake, and meek-azure bridges for censored networks.
+- **Crowdsourced AI deepfake detection** — Users vote, votes go on Nostr, models are retrained and redistributed.
+- **DM encryption** — Nostr NIP-44 (ChaCha20-Poly1305 + ECDH secp256k1).
+- **Multi-platform** — Linux .deb, macOS .dmg, Windows .exe builds via GitHub Actions.
+
+## Quick start
+
+### Run the prebuilt binary
+
+Download the installer for your OS from [Releases](https://github.com/H8dboy/m4tr1x-electron/releases/latest), verify the SHA-256 against `checksums-*.txt`, and run.
+
+### Build from source
 
 ```bash
+git clone https://github.com/H8dboy/m4tr1x-electron.git
+cd m4tr1x-electron
 npm install
-cp .env.example .env   # opzionale — configura ADMIN_KEY, H8_PLATFORM_ADDRESS, ecc.
+cd server && npm install && cd ..
+cp .env.example .env  # edit if you want a custom node URL
 npm start
 ```
 
-L'app si apre come finestra desktop. Il server API locale gira su `http://localhost:8080`.
+The app opens on `http://localhost:8080/app`. The Nostr relay listens on `ws://localhost:4848`.
 
----
-
-## H8 Identity (post-quantum)
-
-Ogni utente M4TR1X ha un **H8-ID** derivato da una keypair **ML-DSA65** (CRYSTALS-Dilithium, NIST FIPS-204 — resistente a computer quantistici).
-
-```
-H8 Address = 'H8' + SHA3-256(publicKey)[0:38]   → 40 caratteri
-```
-
-- Il secret key è cifrato a riposo con **AES-256-GCM + scrypt** (password utente)
-- In sessione, l'identità sbloccata vive in memoria — si blocca alla chiusura dell'app
-- Firma digitale ML-DSA65 su ogni transazione H8
-
----
-
-## H8 Token
-
-Token nativo della piattaforma — ledger locale a **hash chain** (ogni blocco contiene SHA3-256 del precedente).
-
-| Parametro | Valore |
-|---|---|
-| Unità | 1 H8 = 100 centesimi H8 |
-| Supply | Controllata — solo la mint key di H8-Group può coniare |
-| Split tip | 50% creator · 20% piattaforma · 30% server operator |
-| Split shop | 85% venditore · 10% piattaforma · 5% server operator |
-
-La catena è verificabile localmente: manomettere un blocco invalida tutta la catena successiva.
-
----
-
-## Modello AI (ONNX)
-
-Rileva video AI-generated via EfficientNet-B0. Senza il file ONNX, la detection gira in modalità **UNCERTAIN** — nessun crash.
+### Run the smoke test
 
 ```bash
-# Se hai il progetto Python v1:
-cd m4tr1x-python
-python ai_detector.py --export-onnx
-cp models/m4tr1x_detector.onnx ../m4tr1x-electron/models/
+npm run test:smoke
 ```
 
----
+End-to-end test of the H8 ledger: wallet creation, mint, tip with split, boost, chain verification.
 
-## Struttura progetto
+## Architecture
+
+```
+┌─────────────────────────────────────────────┐
+│  Electron main process                      │
+│    │  - CSP enforcement                     │
+│    │  - Sandboxed renderer (Chromium)       │
+│    │  - Tor SOCKS5 auto-detection           │
+│    │  - Starts Express server in-process    │
+│    ▼                                        │
+│  http://127.0.0.1:8080  (Express API)       │
+│    │                                        │
+│    ├── h8identity.js   ML-DSA65 keypairs    │
+│    ├── h8token.js      Hash-chain ledger    │
+│    ├── nostr.js        NIP-01/04/44/19      │
+│    ├── relay.js        Embedded relay :4848 │
+│    ├── peertube.js     Video federation     │
+│    ├── mastodon.js     Forum federation     │
+│    ├── funkwhale.js    Music federation     │
+│    ├── crowdtrain.js   Distributed labels   │
+│    ├── ai_detector.js  ONNX deepfake detect │
+│    ├── tor.js          SOCKS5 auto-detect   │
+│    └── ...                                  │
+│                                             │
+│  ws://0.0.0.0:4848  (Nostr relay)           │
+│    └── NIP-01/11, accessible to peers       │
+└─────────────────────────────────────────────┘
+```
+
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for full details.
+
+## Project structure
 
 ```
 m4tr1x-electron/
-├── main.js               # Electron entry point + sicurezza CSP/Tor
-├── preload.js            # Bridge sicuro renderer ↔ main (contextBridge)
+├── main.js              # Electron main process (CSP, sandbox, Tor detect)
+├── preload.js           # contextBridge surface
 ├── server/
-│   ├── index.js          # Express API server — tutte le route
-│   ├── h8identity.js     # Identità post-quantum (ML-DSA65)
-│   ├── badges.js         # Badge utente (richiesta, approvazione admin)
-│   ├── ai_detector.js    # ONNX AI detector
-│   ├── core.js           # Pulizia metadati ExifTool
-│   ├── db.js             # SQLite risultati analisi
-│   ├── nostr.js          # Nostr (NIP-01, NIP-44, NIP-19)
-│   ├── mastodon.js       # Mastodon / ActivityPub
-│   ├── peertube.js       # PeerTube
-│   ├── funkwhale.js      # Funkwhale (musica)
-│   └── tor.js            # Rilevamento e configurazione Tor
+│   ├── index.js         # Express API — 80+ routes
+│   ├── h8identity.js    # Post-quantum identity (ML-DSA65)
+│   ├── h8token.js       # H8 ledger (hash chain, tip, boost, mint)
+│   ├── nostr.js         # Nostr client (NIP-01/04/44/19)
+│   ├── relay.js         # Embedded NIP-01/11 relay
+│   ├── peertube.js      # PeerTube federation
+│   ├── mastodon.js      # Mastodon / ActivityPub
+│   ├── funkwhale.js     # Funkwhale music federation
+│   ├── universal_post.js # Cross-protocol posting
+│   ├── crowdtrain.js    # Crowdsourced AI training
+│   ├── ai_detector.js   # ONNX deepfake detector
+│   ├── badges.js        # Verified-user badges
+│   ├── tor.js           # Tor proxy detection
+│   ├── livestream.js    # WebRTC P2P streams
+│   ├── node_manager.js  # Node discovery
+│   └── core.js          # ExifTool metadata stripping
 ├── frontend/
-│   ├── index.html        # App principale (feed, forum, shop, DM)
-│   ├── auth.html         # Autenticazione
-│   ├── admin.html        # Pannello admin (solo localhost)
-│   ├── loading.html      # Schermata caricamento
-│   └── safety.html       # Guida sicurezza (6 lingue)
-├── models/
-│   └── m4tr1x_detector.onnx
-└── uploads/
+│   ├── index.html       # Main app UI
+│   ├── auth.html        # Sign in / Register
+│   └── admin.html       # Admin panel (localhost only)
+├── scripts/
+│   └── smoke-test.js    # End-to-end H8 ledger test
+└── .github/workflows/
+    └── build.yml        # Multi-platform CI
 ```
 
----
+## Tokenomics in one paragraph
 
-## API — server locale `http://localhost:8080`
+H8 is a utility closed-credit token (Twitch Bits model). Genesis allocation and minting controlled by the founder key. **This is by design and documented openly** — see [docs/TOKENOMICS.md](docs/TOKENOMICS.md). Tokens are non-transferable outside the M4TR1X economy, which keeps the project outside MiCA scope while preserving full creator monetization. The protocol is open source; the token allocation is sovereign. Same model as Signal (open protocol, central bootstrapping), Mastodon (open code, founder-controlled flagship), early Bitcoin (Satoshi's pre-mine).
 
-### Core
+## Run a node, earn from tips
 
-| Method | Endpoint | Descrizione |
-|--------|----------|-------------|
-| GET  | `/health` | Health check |
-| POST | `/api/v1/analyze` | Upload + analisi video (multipart `video`) |
-| GET  | `/api/v1/analysis/:id` | Risultato analisi per ID |
-| GET  | `/api/v1/analyses` | Lista risultati (`?limit=N`) |
+Every tip routed through your node earns you 30% of the tip amount automatically. Community nodes advertise capabilities (`film`, `music`, `reels`, `topic`) on the Nostr discovery layer and earn the server share on all content tips they route. Setup takes 5 minutes. See [docs/NODE_OPERATOR.md](docs/NODE_OPERATOR.md).
 
-### H8 Identity & Wallet
+## Contributing
 
-| Method | Endpoint | Descrizione |
-|--------|----------|-------------|
-| GET  | `/api/v1/h8/wallet/status` | Stato wallet (esiste? saldo? bloccato?) |
-| POST | `/api/v1/h8/wallet/create` | Crea identità H8 (`{ password }`) |
-| POST | `/api/v1/h8/wallet/unlock` | Sblocca sessione (`{ password }`) |
-| POST | `/api/v1/h8/wallet/lock` | Blocca sessione |
-| GET  | `/api/v1/h8/balance` | Saldo H8 dell'identità attiva |
-| GET  | `/api/v1/h8/history` | Storico transazioni (`?limit=N`) |
-| POST | `/api/v1/h8/transfer` | Invia H8 (`{ toAddress, amount, note }`) |
-| POST | `/api/v1/h8/tip` | Tip a creator (`{ creatorAddress, amount, contentId }`) |
-| POST | `/api/v1/h8/boost` | Boost contenuto (`{ contentId, amount }`) |
-| GET  | `/api/v1/h8/boost/:contentId` | Score boost di un contenuto |
-| GET  | `/api/v1/h8/chain/verify` | Verifica integrità dell'intera catena |
+PRs welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) for branch naming, coding style, and how to claim a `good-first-issue`. Security issues: see [SECURITY.md](SECURITY.md).
 
-### Marketplace
+## Status & roadmap
 
-Marketplace decentralizzato via Nostr — eventi `kind:30402` con tag `m4tr1x-shop`. 
-Nessun server centrale di listing: ogni utente pubblica i suoi prodotti come eventi 
-firmati con la sua chiave Nostr. I pagamenti passano dall'endpoint `/api/v1/h8/tip` 
-con `creatorAddress = 'nostr_' + pubkey[:38]`.
+**v2.3.0 (current)** — Developer Preview. Stable for self-hosters and contributors. Not yet recommended for high-risk activism.
 
-### Badge Utente
+**v2.3.1** — Pseudo-address claim flow (currently `nostr_*` addresses can receive but not spend until claimed by a real H8 wallet).
 
-| Method | Endpoint | Descrizione |
-|--------|----------|-------------|
-| POST | `/api/v1/badge/request` | Richiedi badge (upload documento) |
-| GET  | `/api/v1/badge/:pubkey` | Badge approvato di un utente |
-| GET  | `/api/v1/badge/my/:pubkey` | Stato richiesta corrente |
-| GET  | `/api/v1/admin/badges` | Lista richieste (solo admin/localhost) |
-| POST | `/api/v1/admin/badge/:id/approve` | Approva badge (solo admin) |
-| POST | `/api/v1/admin/badge/:id/reject` | Rifiuta badge (solo admin) |
+**v2.4** — Public Beta. Onboarding wizard, moderation reporting (DSA compliance), password recovery via Nostr nsec, manual fiat gateway documentation, mobile (Tauri Android/iOS) builds.
 
-### Training Crowd
+**v3.0** — Activist-ready. Independent security audit, EFF/Tor Project liaison, multi-language UI, full-disk encryption integration.
 
-| Method | Endpoint | Descrizione |
-|--------|----------|-------------|
-| POST | `/api/v1/train/vote` | Vota autenticità video (`{ videoHash, label }`) |
-| GET  | `/api/v1/train/stats/:videoHash` | Stats voti per hash |
-| GET  | `/api/v1/train/stats` | Stats globali |
-| GET  | `/api/v1/train/leaderboard` | Classifica contributor |
-| GET  | `/api/v1/train/labels` | Export label (admin) |
-| POST | `/api/v1/train/sync` | Sincronizza dataset da peer |
-| GET  | `/api/v1/train/model/latest` | Versione modello corrente |
-| POST | `/api/v1/train/model/update` | Aggiorna modello (admin) |
+## License
 
-### Nostr
-
-| Method | Endpoint | Descrizione |
-|--------|----------|-------------|
-| POST | `/api/v1/nostr/keys` | Genera keypair Nostr |
-| POST | `/api/v1/nostr/load-keys` | Carica chiavi (`{ privkey }`) |
-| GET  | `/api/v1/nostr/relays` | Lista relay attivi |
-| GET  | `/api/v1/nostr/feed` | Feed (`?tags=...&limit=N`) |
-| POST | `/api/v1/nostr/post` | Pubblica nota |
-| POST | `/api/v1/nostr/profile` | Pubblica profilo (kind:0) |
-| POST | `/api/v1/nostr/dm` | Invia DM cifrato NIP-44 |
-| GET  | `/api/v1/nostr/dm/:pubkey` | Fetch DM con una pubkey |
-
-### Mastodon
-
-| Method | Endpoint | Descrizione |
-|--------|----------|-------------|
-| GET  | `/api/v1/mastodon/timeline` | Timeline pubblica |
-| GET  | `/api/v1/mastodon/hashtag/:tag` | Cerca hashtag |
-| GET  | `/api/v1/mastodon/search` | Ricerca testo |
-| POST | `/api/v1/mastodon/post` | Pubblica post |
-
-### PeerTube
-
-| Method | Endpoint | Descrizione |
-|--------|----------|-------------|
-| GET | `/api/v1/peertube/videos` | Video recenti |
-| GET | `/api/v1/peertube/search` | Cerca video |
-| GET | `/api/v1/peertube/video/:instance/:uuid` | Dettaglio video |
-| GET | `/api/v1/peertube/instances` | Scopri istanze |
-
-### Funkwhale (Musica)
-
-| Method | Endpoint | Descrizione |
-|--------|----------|-------------|
-| GET | `/api/v1/music/tracks` | Tracce recenti |
-| GET | `/api/v1/music/search` | Cerca tracce |
-| GET | `/api/v1/music/albums` | Album recenti |
-| GET | `/api/v1/music/channels` | Canali / artisti |
-| GET | `/api/v1/music/instances` | Scopri istanze |
+MIT. See [LICENSE](LICENSE).
 
 ---
 
-## Build distribuzione
+<div align="center">
 
-```bash
-npm run build:win    # Windows (.exe)
-npm run build:mac    # macOS (.dmg)
-npm run build:linux  # Linux (.AppImage)
-```
+*"In the age of synthetic reality, authenticity is the new resistance."*
 
----
+Built by [@H8dboy](https://github.com/H8dboy) — Brescia, Italy 🇮🇹
 
-## Variabili d'ambiente (`.env`)
-
-```env
-ADMIN_KEY=                    # chiave per endpoint admin — OBBLIGATORIA in produzione
-H8_PLATFORM_ADDRESS=          # H8 address della piattaforma (split fee)
-H8_SERVER_ADDRESS=            # H8 address del server operator (split fee)
-API_KEY=                      # chiave API opzionale per proteggere le route
-PORT=8080
-```
-
----
-
-## Sicurezza
-
-- **H8 Identity**: secret key cifrato AES-256-GCM + scrypt — mai trasmesso in chiaro
-- **Firme post-quantum**: ogni transazione firmata ML-DSA65 (resistente a QC)
-- **Nostr privkey**: in `sessionStorage`, mai inviata al server
-- **Tor**: se `tor` è attivo al lancio, tutto il traffico passa via SOCKS5 automaticamente
-- **Metadati video**: rimossi via ExifTool prima dell'analisi
-- **Admin endpoint**: `localhostOnly` + `ADMIN_KEY` — non esposti su rete
-
----
-
-> *"In the age of synthetic reality, authenticity is the new resistance."*
-> **For the Truth. 👁️**
+</div>
