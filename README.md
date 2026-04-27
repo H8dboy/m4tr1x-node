@@ -91,12 +91,10 @@ m4tr1x-electron/
 ├── server/
 │   ├── index.js          # Express API server — tutte le route
 │   ├── h8identity.js     # Identità post-quantum (ML-DSA65)
-│   ├── h8token.js        # Ledger H8 (hash chain, mint, transfer, tip, boost)
 │   ├── badges.js         # Badge utente (richiesta, approvazione admin)
 │   ├── ai_detector.js    # ONNX AI detector
 │   ├── core.js           # Pulizia metadati ExifTool
 │   ├── db.js             # SQLite risultati analisi
-│   ├── shop.js           # Shop decentralizzato (H8 token)
 │   ├── nostr.js          # Nostr (NIP-01, NIP-44, NIP-19)
 │   ├── mastodon.js       # Mastodon / ActivityPub
 │   ├── peertube.js       # PeerTube
@@ -142,16 +140,12 @@ m4tr1x-electron/
 | GET  | `/api/v1/h8/boost/:contentId` | Score boost di un contenuto |
 | GET  | `/api/v1/h8/chain/verify` | Verifica integrità dell'intera catena |
 
-### Shop Decentralizzato (H8)
+### Marketplace
 
-| Method | Endpoint | Descrizione |
-|--------|----------|-------------|
-| GET    | `/api/v1/shop/listings` | Lista prodotti (`?category=...&limit=N`) |
-| GET    | `/api/v1/shop/listings/:id` | Dettaglio prodotto |
-| POST   | `/api/v1/shop/listings` | Crea prodotto (`{ sellerPubkey, title, priceH8, ... }`) |
-| DELETE | `/api/v1/shop/listings/:id` | Disattiva prodotto |
-| POST   | `/api/v1/shop/orders` | Acquisto (`{ listingId, buyerPubkey }`) — pagamento H8 istantaneo |
-| GET    | `/api/v1/shop/orders/:id` | Dettaglio ordine |
+Marketplace decentralizzato via Nostr — eventi `kind:30402` con tag `m4tr1x-shop`. 
+Nessun server centrale di listing: ogni utente pubblica i suoi prodotti come eventi 
+firmati con la sua chiave Nostr. I pagamenti passano dall'endpoint `/api/v1/h8/tip` 
+con `creatorAddress = 'nostr_' + pubkey[:38]`.
 
 ### Badge Utente
 
