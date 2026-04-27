@@ -14,8 +14,7 @@
     "onnxruntime-node":   "^1.17.3",
     "sharp":              "^0.33.2",
     "uuid":               "^9.0.0",
-    "monero-javascript":  "^0.8.4",
-    "nostr-tools":        "^2.3.1",
+"nostr-tools":        "^2.3.1",
     "ws":                 "^8.16.0"
   }
 }

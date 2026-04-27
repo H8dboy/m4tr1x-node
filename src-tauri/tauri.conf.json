@@ -46,7 +46,7 @@
     "copyright": "MIT — Free to use, fork, and build upon.",
     "category":  "SocialNetworking",
     "shortDescription": "Decentralized privacy-first social video.",
-    "longDescription":  "M4TR1X is a beautiful interface over open-source protocols — Nostr, IPFS, Monero — that puts privacy back in your hands.",
+    "longDescription":  "M4TR1X is a beautiful interface over open-source protocols — Nostr, PeerTube, Mastodon, Funkwhale — that puts privacy back in your hands.",
 
     "windows": {
       "nsis": {

@@ -75,7 +75,7 @@ Build outputs:
 ### Desktop (Windows / macOS / Linux)
 - Tauri shell starts `node server/index.js` on port 8080
 - Frontend loads from `http://localhost:8080/app`
-- All existing features work: AI detection, Monero wallet, uploads
+- All existing features work: AI detection, uploads
 
 ### Mobile (Android / iOS)
 - No local server (Node.js can't run on mobile)
@@ -84,9 +84,8 @@ Build outputs:
   - ✅ Nostr feed (direct WebSocket to relays)
   - ✅ Video playback
   - ✅ Profile, follows, notifications
-  - ✅ Encrypted DMs (Signal Protocol over Nostr)
+  - ✅ Encrypted DMs (Nostr NIP-44, ChaCha20-Poly1305)
   - ⏳ AI badge (requires server — coming in v2.1)
-  - ⏳ Monero shop (requires server — coming in v2.1)
   - ⏳ Video upload (UI hidden, upload via Nostr relay — coming in v2.1)
 
 ---
