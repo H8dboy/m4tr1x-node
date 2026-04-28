@@ -432,7 +432,7 @@
                     </div>
 
                     <button class="btn-ext" onclick="connectExtension()">
-                        🔌 CONNECT EXTENSION (ALBY / NOS2X)
+                        🔌 CONNECT NOSTR SIGNER (NIP-07)
                     </button>
 
                     <div class="or-divider">OR IMPORT KEY</div>
@@ -465,9 +465,9 @@
                         <div style="font-family:var(--font-display);font-size:0.6em;color:var(--green-dim);letter-spacing:2px;margin-bottom:16px">// CHOOSE IDENTITY METHOD</div>
 
                         <button class="btn-ext" onclick="connectExtension()">
-                            🔌 USE EXISTING EXTENSION (NIP-07)
+                            🔌 USE EXISTING NOSTR SIGNER (NIP-07)
                         </button>
-                        <div style="font-size:0.6em;color:var(--green-dark);margin:6px 0 14px;text-align:center">Alby, nos2x, Nostore — already have a Nostr key</div>
+                        <div style="font-size:0.6em;color:var(--green-dark);margin:6px 0 14px;text-align:center">nos2x, Nostore, Amber — already have a Nostr key</div>
 
                         <div class="or-divider">OR</div>
 
@@ -522,10 +522,6 @@
                             <textarea class="field-textarea" id="reg-bio" rows="2" placeholder="Boots on the ground. Witness protocol active." maxlength="200"></textarea>
                         </div>
                         <div class="field">
-                            <label class="field-label">Lightning Address (for Zaps) ⚡</label>
-                            <input class="field-input" type="text" id="reg-lud16" placeholder="you@getalby.com" spellcheck="false">
-                        </div>
-                        <div class="field">
                             <label class="field-label">Signal Identity (optional) 🔒</label>
                             <input class="field-input" type="text" id="reg-signal" placeholder="@yourname (Signal username)" spellcheck="false" maxlength="60">
                             <div style="font-size:0.58em;color:var(--green-dark);margin-top:5px;line-height:1.5">Collega il tuo username Signal al profilo M4TR1X. I DM restano <strong style="color:var(--green-dim)">completamente in-app</strong> e cifrati con NIP-44. Il profilo mostrerà un badge <strong style="color:var(--green-dim)">🔒 SIGNAL LINKED</strong>.</div>
@@ -558,18 +554,18 @@
             <li class="active-item">Secp256k1 keypair generation</li>
             <li class="active-item">NIP-94 video file events</li>
             <li class="active-item">Blossom decentralized storage</li>
-            <li class="active-item">NIP-57 Lightning zaps</li>
+            <li class="active-item">H8 token tipping (creator economy)</li>
             <li>NIP-05 identity verification</li>
             <li>E2E encrypted DMs (NIP-04)</li>
             <li>Tor / Onion relay routing</li>
         </ul>
         <div style="border:1px solid var(--green-dark);padding:14px;margin-top:10px">
-            <div class="deco-label" style="margin-bottom:8px">GET A NOSTR EXTENSION</div>
+            <div class="deco-label" style="margin-bottom:8px">NOSTR SIGNER EXTENSIONS</div>
             <div style="font-size:0.6em;color:var(--green-dim);line-height:2.2">
-                <div>→ <span style="color:var(--green)">Alby</span> — getalby.com</div>
-                <div>→ <span style="color:var(--green)">nos2x</span> — Chrome extension</div>
-                <div>→ <span style="color:var(--green)">Nostore</span> — Safari/iOS</div>
+                <div>→ <span style="color:var(--green)">nos2x</span> — Chrome / Brave</div>
+                <div>→ <span style="color:var(--green)">Nostore</span> — Safari / iOS</div>
                 <div>→ <span style="color:var(--green)">Amber</span> — Android signer</div>
+                <div style="margin-top:6px;color:var(--green-dark)">For tipping use the built-in H8 wallet →</div>
             </div>
         </div>
         <div id="right-ext-status" style="border:1px solid var(--green-dark);padding:10px;font-size:0.6em;color:var(--green-dark)">
@@ -680,8 +676,7 @@ function switchTab(tab) {
 // ─── SIGN IN ──────────────────────────────────────────────
 async function connectExtension() {
     if (!window.nostr) {
-        showToast('NO EXTENSION FOUND — INSTALL ALBY OR NOS2X');
-        window.open('https://getalby.com', '_blank');
+        showToast('NO NOSTR SIGNER FOUND — INSTALL NOS2X OR GENERATE KEYS BELOW');
         return;
     }
     try {
@@ -875,7 +870,6 @@ async function publishAndEnter() {
         name,
         display_name: name,
         about: document.getElementById('reg-bio').value.trim(),
-        lud16: document.getElementById('reg-lud16').value.trim(),
         picture: document.getElementById('reg-pic').value.trim(),
         signal: document.getElementById('reg-signal').value.trim(),
         client: 'm4tr1x'
