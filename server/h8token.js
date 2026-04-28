@@ -4,10 +4,12 @@
  * Token utility closed-credit stile Twitch Bits — fuori perimetro MiCA.
  */
 
-const Database = require('better-sqlite3')
-const crypto   = require('crypto')
-const path     = require('path')
-const h8id     = require('./h8identity')
+const Database  = require('better-sqlite3')
+const crypto    = require('crypto')
+const path      = require('path')
+const h8id      = require('./h8identity')
+const { sha3_256 } = require('@noble/hashes/sha3')
+const { bytesToHex } = require('@noble/hashes/utils')
 
 const MINT_ADDRESS     = process.env.H8_MINT_ADDRESS     || 'H8' + '0'.repeat(38)
 const PLATFORM_ADDRESS = process.env.H8_PLATFORM_ADDRESS || 'H8' + '1'.repeat(38)
@@ -33,9 +35,8 @@ function getDb() {
 }
 
 function hashBlock(idx, ts, from, to, amount, type, contentId, prevHash) {
-  return crypto.createHash('sha3-256')
-    .update(`${idx}|${ts}|${from}|${to}|${amount}|${type}|${contentId||''}|${prevHash}`)
-    .digest('hex')
+  const input = `${idx}|${ts}|${from}|${to}|${amount}|${type}|${contentId||''}|${prevHash}`
+  return bytesToHex(sha3_256(new TextEncoder().encode(input)))
 }
 
 function validAddress(addr) {

@@ -13,6 +13,8 @@
 const crypto = require('crypto')
 const path   = require('path')
 const fs     = require('fs')
+const { sha3_256 } = require('@noble/hashes/sha3')
+const { bytesToHex } = require('@noble/hashes/utils')
 
 // ─── ESM lazy load (noble è ESM-only) ────────────────────────────────────────
 let _lib = null
@@ -38,8 +40,7 @@ function getIdentityPath() {
 
 function h8AddressFrom(publicKeyHex) {
   const buf = Buffer.from(publicKeyHex, 'hex')
-  const hash = crypto.createHash('sha3-256').update(buf).digest('hex')
-  return 'H8' + hash.substring(0, 38)   // 40 chars: H8 + 38 hex
+  return 'H8' + bytesToHex(sha3_256(buf)).substring(0, 38)
 }
 
 function encryptSecret(secretKeyHex, password) {
