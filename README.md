@@ -21,7 +21,7 @@
 
 In 2024, footage of protests in Iran, Belarus, and Hong Kong vanished from Instagram and TikTok within hours. The platforms that monetize attention also have datacenters that governments can compel, subpoena, or shut down. M4TR1X exists because that infrastructure is the wrong infrastructure for documenting truth.
 
-But mainstream social media is broken in another way too. The "liquid individual" of 2026 — the same person is a CNC machinist, a musician, an indie filmmaker, a programmer, a seller of niche products — has to fragment themselves across five platforms. Five algorithms, five 30% revenue cuts, five contradictory profiles. M4TR1X collapses this: one identity, one nickname, one wallet, every form of expression in one place.
+But mainstream social media is broken in another way too. The "liquid individual" of 2026 — the same person is a musician, an indie filmmaker, a programmer, a seller of niche products — has to fragment themselves across five platforms. Five algorithms, five 30% revenue cuts, five contradictory profiles. M4TR1X collapses this: one identity, one nickname, one wallet, every form of expression in one place.
 
 The third innovation is economic. The "like" is free, so spam wins. The "tip" costs H8 tokens, so signal wins. The cost itself is the moderation layer — markets filter what algorithms can't, without requiring a Trust & Safety department M4TR1X structurally cannot have.
 
