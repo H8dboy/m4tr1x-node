@@ -12,7 +12,7 @@
     "ffmpeg-static": "^5.2.0",
     "ffprobe-static": "^3.1.0",
     "multer": "^1.4.5-lts.1",
-    "nostr-tools": "^2.3.1",
+    "nostr-tools": "2.3.1",
     "onnxruntime-node": "^1.17.3",
     "sharp": "^0.33.2",
     "uuid": "^9.0.0",
