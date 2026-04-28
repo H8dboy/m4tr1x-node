@@ -229,9 +229,9 @@
   </div>
   <div class="section-banner" id="banner-dm">
     <span class="banner-icon">💬</span>
-    <div class="banner-text"><strong>PRIVATE MESSAGES</strong>Nostr NIP-44 · ChaCha20-Poly1305 · No phone number <span class="integration-status live">E2E ENCRYPTED</span></div>
+    <div class="banner-text"><strong>PRIVATE MESSAGES</strong>ChaCha20-Poly1305 · E2E Encrypted · No phone number <span class="integration-status live">E2E ENCRYPTED</span></div>
   </div>
-  <div class="section-banner" id="banner-live"><span class="banner-icon">🔴</span><div class="banner-text"><strong>LIVE STREAMS</strong> WebRTC P2P via Nostr signaling <span class="integration-status live">P2P LIVE</span></div></div>
+  <div class="section-banner" id="banner-live"><span class="banner-icon">🔴</span><div class="banner-text"><strong>LIVE STREAMS</strong> WebRTC P2P · Decentralized <span class="integration-status live">P2P LIVE</span></div></div>
   <button id="mute-btn" onclick="toggleMute()">🔇</button>
   <div id="feed-wrap">
     <div class="section-feed active" id="feed-signal"><div class="slide-placeholder"><div class="ph-text">[ CONNECTING TO RELAYS... ]</div></div></div>
@@ -267,17 +267,15 @@
       <div class="dm-container" id="dm-container">
         <div class="dm-encryption-badge"><span class="lock-icon">🔒</span> NIP-44 ACTIVE — ChaCha20-Poly1305 — Messages are end-to-end encrypted</div>
         <div class="dm-list" id="dm-list"><div class="slide-placeholder"><div class="ph-text">[ LOADING CONTACTS... ]</div></div></div>
-        <div class="dm-powered">REAL E2E ENCRYPTION · NOSTR NIP-44 · NO PHONE NUMBER REQUIRED</div>
+        <div class="dm-powered">REAL E2E ENCRYPTION · CHACHA20-POLY1305 · NO PHONE NUMBER REQUIRED</div>
       </div>
     </div>
   </div>
   <div class="powered-strip">
-    <span>INTEGRATED WITH</span>
-    <a href="https://nostr.com" target="_blank">NOSTR</a> ·
+    <span>POWERED BY M4TR1X NETWORK · FEDERATED WITH</span>
     <a href="https://joinmastodon.org" target="_blank">MASTODON</a> ·
     <a href="https://joinpeertube.org" target="_blank">PEERTUBE</a> ·
-    <a href="https://funkwhale.audio" target="_blank">FUNKWHALE</a> ·
-    <a href="https://signal.org" target="_blank">SIGNAL</a>
+    <a href="https://funkwhale.audio" target="_blank">FUNKWHALE</a>
   </div>
   <div id="bottom-nav">
     <button class="bnav active" id="bnav-signal" onclick="switchSec('signal')"><span class="bicon">📡</span><span class="bnav-label">SIGNAL</span></button>
@@ -342,7 +340,7 @@
         <div class="field"><label>Tags (space separated)</label><input type="text" id="up-tags" placeholder="evidence underground indie"></div>
         <div class="field"><label>Blossom Server</label><select id="up-server"><option value="cdn.satellite.earth">cdn.satellite.earth (recommended)</option><option value="blossom.band">blossom.band</option><option value="nostrcheck.me">nostrcheck.me</option></select></div>
         <div id="up-progress"><div class="prog-bar"><div class="prog-fill" id="prog-fill"></div></div><div class="prog-txt" id="prog-txt">Preparing...</div></div>
-        <button class="btn-pub" id="btn-pub" onclick="doUpload()" disabled>PUBLISH ON NOSTR</button>
+        <button class="btn-pub" id="btn-pub" onclick="doUpload()" disabled>PUBLISH ON M4TR1X</button>
       </div>
     </div>
   </div>
@@ -757,8 +755,8 @@
       'https://funkwhale.it',
       'https://tanukitunes.com'
     ],
-    // Nostr relays — ws://localhost:4848 è il nodo M4TR1X locale (primo avvio)
-    relays: ['ws://localhost:4848','wss://relay.damus.io','wss://nos.lol','wss://relay.nostr.band','wss://relay.snort.social'],
+    // M4TR1X network nodes — localhost first, then community nodes
+    relays: ['ws://localhost:4848'],
     // Blossom servers
     blossom: {'cdn.satellite.earth':'https://cdn.satellite.earth','blossom.band':'https://blossom.band','nostrcheck.me':'https://nostrcheck.me'}
   };
@@ -1411,7 +1409,7 @@
   // ========== MASTODON FORUM INTEGRATION ==========
   function loadForum() {
     const c = document.getElementById('forum-container');
-    c.innerHTML = '<div class="slide-placeholder"><div class="ph-text">[ CONNECTING TO MASTODON + NOSTR... ]</div></div>';
+    c.innerHTML = '<div class="slide-placeholder"><div class="ph-text">[ CONNECTING TO M4TR1X NETWORK... ]</div></div>';
     // Load from Mastodon instances (ActivityPub)
     CONFIG.mastodon.forEach(instance => {
       fetch(instance + '/api/v1/timelines/tag/m4tr1x?limit=15')
@@ -1457,7 +1455,7 @@
           '<div class="forum-post-body">' + esc(ev.content) + '</div>' +
           '<div class="forum-post-footer"><span class="forum-act" onclick="openComments(\'' + ev.id + '\')">\u{1F4AC} Reply</span>' +
           '<span class="forum-act" onclick="shareEv(\'' + ev.id + '\')">\u{1F4E1} Share</span>' +
-          '<span class="forum-post-source">NOSTR</span></div>';
+          '<span class="forum-post-source">M4TR1X</span></div>';
         c.appendChild(div);
         loadProf(ev.pubkey).then(p => {
           if (!p) return;
@@ -1486,7 +1484,7 @@
       const signed=await signEv(ev);broadcast(signed);
       closeForumModal();
       document.getElementById('forum-title').value='';document.getElementById('forum-body').value='';document.getElementById('forum-tags').value='';
-      toast('THREAD PUBLISHED TO NOSTR + MASTODON');
+      toast('THREAD PUBLISHED TO M4TR1X + MASTODON');
       S.loaded.forum=false;loadForum();
     }catch(e){toast('ERROR: '+e.message)}
   }
@@ -2444,7 +2442,7 @@
           // Blocca la pubblicazione se il video risulta AI-generato (e la categoria è 'signal')
           if(aiVerdict.verdict==='AI_GENERATED'&&S.uploadCat==='signal'){
             const proceed=confirm('⚠️ M4TR1X AI: this video appears to be AI-generated ('+conf+').\nPublish it anyway?');
-            if(!proceed){fill.style.width='0%';prog.style.display='none';btn.disabled=false;btn.textContent='PUBLISH ON NOSTR';return}
+            if(!proceed){fill.style.width='0%';prog.style.display='none';btn.disabled=false;btn.textContent='PUBLISH ON M4TR1X';return}
           }
           // Tag crittografici da includere nel Nostr event
           aiTags=[
@@ -2538,7 +2536,7 @@
       ptxt.textContent=(aiVerdict?aiVerdict.verdict_emoji+' '+aiVerdict.verdict+' — ':'')+' PUBLISHED ✓';
       toast('BROADCAST COMPLETE'+(aiVerdict?' · AI: '+aiVerdict.verdict:''));
       setTimeout(()=>{closeUpload();seen[S.uploadCat].add(signed.id);const c=document.getElementById('feed-'+S.uploadCat);if(c){const ph=c.querySelector('.slide-placeholder');if(ph)ph.remove();c.insertBefore(mkSlide(signed,vurl,S.uploadCat),c.firstChild);}switchSec(S.uploadCat)},1200);
-    }catch(e){toast('ERROR: '+e.message);ptxt.textContent='FAILED';fill.style.width='0%';btn.disabled=false;btn.textContent='PUBLISH ON NOSTR'}
+    }catch(e){toast('ERROR: '+e.message);ptxt.textContent='FAILED';fill.style.width='0%';btn.disabled=false;btn.textContent='PUBLISH ON M4TR1X'}
   }
 
   // ========== BADGE SYSTEM ==========

@@ -427,25 +427,19 @@
                 <!-- ─── SIGN IN PANEL ─── -->
                 <div class="panel active" id="panel-signin">
                     <div class="info-box">
-                        M4TR1X uses <strong>Nostr</strong> for identity.<br>
-                        No password. No email. Your key = your identity.
+                        Your <strong>M4TR1X key</strong> is your identity.<br>
+                        No password. No email. No third-party accounts.
                     </div>
 
-                    <button class="btn-ext" onclick="connectExtension()">
-                        🔌 CONNECT NOSTR SIGNER (NIP-07)
-                    </button>
-
-                    <div class="or-divider">OR IMPORT KEY</div>
-
                     <div class="field">
-                        <label class="field-label">Private Key (nsec or hex)</label>
+                        <label class="field-label">M4TR1X Private Key</label>
                         <div class="nsec-input-wrapper">
                             <input class="field-input" type="password" id="nsec-import" placeholder="nsec1... or 64-char hex" spellcheck="false" autocomplete="off">
                             <button class="nsec-toggle" onclick="toggleNsecVisibility()" title="Show/hide key">👁</button>
                         </div>
                     </div>
                     <button class="btn-primary" onclick="importKey()">ACCESS NETWORK</button>
-                    <button class="btn-secondary" onclick="switchTab('signup')">NEW NODE? REGISTER →</button>
+                    <button class="btn-secondary" onclick="switchTab('signup')">NEW HERE? CREATE ACCOUNT →</button>
                 </div>
 
                 <!-- ─── SIGN UP PANEL ─── -->
@@ -460,50 +454,43 @@
                         <div class="step-dot" id="sdot-3">3</div>
                     </div>
 
-                    <!-- Step 1: Choose method -->
+                    <!-- Step 1: Confirm start -->
                     <div id="signup-step-1" class="step-content">
-                        <div style="font-family:var(--font-display);font-size:0.6em;color:var(--green-dim);letter-spacing:2px;margin-bottom:16px">// CHOOSE IDENTITY METHOD</div>
+                        <div style="font-family:var(--font-display);font-size:0.6em;color:var(--green-dim);letter-spacing:2px;margin-bottom:16px">// CREATE YOUR M4TR1X ACCOUNT</div>
 
-                        <button class="btn-ext" onclick="connectExtension()">
-                            🔌 USE EXISTING NOSTR SIGNER (NIP-07)
-                        </button>
-                        <div style="font-size:0.6em;color:var(--green-dark);margin:6px 0 14px;text-align:center">nos2x, Nostore, Amber — already have a Nostr key</div>
+                        <div class="info-box">
+                            Your identity is generated <strong>locally on this device</strong>.<br>
+                            Never sent anywhere. <strong>You own it completely.</strong>
+                        </div>
 
-                        <div class="or-divider">OR</div>
-
-                        <button class="btn-primary" onclick="goSignupStep(2)">GENERATE NEW KEYPAIR</button>
-                        <div style="font-size:0.6em;color:var(--green-dark);margin-top:6px;text-align:center">New to Nostr? Start fresh.</div>
+                        <button class="btn-primary" onclick="goSignupStep(2)">GENERATE IDENTITY</button>
+                        <div style="font-size:0.6em;color:var(--green-dark);margin-top:6px;text-align:center">Already have an account? <a href="#" onclick="switchTab('signin');return false;" style="color:var(--green)">Sign in →</a></div>
                     </div>
 
                     <!-- Step 2: Generate keys -->
                     <div id="signup-step-2" class="step-content" style="display:none">
-                        <div style="font-family:var(--font-display);font-size:0.6em;color:var(--green-dim);letter-spacing:2px;margin-bottom:16px">// KEYPAIR GENERATION</div>
+                        <div style="font-family:var(--font-display);font-size:0.6em;color:var(--green-dim);letter-spacing:2px;margin-bottom:16px">// GENERATE YOUR KEY</div>
 
-                        <div class="info-box">
-                            Your keys are generated <strong>locally in your browser</strong>.<br>
-                            Never sent to any server. <strong>You own your identity.</strong>
-                        </div>
-
-                        <button class="btn-primary" id="gen-btn" onclick="generateNewKeys()">⚡ GENERATE KEYPAIR</button>
+                        <button class="btn-primary" id="gen-btn" onclick="generateNewKeys()">GENERATE M4TR1X KEY</button>
 
                         <div id="keys-output" style="display:none">
                             <div class="key-box" style="margin-top:14px">
-                                <div class="key-box-label">PUBLIC KEY (NPUB) — Share freely</div>
+                                <div class="key-box-label">PUBLIC KEY — Share with others</div>
                                 <div class="key-box-value" id="npub-out">—</div>
                                 <button class="copy-btn" onclick="copyKey('npub-out')">COPY</button>
                             </div>
                             <div class="key-box" style="border-left-color:var(--red)">
-                                <div class="key-box-label" style="color:var(--red)">PRIVATE KEY (NSEC) — NEVER SHARE</div>
+                                <div class="key-box-label" style="color:var(--red)">PRIVATE KEY — NEVER SHARE THIS</div>
                                 <div class="key-box-value" id="nsec-out" style="filter:blur(4px);cursor:pointer" onclick="revealNsec(this)">click to reveal</div>
                                 <button class="copy-btn" onclick="copyKey('nsec-out')">COPY</button>
                             </div>
                             <div class="warning-box">
-                                ⚠ SAVE YOUR NSEC OFFLINE NOW.<br>
-                                Write it on paper. It cannot be recovered.
+                                ⚠ SAVE YOUR KEY OFFLINE NOW.<br>
+                                This is your only password. It cannot be recovered.
                             </div>
                             <div class="checkbox-field">
                                 <input type="checkbox" id="saved-check" onchange="checkSavedKey()">
-                                <label for="saved-check">I have saved my private key in a safe place</label>
+                                <label for="saved-check">I have saved my key in a safe place</label>
                             </div>
                             <button class="btn-primary" id="next-to-3" onclick="goSignupStep(3)" disabled>CONTINUE →</button>
                         </div>
@@ -531,7 +518,7 @@
                             <input class="field-input" type="text" id="reg-pic" placeholder="https://..." spellcheck="false">
                         </div>
 
-                        <button class="btn-primary" onclick="publishAndEnter()">PUBLISH PROFILE + ENTER NETWORK</button>
+                        <button class="btn-primary" onclick="publishAndEnter()">CREATE PROFILE + ENTER M4TR1X</button>
                         <button class="btn-secondary" onclick="skipProfile()">SKIP — ENTER ANONYMOUS</button>
                     </div>
 
@@ -550,26 +537,23 @@
     <div id="right-deco">
         <div style="font-family:var(--font-display);font-size:0.7em;color:var(--green-dim);letter-spacing:3px;margin-bottom:10px">ACTIVE MODULES</div>
         <ul class="protocol-list">
-            <li class="active-item">NIP-07 browser extension auth</li>
-            <li class="active-item">Secp256k1 keypair generation</li>
-            <li class="active-item">NIP-94 video file events</li>
-            <li class="active-item">Blossom decentralized storage</li>
-            <li class="active-item">H8 token tipping (creator economy)</li>
-            <li>NIP-05 identity verification</li>
-            <li>E2E encrypted DMs (NIP-04)</li>
-            <li>Tor / Onion relay routing</li>
+            <li class="active-item">M4TR1X decentralized identity</li>
+            <li class="active-item">Post-quantum signatures (ML-DSA65)</li>
+            <li class="active-item">H8 token economy</li>
+            <li class="active-item">E2E encrypted direct messages</li>
+            <li class="active-item">Federated video (PeerTube)</li>
+            <li class="active-item">Federated music (Funkwhale)</li>
+            <li>Tor / Onion routing</li>
+            <li>AI deepfake detection</li>
         </ul>
         <div style="border:1px solid var(--green-dark);padding:14px;margin-top:10px">
-            <div class="deco-label" style="margin-bottom:8px">NOSTR SIGNER EXTENSIONS</div>
+            <div class="deco-label" style="margin-bottom:8px">YOUR KEY = YOUR ACCOUNT</div>
             <div style="font-size:0.6em;color:var(--green-dim);line-height:2.2">
-                <div>→ <span style="color:var(--green)">nos2x</span> — Chrome / Brave</div>
-                <div>→ <span style="color:var(--green)">Nostore</span> — Safari / iOS</div>
-                <div>→ <span style="color:var(--green)">Amber</span> — Android signer</div>
-                <div style="margin-top:6px;color:var(--green-dark)">For tipping use the built-in H8 wallet →</div>
+                <div style="color:var(--green-dark)">No server stores your password.</div>
+                <div style="color:var(--green-dark)">No email. No phone number.</div>
+                <div style="color:var(--green-dark)">Your private key IS your identity.</div>
+                <div style="margin-top:8px;color:rgba(0,255,136,0.4)">Save it offline — it cannot be recovered.</div>
             </div>
-        </div>
-        <div id="right-ext-status" style="border:1px solid var(--green-dark);padding:10px;font-size:0.6em;color:var(--green-dark)">
-            [ SCANNING FOR EXTENSION... ]
         </div>
     </div>
 
