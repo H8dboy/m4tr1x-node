@@ -14,12 +14,12 @@
 // ─── Istanze Mastodon di default ─────────────────────────────────────────────
 // L'utente può aggiungere la propria istanza preferita
 const DEFAULT_INSTANCES = [
-  'mastodon.social',        // la più grande istanza pubblica
-  'fosstodon.org',          // tech/open source
-  'kolektiva.social',       // attivismo, movimenti sociali
-  'social.coop',            // cooperativa
+  'fosstodon.org',          // tech/open source — public timeline aperta
   'infosec.exchange',       // sicurezza informatica
   'mastodon.online',        // generale, affidabile
+  'kolektiva.social',       // attivismo, movimenti sociali
+  'social.coop',            // cooperativa
+  'mastodon.social',        // grande istanza — public timeline richiede auth
 ]
 
 // ─── HTTP helper (usa fetch nativo di Node 18+) ──────────────────────────────
@@ -54,9 +54,15 @@ async function apiPost(instance, endpoint, body, accessToken) {
  * @param {string} instance - Es. "mastodon.social"
  * @param {number} limit    - Numero di post (max 40)
  */
-async function getPublicTimeline(instance = DEFAULT_INSTANCES[0], limit = 40) {
-  const posts = await apiGet(instance, `/timelines/public?limit=${limit}&local=false`)
-  return normalizePosts(posts, instance)
+async function getPublicTimeline(instance, limit = 40) {
+  const list = instance ? [instance] : DEFAULT_INSTANCES
+  for (const inst of list) {
+    try {
+      const posts = await apiGet(inst, `/timelines/public?limit=${limit}&local=false`)
+      return normalizePosts(posts, inst)
+    } catch {}
+  }
+  return []
 }
 
 /**

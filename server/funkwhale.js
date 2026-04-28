@@ -16,10 +16,10 @@
 
 // ─── Istanze Funkwhale di default ─────────────────────────────────────────────
 const DEFAULT_INSTANCES = [
+  'tanukitunes.com',         // musica indipendente — confermata attiva
   'open.audio',              // istanza pubblica principale
   'funkwhale.social',        // sociale, aperta
   'audio.gatto.ninja',       // italiana
-  'tanukitunes.com',         // musica indipendente
   'music.gaysweater.net',    // LGBTQ+ artists
 ]
 
@@ -62,9 +62,15 @@ async function searchTracks(query, instances = DEFAULT_INSTANCES.slice(0, 2), li
  * @param {string} instance - Istanza Funkwhale
  * @param {number} limit    - Numero di brani
  */
-async function getRecentTracks(instance = DEFAULT_INSTANCES[0], limit = 30) {
-  const data = await apiGet(instance, `/tracks?page_size=${limit}&ordering=-creation_date`)
-  return normalizeTracks(data.results || [], instance)
+async function getRecentTracks(instance, limit = 30) {
+  const list = instance ? [instance] : DEFAULT_INSTANCES
+  for (const inst of list) {
+    try {
+      const data = await apiGet(inst, `/tracks?page_size=${limit}&ordering=-creation_date`)
+      return normalizeTracks(data.results || [], inst)
+    } catch {}
+  }
+  return []
 }
 
 /**
@@ -73,9 +79,15 @@ async function getRecentTracks(instance = DEFAULT_INSTANCES[0], limit = 30) {
  * @param {string} instance - Istanza
  * @param {number} limit    - Numero album
  */
-async function getRecentAlbums(instance = DEFAULT_INSTANCES[0], limit = 20) {
-  const data = await apiGet(instance, `/albums?page_size=${limit}&ordering=-creation_date`)
-  return (data.results || []).map(a => normalizeAlbum(a, instance))
+async function getRecentAlbums(instance, limit = 20) {
+  const list = instance ? [instance] : DEFAULT_INSTANCES
+  for (const inst of list) {
+    try {
+      const data = await apiGet(inst, `/albums?page_size=${limit}&ordering=-creation_date`)
+      return (data.results || []).map(a => normalizeAlbum(a, inst))
+    } catch {}
+  }
+  return []
 }
 
 /**
@@ -124,7 +136,8 @@ function getStreamUrl(instance, trackId, accessToken = null) {
  *
  * @param {string} instance - Istanza
  */
-async function getChannels(instance = DEFAULT_INSTANCES[0], limit = 20) {
+async function getChannels(instance, limit = 20) {
+  if (!instance) instance = DEFAULT_INSTANCES[0]
   const data = await apiGet(instance, `/channels?page_size=${limit}&ordering=-creation_date`)
   return (data.results || []).map(ch => ({
     uuid:        ch.uuid,
