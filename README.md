@@ -11,8 +11,6 @@
 [![License](https://img.shields.io/github/license/H8dboy/m4tr1x-electron)](LICENSE)
 [![Build](https://github.com/H8dboy/m4tr1x-electron/actions/workflows/build.yml/badge.svg)](https://github.com/H8dboy/m4tr1x-electron/actions)
 
-> 🇮🇹 [Versione italiana](README.it.md)
-
 [Download](https://github.com/H8dboy/m4tr1x-electron/releases/latest) · [Run a Node](docs/NODE_OPERATOR.md) · [Architecture](docs/ARCHITECTURE.md) · [Tokenomics](docs/TOKENOMICS.md) · [Contributing](CONTRIBUTING.md)
 
 </div>
