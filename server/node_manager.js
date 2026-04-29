@@ -11,7 +11,7 @@ const { publishNote, getCurrentPubkey, loadSavedKeys, subscribeToFilter } = requ
 
 const NODE_KIND    = 30078
 const NODE_TAG     = 'm4tr1x-node'
-// shop and crypto are intentionally excluded — handled by the private node only
+const NODE_NAME    = process.env.NODE_NAME || 'alpha'
 const VALID_CAPS   = new Set(['film', 'music', 'reels', 'topic'])
 
 // Private M4TR1X node URL — all shop/crypto calls route here
@@ -40,14 +40,14 @@ async function declareNode(capabilities, wsPort = 4848) {
   const validCaps = capabilities.filter(c => VALID_CAPS.has(c))
   if (!validCaps.length) throw new Error('Invalid capabilities')
 
-  const cfg = { capabilities: validCaps, wsPort, since: Math.floor(Date.now() / 1000) }
+  const cfg = { name: NODE_NAME, capabilities: validCaps, wsPort, since: Math.floor(Date.now() / 1000) }
   saveNodeConfig(cfg)
 
   // Publish only to the embedded local relay, not external Nostr networks
   const keys = loadSavedKeys()
   if (keys) {
     publishNote(
-      JSON.stringify({ type: NODE_TAG, capabilities: validCaps, port: wsPort }),
+      JSON.stringify({ type: NODE_TAG, name: NODE_NAME, capabilities: validCaps, port: wsPort }),
       keys.privkey,
       [
         ['t', NODE_TAG],
@@ -57,8 +57,8 @@ async function declareNode(capabilities, wsPort = 4848) {
     ).catch(() => {}) // fire-and-forget — local relay only, no external deps
   }
 
-  nodeRegistry.set(pubkey, { pubkey, capabilities: validCaps, wsPort, ts: Date.now() })
-  console.log(`[NODE] Declared as node: ${validCaps.join(', ')}`)
+  nodeRegistry.set(pubkey, { pubkey, name: NODE_NAME, capabilities: validCaps, wsPort, ts: Date.now() })
+  console.log(`[NODE] "${NODE_NAME}" declared: ${validCaps.join(', ')}`)
   return cfg
 }
 

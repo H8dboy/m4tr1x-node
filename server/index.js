@@ -86,7 +86,7 @@ const app = express()
 
 // CORS â accetta localhost (Electron) + origini configurate
 app.use(cors({
-  origin: [...ALLOWED_ORIGINS, 'http://localhost:8080', 'http://127.0.0.1:8080'],
+  origin: true,
   credentials: false,
   methods: ['GET', 'POST', 'DELETE'],
   allowedHeaders: ['X-Nostr-Pubkey', 'X-API-Key', 'X-Admin-Key', 'Content-Type'],
@@ -1024,8 +1024,12 @@ function startServer(port = 8080) {
   setTimeout(() => checkAndUpdateModel().catch(() => {}), 5000)
   setTimeout(() => startNodeDiscovery(), 2000)
   return new Promise((resolve, reject) => {
-    server = app.listen(port, '127.0.0.1', () => {
-      console.log(`[SERVER] M4TR1X API in ascolto su http://localhost:${port}`)
+    server = app.listen(port, '0.0.0.0', () => {
+      const { networkInterfaces } = require('os')
+      const nets = networkInterfaces()
+      const lan = Object.values(nets).flat().find(n => n.family === 'IPv4' && !n.internal)
+      console.log(`[SERVER] M4TR1X Alpha Node in ascolto su http://localhost:${port}`)
+      if (lan) console.log(`[SERVER] Raggiungibile dalla rete: http://${lan.address}:${port}`)
       resolve(server)
     })
     server.on('error', reject)
