@@ -1,225 +1,101 @@
 /**
- * M4TR1X - Mastodon / ActivityPub Integration
+ * M4TR1X - Forum/Topic Module (local Nostr relay)
  *
- * Mastodon è la rete sociale federata più grande del mondo.
- * Ogni istanza è indipendente — nessuno può spegnere tutto.
- * Perfetto per discussioni, forum, controinformazione.
- *
- * M4TR1X usa Mastodon come layer di discussione pubblica:
- * legge timeline federate, cerca hashtag, pubblica post.
- *
- * API: REST standard Mastodon v1/v2 — funziona su tutte le istanze.
+ * Posts live on this node's embedded Nostr relay (ws://localhost:4848).
+ * No external Mastodon/ActivityPub federation.
+ * Same API surface — frontend unchanged.
  */
 
-// ─── Istanze Mastodon di default ─────────────────────────────────────────────
-// L'utente può aggiungere la propria istanza preferita
-const DEFAULT_INSTANCES = [
-  'fosstodon.org',          // tech/open source — public timeline aperta
-  'infosec.exchange',       // sicurezza informatica
-  'mastodon.online',        // generale, affidabile
-  'kolektiva.social',       // attivismo, movimenti sociali
-  'social.coop',            // cooperativa
-  'mastodon.social',        // grande istanza — public timeline richiede auth
-]
+const { subscribeToFilter, publishNote, loadSavedKeys } = require('./nostr')
 
-// ─── HTTP helper (usa fetch nativo di Node 18+) ──────────────────────────────
-async function apiGet(instance, endpoint, accessToken = null) {
-  const headers = { 'Accept': 'application/json' }
-  if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`
+// ─── Read posts from local relay ─────────────────────────────────────────────
 
-  const res = await fetch(`https://${instance}/api/v1${endpoint}`, { headers })
-  if (!res.ok) throw new Error(`Mastodon API error ${res.status}: ${endpoint}`)
-  return res.json()
-}
-
-async function apiPost(instance, endpoint, body, accessToken) {
-  const res = await fetch(`https://${instance}/api/v1${endpoint}`, {
-    method:  'POST',
-    headers: {
-      'Content-Type':  'application/json',
-      'Authorization': `Bearer ${accessToken}`,
+function nostrEventToPost(ev) {
+  const tags    = ev.tags || []
+  const subject = tags.find(t => t[0] === 'subject')?.[1] || ''
+  const topic   = tags.find(t => t[0] === 't')?.[1] || ''
+  return {
+    id:         ev.id,
+    instance:   'local',
+    url:        `/topic/${ev.id}`,
+    content:    ev.content,
+    created_at: new Date(ev.created_at * 1000).toISOString(),
+    account: {
+      id:          ev.pubkey,
+      instance:    'local',
+      username:    ev.pubkey.slice(0, 12),
+      displayName: subject || ev.pubkey.slice(0, 8),
+      avatar:      null,
+      url:         `/profile/${ev.pubkey}`,
+      followers:   0,
+      following:   0,
+      note:        '',
     },
-    body: JSON.stringify(body),
-  })
-  if (!res.ok) throw new Error(`Mastodon API error ${res.status}: ${endpoint}`)
-  return res.json()
+    favourites: 0,
+    reblogs:    0,
+    replies:    0,
+    media:      [],
+    tags:       topic ? [topic] : [],
+    sensitive:  false,
+    spoiler:    '',
+    local:      true,
+  }
 }
 
-// ─── Timeline pubblica ────────────────────────────────────────────────────────
-
-/**
- * Legge la timeline pubblica federata di un'istanza.
- * Nessun account necessario — è pubblica per tutti.
- *
- * @param {string} instance - Es. "mastodon.social"
- * @param {number} limit    - Numero di post (max 40)
- */
 async function getPublicTimeline(instance, limit = 40) {
-  const list = instance ? [instance] : DEFAULT_INSTANCES
-  for (const inst of list) {
-    try {
-      const posts = await apiGet(inst, `/timelines/public?limit=${limit}&local=false`)
-      return normalizePosts(posts, inst)
-    } catch {}
-  }
-  return []
-}
+  return new Promise(resolve => {
+    const posts = []
+    const timeout = setTimeout(() => resolve(posts), 1500)
 
-/**
- * Cerca post per hashtag su una o più istanze.
- * Utile per cercare contenuti da zone di crisi: #Gaza, #Iran, #Minneapolis
- *
- * @param {string}   hashtag   - Es. "gaza" (senza #)
- * @param {string[]} instances - Istanze da interrogare
- * @param {number}   limit     - Post per istanza
- */
-async function searchHashtag(hashtag, instances = DEFAULT_INSTANCES.slice(0, 3), limit = 20) {
-  const results = await Promise.allSettled(
-    instances.map(inst =>
-      apiGet(inst, `/timelines/tag/${encodeURIComponent(hashtag)}?limit=${limit}`)
-        .then(posts => normalizePosts(posts, inst))
-        .catch(() => [])
-    )
-  )
-
-  const all = results
-    .filter(r => r.status === 'fulfilled')
-    .flatMap(r => r.value)
-    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
-
-  // Deduplicazione per URL
-  const seen = new Set()
-  return all.filter(p => {
-    if (seen.has(p.url)) return false
-    seen.add(p.url)
-    return true
+    subscribeToFilter(
+      [{ kinds: [1], limit }],
+      ev => {
+        posts.push(nostrEventToPost(ev))
+        if (posts.length >= limit) { clearTimeout(timeout); resolve(posts) }
+      }
+    ).catch(() => { clearTimeout(timeout); resolve([]) })
   })
 }
 
-/**
- * Cerca account e post per query testuale.
- *
- * @param {string} query    - Testo da cercare
- * @param {string} instance - Istanza su cui cercare
- */
-async function search(query, instance = DEFAULT_INSTANCES[0]) {
-  const data = await apiGet(instance, `/search?q=${encodeURIComponent(query)}&resolve=true&limit=20`)
-  return {
-    accounts: (data.accounts || []).map(a => normalizeAccount(a, instance)),
-    statuses: normalizePosts(data.statuses || [], instance),
-  }
+async function searchHashtag(hashtag, instances, limit = 20) {
+  return new Promise(resolve => {
+    const posts = []
+    const timeout = setTimeout(() => resolve(posts), 1500)
+
+    subscribeToFilter(
+      [{ kinds: [1], '#t': [hashtag], limit }],
+      ev => {
+        posts.push(nostrEventToPost(ev))
+        if (posts.length >= limit) { clearTimeout(timeout); resolve(posts) }
+      }
+    ).catch(() => { clearTimeout(timeout); resolve([]) })
+  })
 }
 
-// ─── Azioni autenticate ───────────────────────────────────────────────────────
+async function search(query) {
+  return { accounts: [], statuses: [] }
+}
 
-/**
- * Pubblica un post su Mastodon (richiede access token).
- *
- * @param {string} instance     - Istanza Mastodon dell'utente
- * @param {string} accessToken  - Token OAuth dell'utente
- * @param {string} content      - Testo del post (supporta HTML/menzioni)
- * @param {Object} options      - { visibility, sensitive, spoilerText, inReplyToId }
- */
 async function publishPost(instance, accessToken, content, options = {}) {
-  return apiPost(instance, '/statuses', {
-    status:        content,
-    visibility:    options.visibility    || 'public',
-    sensitive:     options.sensitive     || false,
-    spoiler_text:  options.spoilerText   || '',
-    in_reply_to_id: options.inReplyToId || null,
-  }, accessToken)
+  const keys = loadSavedKeys()
+  if (!keys) throw new Error('No Nostr identity')
+  const tags = []
+  if (options.topic) tags.push(['t', options.topic])
+  if (options.subject) tags.push(['subject', options.subject])
+  if (options.inReplyToId) tags.push(['e', options.inReplyToId, '', 'reply'])
+  await publishNote(content, keys.privkey, tags)
+  return { ok: true }
 }
 
-/**
- * Restituisce la home timeline dell'utente autenticato.
- *
- * @param {string} instance    - Istanza Mastodon
- * @param {string} accessToken - Token OAuth
- * @param {number} limit       - Numero di post
- */
 async function getHomeTimeline(instance, accessToken, limit = 40) {
-  const posts = await apiGet(instance, `/timelines/home?limit=${limit}`, accessToken)
-  return normalizePosts(posts, instance)
+  return getPublicTimeline(instance, limit)
 }
 
-/**
- * Genera l'URL di autorizzazione OAuth per il login con Mastodon.
- * Redirect-free — usa il flusso "out-of-band" per app desktop.
- *
- * @param {string} instance  - Istanza dell'utente (es. "mastodon.social")
- * @param {string} clientId  - Client ID dell'app M4TR1X sull'istanza
- */
-function getAuthUrl(instance, clientId) {
-  const params = new URLSearchParams({
-    client_id:     clientId,
-    redirect_uri:  'urn:ietf:wg:oauth:2.0:oob',
-    response_type: 'code',
-    scope:         'read write',
-  })
-  return `https://${instance}/oauth/authorize?${params}`
-}
-
-/**
- * Registra l'app M4TR1X su un'istanza Mastodon (necessario una volta sola).
- * Restituisce client_id e client_secret da salvare.
- *
- * @param {string} instance - Es. "mastodon.social"
- */
-async function registerApp(instance) {
-  const res = await fetch(`https://${instance}/api/v1/apps`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      client_name:   'M4TR1X',
-      redirect_uris: 'urn:ietf:wg:oauth:2.0:oob',
-      scopes:        'read write',
-      website:       'https://github.com/H8dboy/m4tr1x',
-    }),
-  })
-  return res.json()
-}
-
-// ─── Normalizzazione dati ─────────────────────────────────────────────────────
-// Formato unificato per il frontend — indipendente dall'istanza
-
-function normalizePosts(posts, instance) {
-  return (posts || []).map(p => ({
-    id:          p.id,
-    instance,
-    url:         p.url,
-    content:     p.content,                          // HTML
-    created_at:  p.created_at,
-    account:     normalizeAccount(p.account, instance),
-    favourites:  p.favourites_count,
-    reblogs:     p.reblogs_count,
-    replies:     p.replies_count,
-    media:       (p.media_attachments || []).map(m => ({
-      type: m.type,   // image, video, gifv, audio
-      url:  m.url,
-      preview: m.preview_url,
-    })),
-    tags:        (p.tags || []).map(t => t.name),
-    sensitive:   p.sensitive,
-    spoiler:     p.spoiler_text,
-  }))
-}
-
-function normalizeAccount(a, instance) {
-  return {
-    id:          a.id,
-    instance,
-    username:    a.acct,
-    displayName: a.display_name,
-    avatar:      a.avatar,
-    url:         a.url,
-    followers:   a.followers_count,
-    following:   a.following_count,
-    note:        a.note,
-  }
-}
+function getAuthUrl() { return null }
+async function registerApp() { return {} }
 
 module.exports = {
-  DEFAULT_INSTANCES,
+  DEFAULT_INSTANCES: ['local'],
   getPublicTimeline,
   searchHashtag,
   search,

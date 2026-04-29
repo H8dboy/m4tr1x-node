@@ -458,29 +458,21 @@ app.get('/api/v1/peertube/video/:instance/:uuid', async (req, res) => {
 // Upload video direttamente su PeerTube (usa credenziali salvate per l'h8address)
 app.post('/api/v1/peertube/upload', upload.single('video'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'video richiesto' })
-  const tempPath = req.file.path
   try {
-    const { h8address, name, description, tags, privacy, language } = req.body
-    if (!h8address) { fs.unlinkSync(tempPath); return res.status(400).json({ error: 'h8address richiesto' }) }
-
-    const creds = universal.getProtocolCreds(h8address, 'peertube')
-    if (!creds?.token) { fs.unlinkSync(tempPath); return res.status(403).json({ error: 'PeerTube non connesso per questo profilo' }) }
-
+    const { h8address, name, description, tags, category } = req.body
     const tagList = tags ? tags.split(/[\s,]+/).filter(Boolean) : []
-    const result = await peertube.uploadVideo(creds.instance, creds.token, tempPath, {
+    const result = await peertube.uploadVideo(null, null, req.file.path, {
+      h8address,
       name:         name || req.file.originalname || 'M4TR1X Video',
       description:  description || '',
       tags:         tagList,
-      privacy:      parseInt(privacy || '1'),
-      language:     language || null,
+      category:     category || 'reels',
       originalname: req.file.originalname || '',
     })
-    res.json({ ok: true, ...result })
+    res.status(201).json({ ok: true, ...result })
   } catch (err) {
-    console.error('[PEERTUBE] Upload error:', err.message)
+    console.error('[VIDEO] Upload error:', err.message)
     res.status(500).json({ error: err.message })
-  } finally {
-    if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath)
   }
 })
 
@@ -930,6 +922,71 @@ app.get('/api/v1/tracks', async (req, res) => {
     const { instance, limit } = req.query
     const tracks = await funkwhale.getRecentTracks(instance, parseInt(limit || '30'))
     res.json(tracks)
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+// ─── Local media streaming ────────────────────────────────────────────────────
+
+const UPLOADS_DIR = path.join(DATA_DIR, 'uploads')
+
+app.get('/api/v1/video/stream/:id', (req, res) => {
+  const v = db.getVideoById(req.params.id)
+  if (!v) return res.status(404).json({ error: 'not found' })
+  db.incrementViews(req.params.id)
+  const file = path.join(UPLOADS_DIR, v.filename)
+  if (!fs.existsSync(file)) return res.status(404).json({ error: 'file not found' })
+  const stat = fs.statSync(file)
+  const range = req.headers.range
+  if (range) {
+    const [start, end] = range.replace(/bytes=/, '').split('-').map(Number)
+    const chunkEnd = end || Math.min(start + 1048576, stat.size - 1)
+    res.writeHead(206, {
+      'Content-Range':  `bytes ${start}-${chunkEnd}/${stat.size}`,
+      'Accept-Ranges':  'bytes',
+      'Content-Length': chunkEnd - start + 1,
+      'Content-Type':   'video/mp4',
+    })
+    fs.createReadStream(file, { start, end: chunkEnd }).pipe(res)
+  } else {
+    res.writeHead(200, { 'Content-Length': stat.size, 'Content-Type': 'video/mp4' })
+    fs.createReadStream(file).pipe(res)
+  }
+})
+
+app.get('/api/v1/video/watch/:id', async (req, res) => {
+  try { res.json(await peertube.getVideo(null, req.params.id)) }
+  catch (e) { res.status(404).json({ error: e.message }) }
+})
+
+app.get('/api/v1/video/embed/:id', (req, res) => {
+  res.redirect(`/api/v1/video/stream/${req.params.id}`)
+})
+
+app.get('/api/v1/music/stream/:id', (req, res) => {
+  const t = db.getTrackById(req.params.id)
+  if (!t) return res.status(404).json({ error: 'not found' })
+  const file = path.join(UPLOADS_DIR, t.filename)
+  if (!fs.existsSync(file)) return res.status(404).json({ error: 'file not found' })
+  const stat = fs.statSync(file)
+  res.writeHead(200, { 'Content-Length': stat.size, 'Content-Type': 'audio/mpeg' })
+  fs.createReadStream(file).pipe(res)
+})
+
+app.get('/api/v1/media/:filename', (req, res) => {
+  const file = path.join(UPLOADS_DIR, path.basename(req.params.filename))
+  if (!fs.existsSync(file)) return res.status(404).end()
+  res.sendFile(file)
+})
+
+app.post('/api/v1/music/upload', upload.single('audio'), async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'audio richiesto' })
+  try {
+    const { h8address, title, artist, album } = req.body
+    const result = await funkwhale.uploadTrack(req.file.path, {
+      h8address, title, artist, album,
+      originalname: req.file.originalname,
+    })
+    res.status(201).json({ ok: true, ...result })
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
 

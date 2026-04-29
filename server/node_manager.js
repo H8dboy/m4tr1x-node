@@ -43,10 +43,10 @@ async function declareNode(capabilities, wsPort = 4848) {
   const cfg = { capabilities: validCaps, wsPort, since: Math.floor(Date.now() / 1000) }
   saveNodeConfig(cfg)
 
-  // Publish to Nostr so other peers discover this node
+  // Publish only to the embedded local relay, not external Nostr networks
   const keys = loadSavedKeys()
   if (keys) {
-    await publishNote(
+    publishNote(
       JSON.stringify({ type: NODE_TAG, capabilities: validCaps, port: wsPort }),
       keys.privkey,
       [
@@ -54,7 +54,7 @@ async function declareNode(capabilities, wsPort = 4848) {
         ['caps', validCaps.join(',')],
         ['port', String(wsPort)],
       ]
-    )
+    ).catch(() => {}) // fire-and-forget — local relay only, no external deps
   }
 
   nodeRegistry.set(pubkey, { pubkey, capabilities: validCaps, wsPort, ts: Date.now() })
