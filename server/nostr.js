@@ -58,15 +58,9 @@ function getCurrentPubkey () {
 
 // ── Relay pool ────────────────────────────────────────────────────────────────
 // ws://localhost:4848 is FIRST — the embedded M4TR1X relay has priority
+// M4TR1X uses only its embedded local relay — no external Nostr networks
 const DEFAULT_RELAYS = [
   'ws://localhost:4848',
-  'wss://relay.damus.io',
-  'wss://nos.lol',
-  'wss://relay.nostr.band',
-  'wss://relay.snort.social',
-  'wss://nostr.wine',
-  'wss://relay.nostr.bg',
-  'wss://nostr.mom',
 ]
 
 let _pool            = null

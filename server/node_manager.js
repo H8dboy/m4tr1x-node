@@ -7,6 +7,7 @@
 
 const path = require('path')
 const fs   = require('fs')
+const os   = require('os')
 const { publishNote, getCurrentPubkey, loadSavedKeys, subscribeToFilter } = require('./nostr')
 
 const NODE_KIND    = 30078
@@ -112,6 +113,57 @@ function pickNode(capability) {
   return nodes.sort((a, b) => b.ts - a.ts)[0]
 }
 
+// ─── Get this node's LAN URL ─────────────────────────────────────────────────
+function getLocalUrl(port = 8080) {
+  if (process.env.PUBLIC_NODE_URL) return process.env.PUBLIC_NODE_URL
+  const nets = os.networkInterfaces()
+  const lan  = Object.values(nets).flat().find(n => n.family === 'IPv4' && !n.internal)
+  return lan ? `http://${lan.address}:${port}` : `http://localhost:${port}`
+}
+
+// ─── Announce content to the network ─────────────────────────────────────────
+// Called after every upload so other nodes know this content is here.
+const CONTENT_KIND = 30403
+
+async function announceContent({ id, type, title, category, uploader }) {
+  const keys = loadSavedKeys()
+  if (!keys) return
+  const nodeUrl = getLocalUrl()
+  publishNote(
+    JSON.stringify({ id, type, title, category, uploader, node: nodeUrl, nodeName: NODE_NAME }),
+    keys.privkey,
+    [
+      ['t', 'm4tr1x-content'],
+      ['content-id', id],
+      ['content-type', type],        // 'video' | 'audio'
+      ['node-url', nodeUrl],
+    ]
+  ).catch(() => {})
+  console.log(`[NODE] Content announced: ${type}/${id} on ${nodeUrl}`)
+}
+
+// ─── Locate content across nodes ─────────────────────────────────────────────
+// Returns { nodeUrl, id } for the first node that has this content ID.
+const contentRegistry = new Map()  // id → { nodeUrl, ts }
+
+function locateContent(id) {
+  const entry = contentRegistry.get(id)
+  if (!entry) return null
+  if (Date.now() - entry.ts > 30 * 60 * 1000) { contentRegistry.delete(id); return null }
+  return entry
+}
+
+function startContentDiscovery() {
+  const since = Math.floor(Date.now() / 1000) - 1800  // last 30 min
+  subscribeToFilter([{ kinds: [1], '#t': ['m4tr1x-content'], since }], ev => {
+    try {
+      const data = JSON.parse(ev.content)
+      if (!data.id || !data.node) return
+      contentRegistry.set(data.id, { nodeUrl: data.node, nodeName: data.nodeName, ts: Date.now() })
+    } catch {}
+  }).catch(() => {})
+}
+
 // Returns the private node URL for shop/crypto calls
 function getPrivateNodeUrl() {
   return PRIVATE_NODE_URL
@@ -122,6 +174,10 @@ module.exports = {
   resignNode,
   discoverNodes,
   startNodeDiscovery,
+  startContentDiscovery,
+  announceContent,
+  locateContent,
+  getLocalUrl,
   getNodeConfig,
   pickNode,
   getPrivateNodeUrl,

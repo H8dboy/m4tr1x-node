@@ -17,7 +17,8 @@ require('dotenv').config()
 
 const { analyzeVideo }           = require('./ai_detector')
 const { cleanMetadata, isExifToolAvailable } = require('./core')
-const { initDb, saveResult, loadResult, listResults } = require('./db')
+const db = require('./db')
+const { initDb, saveResult, loadResult, listResults } = db
 const {
   generateIdentity, unlockIdentity, lockIdentity,
   identityExists, getPublicInfo,
@@ -44,7 +45,7 @@ const {
   approveRequest, rejectRequest, getUserRequest,
 } = require('./badges')
 
-const { declareNode, resignNode, discoverNodes, startNodeDiscovery, getNodeConfig, pickNode, getPrivateNodeUrl, VALID_CAPS } = require('./node_manager')
+const { declareNode, resignNode, discoverNodes, startNodeDiscovery, startContentDiscovery, announceContent, locateContent, getLocalUrl, getNodeConfig, pickNode, getPrivateNodeUrl, VALID_CAPS } = require('./node_manager')
 const { startStream, stopStream, sendSignal, listStreams, registerRemoteStream, removeRemoteStream } = require('./livestream')
 
 // âââ Embedded Nostr Relay âââââââââââââââââââââââââââââââââââââââââââââââââââââ
@@ -469,6 +470,7 @@ app.post('/api/v1/peertube/upload', upload.single('video'), async (req, res) => 
       category:     category || 'reels',
       originalname: req.file.originalname || '',
     })
+    announceContent({ id: result.uuid, type: 'video', title: name || 'M4TR1X Video', category: category || 'reels', uploader: h8address }).catch(() => {})
     res.status(201).json({ ok: true, ...result })
   } catch (err) {
     console.error('[VIDEO] Upload error:', err.message)
@@ -925,6 +927,26 @@ app.get('/api/v1/tracks', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
 
+// ─── Content location — find which node has a given content ID ───────────────
+
+app.get('/api/v1/content/locate/:id', (req, res) => {
+  const local = db.getVideoById(req.params.id) || db.getTrackById(req.params.id)
+  if (local) return res.json({ found: true, nodeUrl: getLocalUrl(), local: true })
+  const remote = locateContent(req.params.id)
+  if (remote) return res.json({ found: true, nodeUrl: remote.nodeUrl, nodeName: remote.nodeName, local: false })
+  res.json({ found: false })
+})
+
+// Redirect to the correct node if content is not local
+app.get('/api/v1/content/stream/:id', async (req, res) => {
+  const id = req.params.id
+  if (db.getVideoById(id)) return res.redirect(`/api/v1/video/stream/${id}`)
+  if (db.getTrackById(id)) return res.redirect(`/api/v1/music/stream/${id}`)
+  const remote = locateContent(id)
+  if (remote) return res.redirect(`${remote.nodeUrl}/api/v1/content/stream/${id}`)
+  res.status(404).json({ error: 'Content not found on any node' })
+})
+
 // ─── Local media streaming ────────────────────────────────────────────────────
 
 const UPLOADS_DIR = path.join(DATA_DIR, 'uploads')
@@ -986,6 +1008,7 @@ app.post('/api/v1/music/upload', upload.single('audio'), async (req, res) => {
       h8address, title, artist, album,
       originalname: req.file.originalname,
     })
+    announceContent({ id: result.id, type: 'audio', title: title || 'M4TR1X Track', category: 'music', uploader: h8address }).catch(() => {})
     res.status(201).json({ ok: true, ...result })
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
@@ -1023,6 +1046,7 @@ function startServer(port = 8080) {
   // Check for model updates at startup (background, non-blocking)
   setTimeout(() => checkAndUpdateModel().catch(() => {}), 5000)
   setTimeout(() => startNodeDiscovery(), 2000)
+  setTimeout(() => startContentDiscovery(), 3000)
   return new Promise((resolve, reject) => {
     server = app.listen(port, '0.0.0.0', () => {
       const { networkInterfaces } = require('os')
