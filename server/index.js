@@ -71,12 +71,14 @@ const DATA_DIR      = process.env.M4TR1X_DATA_DIR || process.cwd()
 const UPLOAD_DIR    = path.join(DATA_DIR, 'uploads')
 if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true })
 
+const ADMIN_KEY_FILE = path.join(DATA_DIR, '.admin_key')
 const ADMIN_KEY = (() => {
   if (process.env.ADMIN_KEY) return process.env.ADMIN_KEY
+  if (fs.existsSync(ADMIN_KEY_FILE)) return fs.readFileSync(ADMIN_KEY_FILE, 'utf8').trim()
   const generated = crypto.randomBytes(32).toString('hex')
-  console.warn('[SECURITY] â ï¸  ADMIN_KEY non impostata! Chiave temporanea (solo questa sessione):')
+  fs.writeFileSync(ADMIN_KEY_FILE, generated, { mode: 0o600 })
+  console.warn('[SECURITY] ADMIN_KEY generata e salvata in .admin_key — conservala.')
   console.warn(`[SECURITY]     ${generated}`)
-  console.warn('[SECURITY]     Imposta ADMIN_KEY=<valore> nelle variabili d\'ambiente per una chiave fissa.')
   return generated
 })()
 const BADGE_DOCS_DIR = path.join(DATA_DIR, 'badge_docs')
@@ -94,6 +96,7 @@ app.use(cors({
 }))
 
 app.use(express.json())
+app.use(globalLimit)
 
 // âââ Multer (upload file) âââââââââââââââââââââââââââââââââââââââââââââââââââââ
 const upload = multer({
@@ -128,6 +131,24 @@ const paymentLimit = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Troppe transazioni. Riprova tra un minuto.' },
+})
+
+// Rate limit globale su tutte le route pubbliche (100 req/min per IP)
+const globalLimit = rateLimit({
+  windowMs: 60 * 1000,
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Troppe richieste. Riprova tra un minuto.' },
+})
+
+// Rate limit upload (20 upload/ora per IP)
+const uploadLimit = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Limite upload raggiunto. Riprova tra un'ora." },
 })
 
 // âââ API Key middleware âââââââââââââââââââââââââââââââââââââââââââââââââââââââ
@@ -457,7 +478,7 @@ app.get('/api/v1/peertube/video/:instance/:uuid', async (req, res) => {
 })
 
 // Upload video direttamente su PeerTube (usa credenziali salvate per l'h8address)
-app.post('/api/v1/peertube/upload', upload.single('video'), async (req, res) => {
+app.post('/api/v1/peertube/upload', uploadLimit, upload.single('video'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'video richiesto' })
   try {
     const { h8address, name, description, tags, category } = req.body
