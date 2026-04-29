@@ -1073,6 +1073,21 @@ function stopServer() {
   }
 }
 
+// ─── Admin: graceful server-only reload (no Electron restart needed) ──────────
+app.post('/api/v1/admin/reload', (req, res) => {
+  res.json({ ok: true, message: 'Reloading server...' })
+  setTimeout(() => {
+    const port = server?.address()?.port || 8080
+    server.close(() => {
+      // Purge cached modules so changes are picked up
+      Object.keys(require.cache).forEach(k => {
+        if (k.includes('/server/') && !k.includes('node_modules')) delete require.cache[k]
+      })
+      startServer(port).then(() => console.log('[SERVER] Reloaded.'))
+    })
+  }, 200)
+})
+
 module.exports = { startServer, stopServer, app }
 
 // Auto-start when run directly (e.g. node index.js)
