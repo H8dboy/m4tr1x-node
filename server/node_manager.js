@@ -41,25 +41,28 @@ async function declareNode(capabilities, wsPort = 4848) {
   const validCaps = capabilities.filter(c => VALID_CAPS.has(c))
   if (!validCaps.length) throw new Error('Invalid capabilities')
 
-  const cfg = { name: NODE_NAME, capabilities: validCaps, wsPort, since: Math.floor(Date.now() / 1000) }
+  const onion   = getOnionAddress()
+  const nodeUrl = getLocalUrl()
+  const cfg = { name: NODE_NAME, capabilities: validCaps, wsPort, nodeUrl, onion: onion || undefined, since: Math.floor(Date.now() / 1000) }
   saveNodeConfig(cfg)
 
-  // Publish only to the embedded local relay, not external Nostr networks
   const keys = loadSavedKeys()
   if (keys) {
     publishNote(
-      JSON.stringify({ type: NODE_TAG, name: NODE_NAME, capabilities: validCaps, port: wsPort }),
+      JSON.stringify({ type: NODE_TAG, name: NODE_NAME, capabilities: validCaps, port: wsPort, nodeUrl, onion }),
       keys.privkey,
       [
         ['t', NODE_TAG],
         ['caps', validCaps.join(',')],
         ['port', String(wsPort)],
+        ['node-url', nodeUrl],
+        ...(onion ? [['onion', onion]] : []),
       ]
-    ).catch(() => {}) // fire-and-forget — local relay only, no external deps
+    ).catch(() => {})
   }
 
-  nodeRegistry.set(pubkey, { pubkey, name: NODE_NAME, capabilities: validCaps, wsPort, ts: Date.now() })
-  console.log(`[NODE] "${NODE_NAME}" declared: ${validCaps.join(', ')}`)
+  nodeRegistry.set(pubkey, { pubkey, name: NODE_NAME, capabilities: validCaps, wsPort, nodeUrl, onion, ts: Date.now() })
+  console.log(`[NODE] "${NODE_NAME}" declared: ${validCaps.join(', ')}${onion ? ` | .onion: ${onion}` : ''}`)
   return cfg
 }
 
@@ -121,6 +124,19 @@ function getLocalUrl(port = 8080) {
   return lan ? `http://${lan.address}:${port}` : `http://localhost:${port}`
 }
 
+// ─── Get .onion address if Tor is running ────────────────────────────────────
+function getOnionAddress() {
+  const candidates = [
+    process.env.TOR_HOSTNAME_FILE,
+    path.join(process.env.M4TR1X_DATA_DIR || path.join(require('os').homedir(), '.config', 'm4tr1x'), 'onion_hostname'),
+    '/var/lib/tor/m4tr1x/hostname',
+  ].filter(Boolean)
+  for (const f of candidates) {
+    try { const v = fs.readFileSync(f, 'utf8').trim(); if (v) return v } catch {}
+  }
+  return null
+}
+
 // ─── Announce content to the network ─────────────────────────────────────────
 // Called after every upload so other nodes know this content is here.
 const CONTENT_KIND = 30403
@@ -178,6 +194,7 @@ module.exports = {
   announceContent,
   locateContent,
   getLocalUrl,
+  getOnionAddress,
   getNodeConfig,
   pickNode,
   getPrivateNodeUrl,

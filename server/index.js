@@ -45,7 +45,7 @@ const {
   approveRequest, rejectRequest, getUserRequest,
 } = require('./badges')
 
-const { declareNode, resignNode, discoverNodes, startNodeDiscovery, startContentDiscovery, announceContent, locateContent, getLocalUrl, getNodeConfig, pickNode, getPrivateNodeUrl, VALID_CAPS } = require('./node_manager')
+const { declareNode, resignNode, discoverNodes, startNodeDiscovery, startContentDiscovery, announceContent, locateContent, getLocalUrl, getOnionAddress, getNodeConfig, pickNode, getPrivateNodeUrl, VALID_CAPS } = require('./node_manager')
 const { startStream, stopStream, sendSignal, listStreams, registerRemoteStream, removeRemoteStream } = require('./livestream')
 
 // âââ Embedded Nostr Relay âââââââââââââââââââââââââââââââââââââââââââââââââââââ
@@ -929,6 +929,11 @@ app.get('/api/v1/tracks', async (req, res) => {
 
 // ─── Content location — find which node has a given content ID ───────────────
 
+app.get('/api/v1/node/onion', (req, res) => {
+  const onion = getOnionAddress()
+  res.json({ onion: onion || null, url: onion ? `http://${onion}` : null })
+})
+
 app.get('/api/v1/content/locate/:id', (req, res) => {
   const local = db.getVideoById(req.params.id) || db.getTrackById(req.params.id)
   if (local) return res.json({ found: true, nodeUrl: getLocalUrl(), local: true })
@@ -1054,6 +1059,8 @@ function startServer(port = 8080) {
       const lan = Object.values(nets).flat().find(n => n.family === 'IPv4' && !n.internal)
       console.log(`[SERVER] M4TR1X Alpha Node in ascolto su http://localhost:${port}`)
       if (lan) console.log(`[SERVER] Raggiungibile dalla rete: http://${lan.address}:${port}`)
+      const onion = getOnionAddress()
+      if (onion) console.log(`[SERVER] Indirizzo Tor: http://${onion}`)
       resolve(server)
     })
     server.on('error', reject)
