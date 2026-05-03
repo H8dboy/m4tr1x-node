@@ -128,6 +128,16 @@ function getUnlockedIdentity() {
   return _unlocked
 }
 
+// Deriva una chiave secp256k1 (schnorr/Nostr) in modo deterministico dalla chiave H8.
+// La chiave privata non lascia mai il server.
+function deriveSigningKey() {
+  if (!_unlocked) return null
+  const sk   = Buffer.from(_unlocked.secretKey, 'hex')
+  const seed = crypto.createHash('sha256').update(sk.slice(0, 64)).digest()
+  const { schnorr } = require('@noble/curves/secp256k1.js')
+  return { privKey: seed, pubKeyHex: Buffer.from(schnorr.getPublicKey(seed)).toString('hex') }
+}
+
 function identityExists() {
   return fs.existsSync(getIdentityPath())
 }
@@ -172,6 +182,7 @@ module.exports = {
   unlockIdentity,
   lockIdentity,
   getUnlockedIdentity,
+  deriveSigningKey,
   identityExists,
   getPublicInfo,
   h8AddressFrom,

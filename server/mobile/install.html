@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>M4TR1X — Installa</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0 }
+body {
+  background: #080808; color: #fff; font-family: -apple-system, sans-serif;
+  min-height: 100vh; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; padding: 32px 24px; gap: 24px;
+}
+.logo { font-size: 2.8em; font-weight: 900; letter-spacing: 6px; color: #00ff88; text-shadow: 0 0 40px rgba(0,255,136,0.4) }
+.version { font-size: 0.72em; color: rgba(0,255,136,0.5); font-family: monospace; letter-spacing: 2px }
+.card { background: #111; border: 1px solid rgba(255,255,255,0.08); border-radius: 18px; padding: 24px; width: 100%; max-width: 360px; display: flex; flex-direction: column; gap: 14px }
+.card-title { font-size: 0.78em; letter-spacing: 3px; color: rgba(255,255,255,0.5); text-transform: uppercase }
+.install-btn {
+  display: block; width: 100%; padding: 16px; border-radius: 14px; border: none;
+  background: #00ff88; color: #000; font-size: 1em; font-weight: 800; letter-spacing: 2px;
+  text-align: center; text-decoration: none; cursor: pointer;
+}
+.install-btn:active { background: #00cc6e }
+.install-btn.android { background: #3ddc84; color: #000 }
+.install-btn.ios { background: #fff; color: #000 }
+.note { font-size: 0.7em; color: rgba(255,255,255,0.35); line-height: 1.6; text-align: center }
+.note a { color: #00ff88 }
+.step { display: flex; gap: 10px; align-items: flex-start; font-size: 0.78em; color: rgba(255,255,255,0.6); line-height: 1.5 }
+.step-num { background: rgba(0,255,136,0.15); color: #00ff88; border-radius: 50%; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 0.85em; font-weight: 700 }
+hr { border: none; border-top: 1px solid rgba(255,255,255,0.06) }
+#platform-detect { font-size: 0.7em; color: rgba(0,255,136,0.5); text-align: center; font-family: monospace; letter-spacing: 1px }
+</style>
+</head>
+<body>
+<div class="logo">M4TR1X</div>
+<div class="version" id="ver">v1.0.0</div>
+<div id="platform-detect">rilevamento piattaforma...</div>
+
+<div class="card" id="card-android">
+  <div class="card-title">🤖 Android</div>
+  <a class="install-btn android" id="apk-link" href="/m/m4tr1x.apk">⬇ SCARICA APK</a>
+  <hr>
+  <div class="step"><div class="step-num">1</div><span>Tocca il pulsante sopra e scarica il file <b>.apk</b></span></div>
+  <div class="step"><div class="step-num">2</div><span>Apri il file scaricato — se chiede "fonte sconosciuta", vai in <b>Impostazioni → Sicurezza → Installa app sconosciute</b></span></div>
+  <div class="step"><div class="step-num">3</div><span>Installa → apri <b>M4TR1X</b> → inserisci l'indirizzo del nodo</span></div>
+</div>
+
+<div class="card" id="card-ios" style="display:none">
+  <div class="card-title">🍎 iPhone / iPad</div>
+  <a class="install-btn ios" id="ios-install-btn" href="#">⬇ INSTALLA APP</a>
+  <hr>
+  <div class="step"><div class="step-num">1</div><span>Tocca <b>INSTALLA APP</b> sopra — iOS chiederà conferma</span></div>
+  <div class="step"><div class="step-num">2</div><span>Vai in <b>Impostazioni → Generali → Gestione VPN e dispositivi</b> → tocca lo sviluppatore → <b>Autorizza</b></span></div>
+  <div class="step"><div class="step-num">3</div><span>Apri <b>M4TR1X</b> → inserisci l'indirizzo del nodo</span></div>
+</div>
+
+<div class="note">
+  App distribuita direttamente dal nodo M4TR1X.<br>
+  Nessun App Store. Nessun tracciamento.<br><br>
+  <a href="/m">Apri versione web →</a>
+</div>
+
+<script>
+const ua = navigator.userAgent;
+const isIOS = /iPad|iPhone|iPod/.test(ua);
+const isAndroid = /Android/.test(ua);
+
+document.getElementById('platform-detect').textContent =
+  isIOS ? '📱 iPhone / iPad rilevato' :
+  isAndroid ? '🤖 Android rilevato' : '💻 Desktop — scarica per mobile';
+
+if (isIOS) {
+  document.getElementById('card-ios').style.display = 'flex';
+  document.getElementById('card-android').style.display = 'none';
+} else {
+  document.getElementById('card-android').style.display = 'flex';
+}
+
+// iOS install via itms-services (enterprise/ad-hoc manifest)
+const host = window.location.origin;
+document.getElementById('ios-install-btn').href =
+  'itms-services://?action=download-manifest&url=' +
+  encodeURIComponent(host + '/m/manifest.plist');
+
+// Prefill APK link with current host
+document.getElementById('apk-link').href = host + '/m/m4tr1x.apk';
+</script>
+</body>
+</html>

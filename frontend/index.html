@@ -340,7 +340,7 @@
           <div class="field"><label>Genre / Style</label><input type="text" id="up-music-genre" placeholder="rap / ambient / punk / jazz..."></div>
         </div>
         <div class="field"><label>Tags (space separated)</label><input type="text" id="up-tags" placeholder="evidence underground indie"></div>
-        <div class="field"><label>Blossom Server</label><select id="up-server"><option value="cdn.satellite.earth">cdn.satellite.earth (recommended)</option><option value="blossom.band">blossom.band</option><option value="nostrcheck.me">nostrcheck.me</option></select></div>
+        <div class="field"><label>Blossom Server</label><select id="up-server"><option value="http://localhost:8080/blossom">M4TR1X Node (local)</option></select></div>
         <div id="up-progress"><div class="prog-bar"><div class="prog-fill" id="prog-fill"></div></div><div class="prog-txt" id="prog-txt">Preparing...</div></div>
         <button class="btn-pub" id="btn-pub" onclick="doUpload()" disabled>PUBLISH ON NOSTR</button>
       </div>
@@ -734,8 +734,8 @@
     if(!pk){window.location.href='auth.html';}
     window._pk=pk;
     window._method=localStorage.getItem('m4tr1x_method');
-    // privkey lives in sessionStorage (auth.html stores it there for security)
-    window._priv=sessionStorage.getItem('m4tr1x_privkey')||localStorage.getItem('m4tr1x_privkey');
+    window._h8address=sessionStorage.getItem('m4tr1x_h8address')||localStorage.getItem('m4tr1x_h8address');
+    window._priv=null; // firma delegata al server H8
   })();
 
   // ========== CONFIGURATION ==========
@@ -758,9 +758,9 @@
       'https://tanukitunes.com'
     ],
     // Nostr relays — ws://localhost:4848 è il nodo M4TR1X locale (primo avvio)
-    relays: ['ws://localhost:4848','wss://relay.damus.io','wss://nos.lol','wss://relay.nostr.band','wss://relay.snort.social'],
+    relays: ['ws://localhost:4848','ws://fcicneomtw4mihstawh6spu6f6lpxo6m4dxu276hm3q5nqmdaod4jyqd.onion:4848'],
     // Blossom servers
-    blossom: {'cdn.satellite.earth':'https://cdn.satellite.earth','blossom.band':'https://blossom.band','nostrcheck.me':'https://nostrcheck.me'}
+    blossom: {'M4TR1X Node':'http://localhost:8080/blossom'}
   };
 
   // ========== DM ENCRYPTION ENGINE ==========
@@ -888,7 +888,7 @@
     }
   };
   // ========== STATE ==========
-  const S={pubkey:window._pk,method:window._method,privkey:window._priv,muted:true,section:'signal',loaded:{signal:false,film:false,music:false,forum:false,shop:false,dm:false,live:true},cmtEventId:null,zapEventId:null,zapPubkey:null,zapCreatorH8Id:null,file:null,uploadCat:'signal',tokenBalance:0,tokenAmount:0,dmTarget:null,fwPlaying:null,h8address:null};
+  const S={pubkey:window._pk,h8address:window._h8address||window._pk,method:window._method,privkey:null,muted:true,section:'signal',loaded:{signal:false,film:false,music:false,forum:false,shop:false,dm:false,live:true},cmtEventId:null,zapEventId:null,zapPubkey:null,zapCreatorH8Id:null,file:null,uploadCat:'signal',tokenBalance:0,tokenAmount:0,dmTarget:null,fwPlaying:null};
   const RELAYS=CONFIG.relays;
   const BLOSSOM=CONFIG.blossom;
   const CAT_TAG={signal:'m4tr1x-signal',film:'m4tr1x-film',music:'m4tr1x-music'};
@@ -2474,7 +2474,7 @@
       const result=await new Promise((res,rej)=>{
         xhr.onload=()=>{try{res(JSON.parse(xhr.responseText))}catch(e){rej(new Error('Invalid server response'))}};
         xhr.onerror=()=>rej(new Error('Network error'));
-        xhr.open('POST','https://'+server+'/upload');
+        xhr.open('POST',server+'/upload');
         if(S.pubkey)xhr.setRequestHeader('X-Nostr-Pubkey',S.pubkey);
         xhr.send(fd);
       });
@@ -2810,14 +2810,15 @@
     },{passive:true});
   })();
 
-  // NOSTR SIGNING (nostr-tools v2 — uses finalizeEvent, not signEvent)
+  // H8 SIGNING — la firma avviene server-side con la chiave derivata dall'identità H8
   async function signEv(event){
-    if(S.method==='extension'&&window.nostr)return await window.nostr.signEvent(event);
-    if(S.privkey&&window.NostrTools&&window.NostrTools.finalizeEvent){
-      const sk=window.NostrTools.hexToBytes?window.NostrTools.hexToBytes(S.privkey):Uint8Array.from(S.privkey.match(/.{2}/g).map(b=>parseInt(b,16)));
-      return window.NostrTools.finalizeEvent(event,sk);
-    }
-    throw new Error(S.privkey?'nostr-tools not loaded':'No signing method');
+    const r = await fetch('/api/v1/h8/sign-event', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(event)
+    });
+    if(!r.ok) throw new Error('H8 wallet bloccato — sblocca il wallet per pubblicare');
+    return r.json();
   }
   function broadcast(ev){Object.values(ws).forEach(r=>{if(r.ok&&r.w.readyState===1)r.w.send(JSON.stringify(['EVENT',ev]))})}
 

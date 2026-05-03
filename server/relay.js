@@ -15,7 +15,9 @@ const path     = require('path')
 const crypto   = require('crypto')
 
 const RELAY_PORT = 4848
-const DB_PATH    = path.join(process.env.USERDATA_PATH || __dirname, '..', 'relay.db')
+const DB_PATH    = process.env.USERDATA_PATH
+  ? path.join(process.env.USERDATA_PATH, 'relay.db')
+  : path.join(__dirname, '..', 'relay.db')
 
 // ── Database ──────────────────────────────────────────────────────────────────
 const db = new Database(DB_PATH)
