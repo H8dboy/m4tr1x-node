@@ -1287,26 +1287,30 @@ app.post('/api/v1/coin/send', async (req, res) => {
 
 // ─── Routes: H8 Wallet ────────────────────────────────────────────────────────
 
-// POST /api/v1/wallet/generate   — create new wallet (mnemonic + encrypted key file)
+// POST /api/v1/wallet/generate
+// body: { name, password, bip39_passphrase? }
+// Returns mnemonic ONCE — never stored.  User must write it down.
 app.post('/api/v1/wallet/generate', (req, res) => {
   try {
-    const { name = '', password } = req.body
+    const { name = '', password, bip39_passphrase = '' } = req.body
     if (!password) return res.status(400).json({ error: 'password required' })
-    const w = wallet.generateWallet()
-    wallet.saveWallet({ address: w.address, pubkey: w.pubkey, privkeyHex: w.privkeyHex, name }, password)
-    res.json({ address: w.address, pubkey: w.pubkey, mnemonic: w.mnemonic, path: w.path, name })
+    const w = wallet.generateWallet(bip39_passphrase)
+    wallet.saveWallet({ address: w.address, pubkey: w.pubkey, privkeyHex: w.privkey, name }, password)
+    res.json({ address: w.address, pubkey: w.pubkey, mnemonic: w.mnemonic, path: w.path, name,
+               warning: 'Write down the mnemonic NOW — it will never be shown again.' })
   } catch (err) {
     res.status(500).json({ error: err.message })
   }
 })
 
-// POST /api/v1/wallet/import   — import from BIP39 mnemonic
+// POST /api/v1/wallet/import
+// body: { mnemonic, name, password, bip39_passphrase? }
 app.post('/api/v1/wallet/import', (req, res) => {
   try {
-    const { mnemonic, name = '', password } = req.body
+    const { mnemonic, name = '', password, bip39_passphrase = '' } = req.body
     if (!mnemonic || !password) return res.status(400).json({ error: 'mnemonic and password required' })
-    const w = wallet.importWallet(mnemonic)
-    wallet.saveWallet({ address: w.address, pubkey: w.pubkey, privkeyHex: w.privkeyHex, name }, password)
+    const w = wallet.importWallet(mnemonic, bip39_passphrase)
+    wallet.saveWallet({ address: w.address, pubkey: w.pubkey, privkeyHex: w.privkey, name }, password)
     res.json({ address: w.address, pubkey: w.pubkey, path: wallet.DERIV_PATH, name })
   } catch (err) {
     res.status(400).json({ error: err.message })
@@ -1329,13 +1333,35 @@ app.get('/api/v1/wallet/history/:address', (req, res) => {
   res.json(wallet.walletHistory(req.params.address, limit))
 })
 
-// POST /api/v1/wallet/send   — send using password-unlocked wallet
+// POST /api/v1/wallet/send
 app.post('/api/v1/wallet/send', async (req, res) => {
   try {
     const { address, password, to_address, amount_h8c, memo } = req.body
     if (!address || !password || !to_address || !amount_h8c) return res.status(400).json({ error: 'address, password, to_address, amount_h8c required' })
     const tx = await wallet.walletSend({ address, password, toAddress: to_address, amountH8C: amount_h8c, memo: memo || '' })
     res.json({ ok: true, ...tx })
+  } catch (err) {
+    res.status(400).json({ error: err.message })
+  }
+})
+
+// POST /api/v1/wallet/change-password
+app.post('/api/v1/wallet/change-password', async (req, res) => {
+  try {
+    const { address, old_password, new_password } = req.body
+    if (!address || !old_password || !new_password) return res.status(400).json({ error: 'address, old_password, new_password required' })
+    await wallet.changePassword(address, old_password, new_password)
+    res.json({ ok: true })
+  } catch (err) {
+    res.status(400).json({ error: err.message })
+  }
+})
+
+// POST /api/v1/admin/wallet/reset-lockout/:address  (localhost-only)
+app.post('/api/v1/admin/wallet/reset-lockout/:address', localhostOnly, verifyAdminKey, (req, res) => {
+  try {
+    wallet.resetLockout(req.params.address)
+    res.json({ ok: true })
   } catch (err) {
     res.status(400).json({ error: err.message })
   }
