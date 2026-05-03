@@ -1,0 +1,905 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#080808">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="M4TR1X">
+<title>M4TR1X</title>
+<link rel="manifest" href="/m/manifest.json">
+<link rel="apple-touch-icon" href="/m/icon-192.png">
+<style>
+:root {
+  --g: #00ff88;
+  --r: #ff003c;
+  --b: #00aaff;
+  --bg: #080808;
+  --bg2: #111;
+  --bg3: #1a1a1a;
+  --text: #fff;
+  --muted: rgba(255,255,255,0.45);
+  --border: rgba(255,255,255,0.08);
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bot: env(safe-area-inset-bottom, 0px);
+  --nav-h: calc(60px + var(--safe-bot));
+  --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --mono: 'SF Mono', 'Fira Mono', monospace;
+}
+*,*::before,*::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent }
+html,body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--font); overflow: hidden }
+
+/* ── Layout ── */
+#app { display: flex; flex-direction: column; height: 100%; height: 100dvh }
+#topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: calc(var(--safe-top) + 10px) 16px 10px;
+  background: var(--bg); border-bottom: 1px solid var(--border);
+  flex-shrink: 0; z-index: 10;
+}
+#topbar .logo { font-size: 1.2em; font-weight: 900; letter-spacing: 3px; color: var(--g) }
+#topbar .top-right { display: flex; gap: 12px; align-items: center }
+#topbar .top-right button { background: none; border: none; font-size: 1.3em; cursor: pointer; padding: 4px }
+#node-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--g); box-shadow: 0 0 6px var(--g) }
+
+#sections { flex: 1; overflow: hidden; position: relative }
+.section { position: absolute; inset: 0; overflow-y: auto; overflow-x: hidden; display: none }
+.section.active { display: flex; flex-direction: column }
+
+/* ── Bottom Nav ── */
+#bottom-nav {
+  display: flex; align-items: center; justify-content: space-around;
+  background: var(--bg); border-top: 1px solid var(--border);
+  padding-bottom: var(--safe-bot);
+  height: var(--nav-h); flex-shrink: 0; z-index: 10;
+}
+.bnav { display: flex; flex-direction: column; align-items: center; gap: 3px; background: none; border: none; cursor: pointer; padding: 8px 12px; flex: 1; min-width: 0 }
+.bnav .bi { font-size: 1.45em; transition: transform 0.15s }
+.bnav .bl { font-size: 0.5em; letter-spacing: 1.5px; color: var(--muted); font-family: var(--mono); transition: color 0.15s }
+.bnav.active .bl { color: var(--g) }
+.bnav.active .bi { transform: scale(1.15) }
+.bnav-post { background: var(--g); width: 50px; height: 50px; border-radius: 50%; border: none; font-size: 1.7em; font-weight: 700; color: #000; cursor: pointer; flex-shrink: 0; box-shadow: 0 0 20px rgba(0,255,136,0.4); transition: transform 0.15s, box-shadow 0.15s }
+.bnav-post:active { transform: scale(0.93); box-shadow: 0 0 30px rgba(0,255,136,0.6) }
+
+/* ── Node Setup Screen ── */
+#setup-screen {
+  position: fixed; inset: 0; z-index: 999; background: var(--bg);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 32px 24px; gap: 20px;
+}
+#setup-screen .logo { font-size: 2.4em; font-weight: 900; letter-spacing: 6px; color: var(--g); text-shadow: 0 0 30px rgba(0,255,136,0.4) }
+#setup-screen p { font-size: 0.82em; color: var(--muted); text-align: center; line-height: 1.6; letter-spacing: 0.5px }
+#setup-screen input {
+  width: 100%; padding: 14px 16px; background: var(--bg3); border: 1px solid rgba(0,255,136,0.3);
+  border-radius: 12px; color: var(--text); font-size: 0.95em; font-family: var(--mono);
+  outline: none; letter-spacing: 0.5px;
+}
+#setup-screen input:focus { border-color: var(--g); box-shadow: 0 0 0 3px rgba(0,255,136,0.12) }
+#setup-screen button {
+  width: 100%; padding: 15px; background: var(--g); border: none; border-radius: 12px;
+  color: #000; font-size: 1em; font-weight: 700; letter-spacing: 2px; cursor: pointer;
+}
+#setup-screen .hint { font-size: 0.68em; color: rgba(0,255,136,0.4); font-family: var(--mono); letter-spacing: 1px; text-align: center }
+
+/* ── Stories ── */
+#stories-bar {
+  display: flex; gap: 12px; padding: 12px 16px; overflow-x: auto; flex-shrink: 0;
+  scrollbar-width: none; border-bottom: 1px solid var(--border);
+}
+#stories-bar::-webkit-scrollbar { display: none }
+.story-bubble {
+  display: flex; flex-direction: column; align-items: center; gap: 5px;
+  flex-shrink: 0; cursor: pointer;
+}
+.story-ring {
+  width: 62px; height: 62px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--g) 0%, #00ccff 50%, #aa00ff 100%);
+  padding: 2.5px; position: relative;
+}
+.story-ring.seen { background: var(--border) }
+.story-ring-inner {
+  width: 100%; height: 100%; border-radius: 50%; background: var(--bg2);
+  overflow: hidden; border: 2px solid var(--bg2);
+}
+.story-ring-inner img { width: 100%; height: 100%; object-fit: cover }
+.story-ring-inner .story-icon { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 1.6em }
+.story-name { font-size: 0.58em; color: var(--muted); max-width: 66px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center }
+.story-add-btn { width: 62px; height: 62px; border-radius: 50%; background: rgba(0,255,136,0.1); border: 2px dashed rgba(0,255,136,0.35); display: flex; align-items: center; justify-content: center; font-size: 1.5em; cursor: pointer; color: var(--g); flex-shrink: 0 }
+
+/* ── Feed ── */
+#feed { flex: 1; overflow-y: auto; padding: 0 0 8px; scroll-snap-type: y mandatory }
+#feed::-webkit-scrollbar { display: none }
+
+.post-card {
+  margin: 8px 0; background: var(--bg2); border-radius: 0;
+  scroll-snap-align: start; position: relative;
+}
+.post-header { display: flex; align-items: center; gap: 10px; padding: 12px 14px }
+.post-av { width: 36px; height: 36px; border-radius: 50%; background: var(--bg3); border: 1.5px solid var(--g); display: flex; align-items: center; justify-content: center; font-size: 1em; flex-shrink: 0; overflow: hidden }
+.post-av img { width: 100%; height: 100%; object-fit: cover }
+.post-meta { flex: 1; min-width: 0 }
+.post-name { font-size: 0.88em; font-weight: 600; letter-spacing: 0.3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+.post-time { font-size: 0.62em; color: var(--muted); font-family: var(--mono) }
+.post-img { width: 100%; aspect-ratio: 1; background: var(--bg3); overflow: hidden; position: relative }
+.post-img img { width: 100%; height: 100%; object-fit: cover; display: block }
+.post-img .music-overlay {
+  position: absolute; bottom: 10px; left: 10px; right: 10px;
+  background: rgba(0,0,0,0.7); backdrop-filter: blur(8px);
+  border-radius: 20px; padding: 6px 12px; display: flex; align-items: center; gap: 8px;
+  font-size: 0.72em; color: var(--text);
+}
+.music-overlay .note { color: var(--g); font-size: 1em; animation: spin-note 2s linear infinite }
+@keyframes spin-note { 0%,100%{transform:rotate(-8deg)} 50%{transform:rotate(8deg)} }
+.post-actions { display: flex; align-items: center; gap: 0; padding: 4px 10px; border-top: 1px solid var(--border) }
+.pact { display: flex; align-items: center; gap: 5px; padding: 10px 8px; cursor: pointer; flex: 1; justify-content: center }
+.pact .icon { font-size: 1.25em }
+.pact .cnt { font-size: 0.7em; color: var(--muted); font-family: var(--mono) }
+.pact.liked .icon { filter: drop-shadow(0 0 4px #ff003c) }
+.post-caption { padding: 8px 14px 6px; font-size: 0.85em; line-height: 1.45; color: rgba(255,255,255,0.88) }
+.post-tags { padding: 0 14px 10px; display: flex; flex-wrap: wrap; gap: 6px }
+.post-tag { font-size: 0.65em; color: var(--g); font-family: var(--mono); letter-spacing: 0.5px }
+
+/* ── Film section ── */
+#film-feed { flex: 1; overflow: hidden; position: relative }
+.film-player-wrap {
+  width: 100%; height: 100%; background: #000; position: relative; overflow: hidden;
+}
+video.film-vid { width: 100%; height: 100%; object-fit: contain }
+.film-overlay {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  background: linear-gradient(transparent, rgba(0,0,0,0.85));
+  padding: 20px 16px;
+}
+.film-title { font-size: 1em; font-weight: 700; margin-bottom: 4px }
+.film-desc { font-size: 0.75em; color: var(--muted); line-height: 1.4 }
+#film-nav { display: flex; gap: 10px; padding: 12px 16px; flex-shrink: 0 }
+.film-nav-btn { flex: 1; padding: 10px; background: var(--bg3); border: 1px solid var(--border); border-radius: 10px; color: var(--text); font-size: 0.78em; letter-spacing: 1px; cursor: pointer; text-align: center }
+.film-nav-btn.active { border-color: var(--g); color: var(--g) }
+#film-list { flex: 1; overflow-y: auto; padding: 8px }
+#film-list::-webkit-scrollbar { display: none }
+.film-card { display: flex; gap: 12px; padding: 12px; background: var(--bg3); border-radius: 12px; margin-bottom: 8px; cursor: pointer; align-items: center }
+.film-thumb { width: 80px; height: 56px; border-radius: 8px; background: #000; overflow: hidden; flex-shrink: 0 }
+.film-thumb img { width: 100%; height: 100%; object-fit: cover }
+.film-thumb .film-icon { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 1.8em }
+.film-info { flex: 1; min-width: 0 }
+.film-card-title { font-size: 0.9em; font-weight: 600; margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+.film-card-meta { font-size: 0.65em; color: var(--muted); font-family: var(--mono) }
+.live-badge { background: var(--r); color: #fff; font-size: 0.55em; font-family: var(--mono); padding: 2px 6px; border-radius: 4px; letter-spacing: 1px; vertical-align: middle }
+
+/* ── Music section ── */
+#music-list { flex: 1; overflow-y: auto; padding: 8px }
+#music-list::-webkit-scrollbar { display: none }
+.track-card { display: flex; align-items: center; gap: 12px; padding: 12px; background: var(--bg3); border-radius: 12px; margin-bottom: 8px; cursor: pointer; transition: background 0.15s }
+.track-card:active { background: rgba(0,255,136,0.08) }
+.track-card.playing { background: rgba(0,255,136,0.07); border-left: 3px solid var(--g) }
+.track-cover { width: 52px; height: 52px; border-radius: 8px; background: var(--bg); overflow: hidden; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 1.5em }
+.track-cover img { width: 100%; height: 100%; object-fit: cover }
+.track-info { flex: 1; min-width: 0 }
+.track-title { font-size: 0.88em; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+.track-artist { font-size: 0.68em; color: var(--muted); margin-top: 2px }
+.track-dur { font-size: 0.62em; color: var(--muted); font-family: var(--mono) }
+#mini-player {
+  display: none; align-items: center; gap: 12px; padding: 10px 16px;
+  background: var(--bg3); border-top: 1px solid var(--border); flex-shrink: 0;
+}
+#mini-player.show { display: flex }
+#mini-player .mp-title { flex: 1; font-size: 0.8em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+#mini-player .mp-play { background: none; border: none; font-size: 1.4em; cursor: pointer; padding: 4px }
+#mini-player .mp-note { font-size: 1em; animation: spin-note 2s linear infinite; color: var(--g) }
+
+/* ── Forum / DM stubs ── */
+.sec-placeholder { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 40px 24px; color: var(--muted) }
+.sec-placeholder .sec-icon { font-size: 3em }
+.sec-placeholder h2 { font-size: 1em; letter-spacing: 2px; color: var(--text) }
+.sec-placeholder p { font-size: 0.8em; text-align: center; line-height: 1.6 }
+.sec-placeholder a { color: var(--g); text-decoration: none; font-family: var(--mono); font-size: 0.8em }
+
+/* ── Post Modal ── */
+#post-modal {
+  position: fixed; inset: 0; z-index: 500; background: rgba(0,0,0,0.88);
+  display: none; align-items: flex-end; justify-content: center;
+}
+#post-modal.open { display: flex }
+#post-sheet {
+  width: 100%; max-width: 540px; background: var(--bg2);
+  border-radius: 20px 20px 0 0; padding: 0 0 calc(16px + var(--safe-bot));
+  max-height: 92dvh; overflow-y: auto; animation: slide-up 0.28s cubic-bezier(0.34,1.3,0.64,1);
+}
+@keyframes slide-up { from{transform:translateY(100%)} to{transform:translateY(0)} }
+.sheet-handle { width: 40px; height: 4px; background: var(--border); border-radius: 2px; margin: 12px auto 18px }
+.sheet-head { display: flex; align-items: center; justify-content: space-between; padding: 0 18px 16px; border-bottom: 1px solid var(--border) }
+.sheet-title { font-size: 0.9em; font-weight: 700; letter-spacing: 2px; color: var(--g) }
+.sheet-close { background: none; border: none; font-size: 1.2em; cursor: pointer; color: var(--muted); padding: 4px }
+.mode-tabs { display: flex; gap: 8px; padding: 16px 18px }
+.mode-tab { flex: 1; padding: 11px; border-radius: 10px; border: 1px solid var(--border); background: none; color: var(--muted); font-size: 0.78em; font-weight: 600; letter-spacing: 1px; cursor: pointer; transition: all 0.15s }
+.mode-tab.sel { border-color: var(--g); background: rgba(0,255,136,0.1); color: var(--g) }
+.sheet-body { padding: 0 18px }
+#pm-drop {
+  width: 100%; aspect-ratio: 4/3; background: var(--bg3); border-radius: 14px;
+  border: 2px dashed rgba(0,255,136,0.25); display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 8px; cursor: pointer;
+  overflow: hidden; margin-bottom: 14px; position: relative;
+}
+#pm-drop .drop-icon { font-size: 2.5em }
+#pm-drop .drop-txt { font-size: 0.72em; color: var(--muted); letter-spacing: 1px; font-family: var(--mono) }
+#pm-preview { display: none; width: 100%; height: 100%; object-fit: cover; position: absolute; inset: 0 }
+.sheet-field { margin-bottom: 12px }
+.sheet-field input, .sheet-field textarea {
+  width: 100%; padding: 12px 14px; background: var(--bg3); border: 1px solid var(--border);
+  border-radius: 10px; color: var(--text); font-size: 0.88em; outline: none;
+  font-family: var(--font); resize: none;
+}
+.sheet-field input:focus, .sheet-field textarea:focus { border-color: rgba(0,255,136,0.4) }
+.sheet-field textarea { min-height: 72px }
+.sheet-field label { display: block; font-size: 0.65em; color: var(--muted); letter-spacing: 1px; font-family: var(--mono); margin-bottom: 5px }
+#pm-story-note { display: none; background: rgba(255,200,80,0.08); border: 1px solid rgba(255,200,80,0.2); border-radius: 8px; padding: 8px 12px; font-size: 0.7em; color: rgba(255,200,80,0.8); letter-spacing: 0.5px; margin-bottom: 12px; text-align: center }
+.sheet-prog { display: none; margin-bottom: 12px }
+.sheet-prog-bar { height: 3px; background: var(--border); border-radius: 2px; overflow: hidden }
+.sheet-prog-fill { height: 100%; background: var(--g); width: 0%; transition: width 0.3s }
+.sheet-prog-txt { font-size: 0.62em; color: var(--g); font-family: var(--mono); letter-spacing: 1px; margin-top: 5px; text-align: center }
+#pm-publish {
+  width: 100%; padding: 15px; background: rgba(0,255,136,0.1); border: 1px solid rgba(0,255,136,0.25);
+  border-radius: 12px; color: rgba(0,255,136,0.4); font-size: 0.88em; font-weight: 700;
+  letter-spacing: 2px; cursor: not-allowed; margin-top: 4px; transition: all 0.15s;
+}
+#pm-publish.ready { background: rgba(0,255,136,0.18); border-color: var(--g); color: var(--g); cursor: pointer }
+#pm-publish.ready:active { background: rgba(0,255,136,0.3) }
+
+/* ── Story Viewer ── */
+#story-viewer {
+  position: fixed; inset: 0; z-index: 600; background: #000; display: none; flex-direction: column;
+}
+#story-viewer.open { display: flex }
+#sv-header { position: absolute; top: 0; left: 0; right: 0; z-index: 2; padding: calc(var(--safe-top) + 10px) 16px 10px }
+#sv-bars { display: flex; gap: 3px; margin-bottom: 12px }
+.sv-bar { flex: 1; height: 2.5px; background: rgba(255,255,255,0.3); border-radius: 2px; overflow: hidden }
+.sv-bar-fill { height: 100%; background: #fff; width: 0%; transition: none }
+#sv-info { display: flex; align-items: center; gap: 10px }
+.sv-av { width: 32px; height: 32px; border-radius: 50%; background: var(--bg3); border: 1.5px solid #fff; overflow: hidden; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 0.9em }
+.sv-av img { width: 100%; height: 100%; object-fit: cover }
+.sv-name { font-size: 0.82em; font-weight: 600; color: #fff }
+.sv-time { font-size: 0.62em; color: rgba(255,255,255,0.6); font-family: var(--mono) }
+#sv-close { margin-left: auto; background: none; border: none; color: #fff; font-size: 1.4em; cursor: pointer; padding: 4px }
+#sv-img { position: absolute; inset: 0; overflow: hidden }
+#sv-img img { width: 100%; height: 100%; object-fit: cover }
+#sv-caption { position: absolute; bottom: 0; left: 0; right: 0; padding: 20px 16px calc(20px + var(--safe-bot)); background: linear-gradient(transparent, rgba(0,0,0,0.8)); font-size: 0.88em; line-height: 1.4 }
+#sv-music { position: absolute; bottom: calc(56px + var(--safe-bot)); left: 16px; right: 16px; background: rgba(0,0,0,0.65); backdrop-filter: blur(10px); border-radius: 20px; padding: 6px 14px; display: none; align-items: center; gap: 8px; font-size: 0.72em }
+.sv-note { color: var(--g); animation: spin-note 2s linear infinite }
+
+/* ── Toast ── */
+#toast {
+  position: fixed; bottom: calc(var(--nav-h) + 16px); left: 50%; transform: translateX(-50%) translateY(12px);
+  background: rgba(0,0,0,0.88); border: 1px solid rgba(255,255,255,0.15); border-radius: 20px;
+  padding: 8px 18px; font-size: 0.78em; letter-spacing: 0.5px; color: #fff;
+  opacity: 0; transition: all 0.25s; pointer-events: none; z-index: 800; white-space: nowrap;
+}
+#toast.show { opacity: 1; transform: translateX(-50%) translateY(0) }
+
+/* ── Section header ── */
+.sec-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px 10px; flex-shrink: 0 }
+.sec-header h1 { font-size: 0.85em; font-weight: 700; letter-spacing: 3px; color: var(--g) }
+.sec-header span { font-size: 0.7em; color: var(--muted); font-family: var(--mono) }
+
+/* ── Spinner ── */
+.spinner { width: 24px; height: 24px; border: 2px solid var(--border); border-top-color: var(--g); border-radius: 50%; animation: spin 0.7s linear infinite; margin: 40px auto }
+@keyframes spin { to { transform: rotate(360deg) } }
+
+/* ── Error bar ── */
+#err-bar { display:none; position:fixed; bottom:var(--nav-h); left:0; right:0; z-index:700; background:#1a0008; border-top:2px solid #ff003c; font-family:var(--mono); font-size:0.7em; max-height:140px; overflow-y:auto }
+#err-bar-head { display:flex; align-items:center; justify-content:space-between; padding:5px 10px; border-bottom:1px solid rgba(255,0,60,0.3); position:sticky; top:0; background:#1a0008 }
+#err-bar-head span { color:#ff003c; letter-spacing:2px }
+#err-bar-head div { display:flex; gap:6px }
+#err-bar-head button { background:none; border:1px solid rgba(255,0,60,0.4); color:#ff003c; font-family:var(--mono); font-size:0.85em; padding:2px 7px; cursor:pointer }
+#err-list { padding:2px 0 }
+.err-entry { padding:3px 10px; border-bottom:1px solid rgba(255,0,60,0.1); color:#ff6680; word-break:break-all; line-height:1.4 }
+</style>
+</head>
+<body>
+
+<!-- Setup screen (prima volta) -->
+<div id="setup-screen">
+  <div class="logo">M4TR1X</div>
+  <p>Inserisci l'indirizzo del tuo nodo M4TR1X per connetterti</p>
+  <input id="node-url-input" type="url" placeholder="http://192.168.1.x:8080" autocomplete="off" autocorrect="off" spellcheck="false">
+  <div class="hint">IP locale (WiFi) · o indirizzo .onion (Tor)</div>
+  <button onclick="connectNode()">CONNETTI →</button>
+  <div class="hint" id="connect-err" style="color:#ff003c;display:none"></div>
+</div>
+
+<!-- Main App -->
+<div id="app" style="display:none">
+  <div id="topbar">
+    <div class="logo">M4TR1X</div>
+    <div class="top-right">
+      <div id="node-dot" title="Nodo connesso"></div>
+      <button onclick="openPostModal()" style="color:var(--g)" title="Pubblica">＋</button>
+      <button onclick="resetNode()" title="Cambia nodo" style="color:var(--muted);font-size:1em">⚡</button>
+    </div>
+  </div>
+
+  <div id="sections">
+    <!-- SIGNAL -->
+    <div class="section active" id="sec-signal">
+      <div id="stories-bar">
+        <div class="story-add-btn" onclick="openPostModal('story')">＋</div>
+      </div>
+      <div id="feed"><div class="spinner"></div></div>
+    </div>
+
+    <!-- FILM -->
+    <div class="section" id="sec-film">
+      <div class="sec-header"><h1>🎬 FILM</h1></div>
+      <div id="film-list"><div class="spinner"></div></div>
+    </div>
+
+    <!-- MUSIC -->
+    <div class="section" id="sec-music">
+      <div class="sec-header"><h1>🎵 MUSIC</h1></div>
+      <div id="music-list"><div class="spinner"></div></div>
+      <div id="mini-player">
+        <span class="mp-note">♪</span>
+        <span class="mp-title" id="mp-title">—</span>
+        <button class="mp-play" id="mp-play-btn" onclick="togglePlay()">▶</button>
+      </div>
+      <audio id="audio-player"></audio>
+    </div>
+
+    <!-- FORUM -->
+    <div class="section" id="sec-forum">
+      <div class="sec-placeholder">
+        <div class="sec-icon">🏛️</div>
+        <h2>FORUM</h2>
+        <p>Accedi al forum completo dall'app desktop M4TR1X.</p>
+        <a id="forum-link" href="#" onclick="openDesktop('forum')">Apri nel browser →</a>
+      </div>
+    </div>
+
+    <!-- DM -->
+    <div class="section" id="sec-dm">
+      <div class="sec-placeholder">
+        <div class="sec-icon">💬</div>
+        <h2>MESSAGGI</h2>
+        <p>I messaggi cifrati E2E sono disponibili dall'app desktop.</p>
+        <a id="dm-link" href="#" onclick="openDesktop('dm')">Apri nel browser →</a>
+      </div>
+    </div>
+  </div>
+
+  <div id="bottom-nav">
+    <button class="bnav active" id="bnav-signal" onclick="goSec('signal')"><span class="bi">📡</span><span class="bl">SIGNAL</span></button>
+    <button class="bnav" id="bnav-film" onclick="goSec('film')"><span class="bi">🎬</span><span class="bl">FILM</span></button>
+    <button class="bnav-post" onclick="openPostModal()">＋</button>
+    <button class="bnav" id="bnav-music" onclick="goSec('music')"><span class="bi">🎵</span><span class="bl">MUSIC</span></button>
+    <button class="bnav" id="bnav-dm" onclick="goSec('dm')"><span class="bi">💬</span><span class="bl">DM</span></button>
+  </div>
+</div>
+
+<!-- Post Modal -->
+<div id="post-modal" onclick="if(event.target===this)closePostModal()">
+  <div id="post-sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head">
+      <span class="sheet-title">PUBBLICA</span>
+      <button class="sheet-close" onclick="closePostModal()">✕</button>
+    </div>
+    <div class="mode-tabs">
+      <button class="mode-tab sel" id="pm-tab-photo" onclick="pmSetMode('photo')">📷 FOTO</button>
+      <button class="mode-tab" id="pm-tab-story" onclick="pmSetMode('story')">⭕ STORIA</button>
+    </div>
+    <div class="sheet-body">
+      <div id="pm-story-note">Scade in 24h · visibile a tutti sul nodo</div>
+      <div id="pm-drop" onclick="document.getElementById('pm-file').click()">
+        <div class="drop-icon">📷</div>
+        <div class="drop-txt">TOCCA PER SCEGLIERE</div>
+        <img id="pm-preview">
+      </div>
+      <input type="file" id="pm-file" accept="image/*" capture="environment" style="display:none" onchange="pmPickFile(this)">
+      <div class="sheet-field">
+        <label>DIDASCALIA</label>
+        <textarea id="pm-caption" placeholder="Cosa sta succedendo?"></textarea>
+      </div>
+      <div class="sheet-field">
+        <label>HASHTAG</label>
+        <input id="pm-tags" type="text" placeholder="#m4tr1x #underground">
+      </div>
+      <div class="sheet-prog" id="pm-prog">
+        <div class="sheet-prog-bar"><div class="sheet-prog-fill" id="pm-prog-fill"></div></div>
+        <div class="sheet-prog-txt" id="pm-prog-txt">Caricamento...</div>
+      </div>
+      <button id="pm-publish" onclick="doPost()">PUBBLICA</button>
+    </div>
+  </div>
+</div>
+
+<!-- Story Viewer -->
+<div id="story-viewer">
+  <div id="sv-header">
+    <div id="sv-bars"></div>
+    <div id="sv-info">
+      <div class="sv-av" id="sv-av"><span>👤</span></div>
+      <div><div class="sv-name" id="sv-name">—</div><div class="sv-time" id="sv-time">—</div></div>
+      <button id="sv-close" onclick="closeStoryViewer()">✕</button>
+    </div>
+  </div>
+  <div id="sv-img"><img id="sv-photo" src="" alt=""></div>
+  <div id="sv-music"><span class="sv-note">♪</span><span id="sv-music-txt">—</span></div>
+  <div id="sv-caption" id="sv-cap-txt"></div>
+</div>
+
+<!-- Error bar -->
+<div id="err-bar">
+  <div id="err-bar-head">
+    <span>⚠ ERRORI</span>
+    <div>
+      <button onclick="copyErrs()">COPIA</button>
+      <button onclick="clearErrs()">✕</button>
+    </div>
+  </div>
+  <div id="err-list"></div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+'use strict';
+
+// ── Error capture ────────────────────────────────────────────────────────────
+const _errs = [];
+function showErr(m) {
+  _errs.push(m);
+  const bar = document.getElementById('err-bar');
+  const list = document.getElementById('err-list');
+  if (!bar || !list) return;
+  bar.style.display = 'block';
+  const e = document.createElement('div');
+  e.className = 'err-entry';
+  e.textContent = '[' + new Date().toLocaleTimeString() + '] ' + m;
+  list.appendChild(e);
+  list.scrollTop = list.scrollHeight;
+}
+window.copyErrs = () => { navigator.clipboard?.writeText(_errs.join('\n')).catch(()=>{}); toast('✓ COPIATO'); };
+window.clearErrs = () => { _errs.length=0; document.getElementById('err-list').innerHTML=''; document.getElementById('err-bar').style.display='none'; };
+const _ce = console.error.bind(console);
+console.error = (...a) => { _ce(...a); showErr(a.map(x=>typeof x==='object'?JSON.stringify(x):String(x)).join(' ')); };
+window.onerror = (m,s,l,c,err) => { showErr((err?.stack||m)+(s?' @ '+s.split('/').pop()+':'+l:'')); return false; };
+window.addEventListener('unhandledrejection', e => showErr('Promise: '+(e.reason?.stack||e.reason?.message||String(e.reason))));
+
+// ── State ────────────────────────────────────────────────────────────────────
+let NODE = localStorage.getItem('m4tr1x_node') || '';
+let _curSec = 'signal';
+let _loaded = {};
+let _pmMode = 'photo';
+let _pmFile = null;
+let _stories = [];
+let _svIdx = 0;
+let _svTimer = null;
+let _svAnim = null;
+let _playing = null;
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') }
+function ago(ts) {
+  const d = Math.floor(Date.now()/1000) - ts;
+  if (d < 60) return d + 's fa';
+  if (d < 3600) return Math.floor(d/60) + 'm fa';
+  if (d < 86400) return Math.floor(d/3600) + 'h fa';
+  return Math.floor(d/86400) + 'g fa';
+}
+function toast(msg, dur = 2800) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(t._t); t._t = setTimeout(() => t.classList.remove('show'), dur);
+}
+function api(path, opts) { return fetch(NODE + path, opts).then(r => r.json()); }
+
+// ── Node connection ──────────────────────────────────────────────────────────
+async function connectNode() {
+  const url = document.getElementById('node-url-input').value.trim().replace(/\/$/, '');
+  const err = document.getElementById('connect-err');
+  err.style.display = 'none';
+  if (!url) { err.textContent = 'Inserisci un URL'; err.style.display = 'block'; return; }
+  try {
+    const r = await fetch(url + '/health', { signal: AbortSignal.timeout(6000) }).then(r => r.json());
+    if (r.status !== 'online') throw new Error('Node offline');
+    NODE = url;
+    localStorage.setItem('m4tr1x_node', NODE);
+    launchApp();
+  } catch(e) {
+    err.textContent = 'Nodo non raggiungibile: ' + e.message;
+    err.style.display = 'block';
+  }
+}
+
+function resetNode() {
+  localStorage.removeItem('m4tr1x_node');
+  NODE = '';
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('setup-screen').style.display = 'flex';
+  document.getElementById('node-url-input').value = '';
+}
+
+function openDesktop(sec) {
+  window.open(NODE + '/app/#' + sec, '_blank');
+}
+
+function launchApp() {
+  document.getElementById('setup-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+  loadSignal();
+}
+
+// ── Section switching ────────────────────────────────────────────────────────
+function goSec(name) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.bnav').forEach(b => b.classList.remove('active'));
+  const sec = document.getElementById('sec-' + name);
+  const btn = document.getElementById('bnav-' + name);
+  if (sec) sec.classList.add('active');
+  if (btn) btn.classList.add('active');
+  _curSec = name;
+  if (!_loaded[name]) { loadSec(name); _loaded[name] = true; }
+}
+
+function loadSec(name) {
+  if (name === 'signal') loadSignal();
+  else if (name === 'film') loadFilm();
+  else if (name === 'music') loadMusic();
+}
+
+// ── Signal: stories + photo feed ─────────────────────────────────────────────
+async function loadSignal() {
+  _loaded.signal = true;
+  await Promise.all([loadStories(), loadPhotos()]);
+}
+
+async function loadStories() {
+  try {
+    const data = await api('/api/v1/story/list?limit=30');
+    _stories = Array.isArray(data) ? data : [];
+    renderStoriesBar();
+  } catch(e) { console.error('Stories:', e.message); }
+}
+
+function renderStoriesBar() {
+  const bar = document.getElementById('stories-bar');
+  // keep the add button
+  bar.innerHTML = '<div class="story-add-btn" onclick="openPostModal(\'story\')">＋</div>';
+  _stories.forEach((s, i) => {
+    const bub = document.createElement('div');
+    bub.className = 'story-bubble';
+    bub.onclick = () => openStoryViewer(i);
+    const timeLeft = s.expires_at - Math.floor(Date.now()/1000);
+    const hLeft = Math.ceil(timeLeft / 3600);
+    bub.innerHTML = `
+      <div class="story-ring">
+        <div class="story-ring-inner">
+          <img src="${NODE}/blossom/${s.thumb_sha256||s.sha256}" onerror="this.parentElement.innerHTML='<div class=\\'story-icon\\'>📷</div>'" alt="">
+        </div>
+      </div>
+      <span class="story-name">${hLeft}h</span>`;
+    bar.appendChild(bub);
+  });
+}
+
+async function loadPhotos() {
+  const feed = document.getElementById('feed');
+  try {
+    const data = await api('/api/v1/photo/list?limit=30');
+    const photos = Array.isArray(data) ? data : [];
+    feed.innerHTML = '';
+    if (!photos.length) {
+      feed.innerHTML = '<div style="text-align:center;padding:60px 24px;color:var(--muted);font-size:0.82em;letter-spacing:1px">Nessuna foto ancora.<br>Pubblica la prima! 📷</div>';
+      return;
+    }
+    photos.forEach(p => feed.appendChild(makePostCard(p)));
+  } catch(e) {
+    console.error('Photos:', e.message);
+    feed.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted);font-size:0.8em">Errore caricamento feed</div>';
+  }
+}
+
+function makePostCard(p) {
+  const el = document.createElement('div');
+  el.className = 'post-card';
+  const tags = (p.tags||[]).map(t => `<span class="post-tag">#${esc(t)}</span>`).join('');
+  const musicHtml = p.music ? `
+    <div class="music-overlay">
+      <span class="note">♪</span>
+      <span>${esc(p.music.title)} · ${esc(p.music.artist)}</span>
+    </div>` : '';
+  el.innerHTML = `
+    <div class="post-header">
+      <div class="post-av">📡</div>
+      <div class="post-meta">
+        <div class="post-name">nodo · ${NODE.split('//')[1]?.split(':')[0]||'local'}</div>
+        <div class="post-time">${ago(p.created_at)}</div>
+      </div>
+    </div>
+    <div class="post-img">
+      <img src="${NODE}/blossom/${p.sha256}" alt="${esc(p.alt||'')}" loading="lazy">
+      ${musicHtml}
+    </div>
+    <div class="post-actions">
+      <div class="pact" onclick="likePost(this)"><span class="icon">🤍</span><span class="cnt">${p.likes||0}</span></div>
+      <div class="pact"><span class="icon">💬</span><span class="cnt">0</span></div>
+      <div class="pact" onclick="sharePost('${p.id}')"><span class="icon">↗</span><span class="cnt"></span></div>
+    </div>
+    ${p.caption ? `<div class="post-caption">${esc(p.caption)}</div>` : ''}
+    ${tags ? `<div class="post-tags">${tags}</div>` : ''}`;
+  return el;
+}
+
+function likePost(el) {
+  el.classList.toggle('liked');
+  const cnt = el.querySelector('.cnt');
+  const n = parseInt(cnt.textContent)||0;
+  el.querySelector('.icon').textContent = el.classList.contains('liked') ? '❤️' : '🤍';
+  cnt.textContent = el.classList.contains('liked') ? n+1 : Math.max(0,n-1);
+}
+
+function sharePost(id) {
+  const url = NODE + '/api/v1/photo/' + id;
+  navigator.share ? navigator.share({url}) : navigator.clipboard?.writeText(url).then(()=>toast('URL copiato'));
+}
+
+// ── Story Viewer ──────────────────────────────────────────────────────────────
+function openStoryViewer(idx) {
+  if (!_stories.length) return;
+  _svIdx = idx;
+  document.getElementById('story-viewer').classList.add('open');
+  renderStory(_svIdx);
+  // touch to advance
+  const sv = document.getElementById('story-viewer');
+  sv.ontouchstart = e => {
+    const x = e.touches[0].clientX;
+    sv._touchX = x;
+  };
+  sv.ontouchend = e => {
+    const dx = e.changedTouches[0].clientX - (sv._touchX||0);
+    if (Math.abs(dx) > 40) { dx < 0 ? nextStory() : prevStory(); }
+    else if (document.getElementById('sv-close') !== e.target) nextStory();
+  };
+}
+
+function renderStory(idx) {
+  clearTimeout(_svTimer);
+  if (_svAnim) { _svAnim.cancel(); _svAnim = null; }
+  const s = _stories[idx];
+  if (!s) { closeStoryViewer(); return; }
+
+  // bars
+  const barsEl = document.getElementById('sv-bars');
+  barsEl.innerHTML = _stories.map((_, i) =>
+    `<div class="sv-bar"><div class="sv-bar-fill" id="svb-${i}" style="width:${i<idx?'100':i===idx?'0':'0'}%"></div></div>`
+  ).join('');
+
+  document.getElementById('sv-photo').src = NODE + '/blossom/' + s.sha256;
+  document.getElementById('sv-name').textContent = 'nodo · ' + (NODE.split('//')[1]?.split(':')[0]||'local');
+  document.getElementById('sv-time').textContent = ago(s.created_at) + ' · ' + Math.ceil((s.expires_at - Date.now()/1000)/3600) + 'h rimaste';
+  document.getElementById('sv-caption').textContent = s.caption || '';
+
+  const music = document.getElementById('sv-music');
+  if (s.music) {
+    document.getElementById('sv-music-txt').textContent = s.music.title + ' · ' + s.music.artist;
+    music.style.display = 'flex';
+  } else {
+    music.style.display = 'none';
+  }
+
+  // progress bar animation 5s
+  const fill = document.getElementById('svb-' + idx);
+  if (fill) {
+    _svAnim = fill.animate([{width:'0%'},{width:'100%'}], {duration:5000,fill:'forwards'});
+    _svAnim.onfinish = nextStory;
+  }
+}
+
+function nextStory() {
+  if (_svIdx < _stories.length - 1) { _svIdx++; renderStory(_svIdx); }
+  else closeStoryViewer();
+}
+function prevStory() {
+  if (_svIdx > 0) { _svIdx--; renderStory(_svIdx); }
+}
+function closeStoryViewer() {
+  clearTimeout(_svTimer);
+  if (_svAnim) { _svAnim.cancel(); _svAnim = null; }
+  document.getElementById('story-viewer').classList.remove('open');
+}
+
+// ── Film ──────────────────────────────────────────────────────────────────────
+async function loadFilm() {
+  const list = document.getElementById('film-list');
+  try {
+    const data = await api('/api/v1/video/list?limit=30');
+    const videos = Array.isArray(data) ? data : (data.videos||[]);
+    list.innerHTML = '';
+    if (!videos.length) {
+      list.innerHTML = '<div style="text-align:center;padding:60px 24px;color:var(--muted);font-size:0.8em;letter-spacing:1px">Nessun video ancora.</div>';
+      return;
+    }
+    videos.forEach(v => {
+      const card = document.createElement('div');
+      card.className = 'film-card';
+      const thumbSrc = v.thumb ? NODE + (v.thumb.startsWith('http') ? v.thumb.replace(NODE,'') : v.thumb) : '';
+      card.innerHTML = `
+        <div class="film-thumb">
+          ${thumbSrc ? `<img src="${thumbSrc}" alt="" onerror="this.parentElement.innerHTML='<div class=film-icon>🎬</div>'">` : '<div class="film-icon">🎬</div>'}
+        </div>
+        <div class="film-info">
+          <div class="film-card-title">${esc(v.title||'Senza titolo')}</div>
+          <div class="film-card-meta">${v.views||0} views · ${ago(v.created_at||0)}</div>
+        </div>`;
+      card.onclick = () => window.open(NODE + '/v/' + v.id, '_blank');
+      list.appendChild(card);
+    });
+  } catch(e) {
+    console.error('Film:', e.message);
+    list.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted);font-size:0.8em">Errore caricamento video</div>';
+  }
+}
+
+// ── Music ─────────────────────────────────────────────────────────────────────
+async function loadMusic() {
+  const list = document.getElementById('music-list');
+  try {
+    const data = await api('/api/v1/music/local?limit=50').catch(() => []);
+    const tracks = Array.isArray(data) ? data : [];
+    list.innerHTML = '';
+    if (!tracks.length) {
+      list.innerHTML = '<div style="text-align:center;padding:60px 24px;color:var(--muted);font-size:0.8em">Nessuna traccia locale.</div>';
+      return;
+    }
+    tracks.forEach(t => {
+      const card = document.createElement('div');
+      card.className = 'track-card';
+      const dur = t.duration ? Math.floor(t.duration/60)+':'+String(t.duration%60).padStart(2,'0') : '';
+      card.innerHTML = `
+        <div class="track-cover">${t.cover_url?`<img src="${NODE+t.cover_url}" alt="">`:' 🎵'}</div>
+        <div class="track-info">
+          <div class="track-title">${esc(t.title||'?')}</div>
+          <div class="track-artist">${esc(t.artist||'—')}</div>
+        </div>
+        <span class="track-dur">${dur}</span>`;
+      card.onclick = () => playTrack(t, card);
+      list.appendChild(card);
+    });
+  } catch(e) {
+    console.error('Music:', e.message);
+  }
+}
+
+function playTrack(track, cardEl) {
+  const audio = document.getElementById('audio-player');
+  const player = document.getElementById('mini-player');
+  document.querySelectorAll('.track-card').forEach(c => c.classList.remove('playing'));
+  if (cardEl) cardEl.classList.add('playing');
+  audio.src = NODE + '/api/v1/music/stream/' + track.id;
+  audio.play().catch(e => console.error('Play:', e.message));
+  document.getElementById('mp-title').textContent = track.title + ' · ' + (track.artist||'—');
+  document.getElementById('mp-play-btn').textContent = '⏸';
+  player.classList.add('show');
+  _playing = track;
+}
+
+function togglePlay() {
+  const audio = document.getElementById('audio-player');
+  const btn = document.getElementById('mp-play-btn');
+  if (audio.paused) { audio.play(); btn.textContent = '⏸'; }
+  else { audio.pause(); btn.textContent = '▶'; }
+}
+
+// ── Post Modal ────────────────────────────────────────────────────────────────
+function openPostModal(mode) {
+  _pmFile = null; _pmMode = mode || 'photo';
+  document.getElementById('pm-file').value = '';
+  document.getElementById('pm-preview').style.display = 'none';
+  document.getElementById('pm-drop').querySelector('.drop-icon').textContent = '📷';
+  document.getElementById('pm-drop').querySelector('.drop-txt').textContent = 'TOCCA PER SCEGLIERE';
+  document.getElementById('pm-caption').value = '';
+  document.getElementById('pm-tags').value = '';
+  document.getElementById('pm-prog').style.display = 'none';
+  document.getElementById('pm-prog-fill').style.width = '0%';
+  document.getElementById('pm-publish').className = 'sheet-field'; // reset
+  const pub = document.getElementById('pm-publish');
+  pub.className = ''; pub.style.cssText = ''; pub.disabled = true;
+  pub.style.width='100%'; pub.style.padding='15px'; pub.style.background='rgba(0,255,136,0.1)';
+  pub.style.border='1px solid rgba(0,255,136,0.25)'; pub.style.borderRadius='12px';
+  pub.style.color='rgba(0,255,136,0.4)'; pub.style.fontSize='0.88em';
+  pub.style.fontWeight='700'; pub.style.letterSpacing='2px'; pub.style.cursor='not-allowed';
+  pub.style.marginTop='4px';
+  pmSetMode(_pmMode);
+  document.getElementById('post-modal').classList.add('open');
+}
+
+function closePostModal() {
+  document.getElementById('post-modal').classList.remove('open');
+  _pmFile = null;
+}
+
+function pmSetMode(mode) {
+  _pmMode = mode;
+  const tabP = document.getElementById('pm-tab-photo');
+  const tabS = document.getElementById('pm-tab-story');
+  const note = document.getElementById('pm-story-note');
+  if (mode === 'photo') {
+    tabP.classList.add('sel'); tabS.classList.remove('sel');
+    note.style.display = 'none';
+  } else {
+    tabS.classList.add('sel'); tabP.classList.remove('sel');
+    note.style.display = 'block';
+  }
+}
+
+function pmPickFile(input) {
+  const file = input.files[0];
+  if (!file || !file.type.startsWith('image/')) { toast('Solo immagini'); return; }
+  _pmFile = file;
+  const url = URL.createObjectURL(file);
+  const prev = document.getElementById('pm-preview');
+  prev.src = url; prev.style.display = 'block';
+  document.getElementById('pm-drop').querySelector('.drop-icon').textContent = '✅';
+  document.getElementById('pm-drop').querySelector('.drop-txt').textContent = file.name.substring(0,24);
+  const pub = document.getElementById('pm-publish');
+  pub.disabled = false;
+  pub.style.background = 'rgba(0,255,136,0.18)';
+  pub.style.borderColor = 'var(--g)';
+  pub.style.color = 'var(--g)';
+  pub.style.cursor = 'pointer';
+}
+
+async function doPost() {
+  if (!_pmFile) { toast('Seleziona un\'immagine'); return; }
+  const pub = document.getElementById('pm-publish');
+  const prog = document.getElementById('pm-prog');
+  const fill = document.getElementById('pm-prog-fill');
+  const txt = document.getElementById('pm-prog-txt');
+  pub.disabled = true; pub.textContent = 'CARICAMENTO...';
+  prog.style.display = 'block'; fill.style.width = '30%'; txt.textContent = 'Upload...';
+  try {
+    const fd = new FormData();
+    fd.append('photo', _pmFile);
+    fd.append('caption', document.getElementById('pm-caption').value);
+    fd.append('tags', document.getElementById('pm-tags').value.replace(/#/g,'').trim());
+    fill.style.width = '65%'; txt.textContent = 'Nostr...';
+    const ep = _pmMode === 'story' ? '/api/v1/story/publish' : '/api/v1/photo/publish';
+    const res = await fetch(NODE + ep, { method: 'POST', body: fd }).then(r => r.json());
+    fill.style.width = '100%';
+    if (res.ok) {
+      txt.textContent = _pmMode === 'story' ? '✓ Storia pubblicata' : '✓ Foto pubblicata';
+      toast(_pmMode === 'story' ? '⭕ STORIA PUBBLICATA' : '📷 FOTO PUBBLICATA');
+      setTimeout(() => {
+        closePostModal();
+        if (_pmMode === 'story') { loadStories(); }
+        else { loadPhotos(); }
+      }, 1000);
+    } else {
+      txt.textContent = 'Errore: ' + (res.error||'sconosciuto');
+      pub.disabled = false; pub.textContent = 'PUBBLICA';
+      console.error('Post error:', res.error);
+    }
+  } catch(e) {
+    txt.textContent = 'Errore di rete';
+    pub.disabled = false; pub.textContent = 'PUBBLICA';
+    console.error('Post network:', e.message);
+  }
+}
+
+// ── Boot ──────────────────────────────────────────────────────────────────────
+if (NODE) {
+  fetch(NODE + '/health', { signal: AbortSignal.timeout(4000) })
+    .then(r => r.json())
+    .then(r => { if (r.status === 'online') launchApp(); else resetNode(); })
+    .catch(() => { toast('Nodo non raggiungibile'); resetNode(); });
+} else {
+  document.getElementById('setup-screen').style.display = 'flex';
+  // prefill with common local addresses
+  document.getElementById('node-url-input').placeholder = 'http://192.168.1.x:8080';
+}
+
+// handle Enter on setup input
+document.getElementById('node-url-input').addEventListener('keydown', e => { if(e.key==='Enter') connectNode(); });
+</script>
+</body>
+</html>

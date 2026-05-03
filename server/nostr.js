@@ -70,7 +70,10 @@ let _reconnectDelay  = 1000   // ms — doubles on each failure, capped at 30s
 const MAX_RECONNECT  = 30000
 
 function getPool () {
-  if (!_pool) _pool = new SimplePool()
+  if (!_pool) {
+    _pool = new SimplePool()
+    _pool._WebSocket = WS
+  }
   return _pool
 }
 

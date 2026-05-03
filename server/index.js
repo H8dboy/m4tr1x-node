@@ -21,7 +21,7 @@ const db = require('./db')
 const { initDb, saveResult, loadResult, listResults } = db
 const {
   generateIdentity, unlockIdentity, lockIdentity,
-  identityExists, getPublicInfo,
+  identityExists, getPublicInfo, deriveSigningKey,
 } = require('./h8identity')
 const {
   generateKeys, loadSavedKeys, loadKeys, getCurrentPubkey,
@@ -47,6 +47,9 @@ const {
 
 const { declareNode, resignNode, discoverNodes, startNodeDiscovery, startContentDiscovery, announceContent, locateContent, getLocalUrl, getOnionAddress, getNodeConfig, pickNode, getPrivateNodeUrl, VALID_CAPS } = require('./node_manager')
 const { startStream, stopStream, sendSignal, listStreams, registerRemoteStream, removeRemoteStream } = require('./livestream')
+const videoHost = require('./video_host')
+const photo     = require('./photo')
+const story     = require('./story')
 
 // âââ Embedded Nostr Relay âââââââââââââââââââââââââââââââââââââââââââââââââââââ
 // Avviato in processo figlio per evitare che EADDRINUSE faccia crashare il server
@@ -89,7 +92,16 @@ const app = express()
 
 // CORS â accetta localhost (Electron) + origini configurate
 app.use(cors({
-  origin: true,
+  origin: (origin, cb) => {
+    if (!origin) return cb(null, true)
+    if (origin.startsWith('http://192.168.') || origin.startsWith('http://10.') ||
+        origin.startsWith('http://172.') || origin.includes('.onion') ||
+        origin.includes('localhost') || ALLOWED_ORIGINS.includes(origin)) {
+      return cb(null, true)
+    }
+    cb(null, false)
+  },
+
   credentials: false,
   methods: ['GET', 'POST', 'DELETE'],
   allowedHeaders: ['X-Nostr-Pubkey', 'X-API-Key', 'X-Admin-Key', 'Content-Type'],
@@ -102,6 +114,17 @@ app.use(globalLimit)
 const upload = multer({
   dest: UPLOAD_DIR,
   limits: { fileSize: MAX_FILE_MB * 1024 * 1024 },
+})
+
+// Photo upload (JPEG/PNG/WebP/GIF — max 20MB)
+const ALLOWED_IMG_EXT = new Set([".jpg", ".jpeg", ".png", ".webp", ".gif"])
+const photoUpload = multer({
+  dest: UPLOAD_DIR,
+  limits: { fileSize: 20 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const ext = path.extname(file.originalname || "").toLowerCase()
+    cb(null, ALLOWED_IMG_EXT.has(ext) || file.mimetype.startsWith("image/"))
+  },
 })
 
 // Badge document upload (PDF, JPG, PNG â max 10MB)
@@ -169,6 +192,28 @@ app.get('/health', (req, res) => {
     runtime: 'electron+node',
     exiftool_available: isExifToolAvailable(),
   })
+})
+
+// ─── Blossom local storage ────────────────────────────────────────────────────
+const BLOBS_DIR = path.join(DATA_DIR, 'blobs')
+if (!fs.existsSync(BLOBS_DIR)) fs.mkdirSync(BLOBS_DIR, { recursive: true })
+
+const blossomUpload = multer({ dest: BLOBS_DIR, limits: { fileSize: MAX_FILE_MB * 1024 * 1024 } })
+
+app.post('/blossom/upload', blossomUpload.single('file'), async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'No file' })
+  const buf = fs.readFileSync(req.file.path)
+  const sha256 = crypto.createHash('sha256').update(buf).digest('hex')
+  const dest = path.join(BLOBS_DIR, sha256)
+  fs.renameSync(req.file.path, dest)
+  const base = (process.env.PRIVATE_NODE_URL || 'http://localhost:8080').replace(/\/$/, '')
+  res.json({ url: `${base}/blossom/${sha256}`, sha256, size: req.file.size, type: req.file.mimetype })
+})
+
+app.get('/blossom/:sha256', (req, res) => {
+  const p = path.join(BLOBS_DIR, path.basename(req.params.sha256))
+  if (!fs.existsSync(p)) return res.status(404).json({ error: 'Not found' })
+  res.sendFile(p)
 })
 
 // Analisi video
@@ -286,6 +331,29 @@ app.post('/api/v1/h8/wallet/unlock', verifyApiKey, async (req, res) => {
 app.post('/api/v1/h8/wallet/lock', verifyApiKey, (req, res) => {
   lockIdentity()
   res.json({ status: 'locked' })
+})
+
+// Ritorna address H8 e chiave pubblica di firma (secp256k1 derivata) della sessione attiva.
+app.get('/api/v1/h8/session-info', (req, res) => {
+  const id = require('./h8identity').getUnlockedIdentity()
+  if (!id) return res.status(401).json({ error: 'wallet bloccato' })
+  const sk = deriveSigningKey()
+  res.json({ address: id.address, pubkey: sk.pubKeyHex })
+})
+
+// Firma un evento Nostr con la chiave derivata dall'identità H8.
+// Il client invia l'evento senza id/sig; il server aggiunge entrambi.
+app.post('/api/v1/h8/sign-event', (req, res) => {
+  const id = require('./h8identity').getUnlockedIdentity()
+  if (!id) return res.status(401).json({ error: 'wallet bloccato' })
+  const sk = deriveSigningKey()
+  const { schnorr } = require('@noble/curves/secp256k1.js')
+  const ev = req.body
+  ev.pubkey = sk.pubKeyHex
+  const serial = JSON.stringify([0, ev.pubkey, ev.created_at, ev.kind, ev.tags, ev.content])
+  ev.id = crypto.createHash('sha256').update(serial).digest('hex')
+  ev.sig = Buffer.from(schnorr.sign(ev.id, sk.privKey)).toString('hex')
+  res.json(ev)
 })
 
 // ─── H8 Token Economy ────────────────────────────────────────────────────────
@@ -948,6 +1016,7 @@ app.get('/api/v1/tracks', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
 
+<<<<<<< HEAD
 // ─── Content location — find which node has a given content ID ───────────────
 
 app.get('/api/v1/node/onion', (req, res) => {
@@ -1039,6 +1108,177 @@ app.post('/api/v1/music/upload', upload.single('audio'), async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
 
+=======
+// ─── Routes: Photo Posts (NIP-68 kind:20) ────────────────────────────────────
+
+// Upload + strip EXIF + store Blossom + publish Nostr kind:20
+app.post('/api/v1/photo/publish', photoUpload.single('photo'), async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'immagine richiesta' })
+  const srcPath = req.file.path
+  try {
+    const { caption, alt, tags, uploader, music_id } = req.body
+    const tagList = tags ? tags.split(/[\s,]+/).filter(Boolean) : []
+    const result = await photo.publishPhoto(srcPath, {
+      caption:  caption  || '',
+      alt:      alt      || '',
+      tags:     tagList,
+      uploader: uploader || '',
+      music_id: music_id || '',
+    })
+    res.json({ ok: true, ...result })
+  } catch (err) {
+    console.error('[PHOTO] Error:', err.message)
+    res.status(500).json({ error: err.message })
+  } finally {
+    if (fs.existsSync(srcPath)) fs.unlinkSync(srcPath)
+  }
+})
+
+// Feed foto
+app.get('/api/v1/photo/list', (req, res) => {
+  const limit  = parseInt(req.query.limit  || '50')
+  const offset = parseInt(req.query.offset || '0')
+  res.json(photo.listPhotos(limit, offset))
+})
+
+// Singola foto
+app.get('/api/v1/photo/:id', (req, res) => {
+  const p = photo.getPhoto(req.params.id)
+  if (!p) return res.status(404).json({ error: 'not found' })
+  res.json(p)
+})
+
+// ─── Routes: Stories (NIP-68 kind:20 + NIP-40 expiry 24h) ───────────────────
+
+// Upload + publish story (expires in 24h)
+app.post('/api/v1/story/publish', photoUpload.single('photo'), async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'immagine richiesta' })
+  const srcPath = req.file.path
+  try {
+    const { caption, alt, tags, uploader, music_id } = req.body
+    const tagList = tags ? tags.split(/[\s,]+/).filter(Boolean) : []
+    const result = await story.publishStory(srcPath, {
+      caption:  caption  || '',
+      alt:      alt      || '',
+      tags:     tagList,
+      uploader: uploader || '',
+      music_id: music_id || '',
+    })
+    res.json({ ok: true, ...result })
+  } catch (err) {
+    console.error('[STORY] Error:', err.message)
+    res.status(500).json({ error: err.message })
+  } finally {
+    if (fs.existsSync(srcPath)) fs.unlinkSync(srcPath)
+  }
+})
+
+// Active stories (not expired)
+app.get('/api/v1/story/list', (req, res) => {
+  const limit = parseInt(req.query.limit || '50')
+  res.json(story.listStories(limit))
+})
+
+// Single story
+app.get('/api/v1/story/:id', (req, res) => {
+  const s = story.getStory(req.params.id)
+  if (!s) return res.status(404).json({ error: 'not found' })
+  res.json(s)
+})
+
+// ─── Routes: Native Video Hosting (NIP-71) ────────────────────────────────────
+
+// Upload + transcode + publish (Nostr NIP-71 kind:34235)
+app.post('/api/v1/video/publish', upload.single('video'), async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'video richiesto' })
+  const tempPath = req.file.path
+  try {
+    const { title, description, tags, uploader } = req.body
+    if (!title) { fs.unlinkSync(tempPath); return res.status(400).json({ error: 'title richiesto' }) }
+    const tagList = tags ? tags.split(/[\s,]+/).filter(Boolean) : []
+    const result = await videoHost.publishVideo(tempPath, { title, description: description || '', tags: tagList, uploader: uploader || '' })
+    res.json({ ok: true, ...result })
+  } catch (err) {
+    console.error('[VIDEO] Publish error:', err.message)
+    res.status(500).json({ error: err.message })
+  } finally {
+    if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath)
+  }
+})
+
+// List hosted videos
+app.get('/api/v1/video/list', (req, res) => {
+  const limit  = parseInt(req.query.limit  || '50')
+  const offset = parseInt(req.query.offset || '0')
+  res.json(videoHost.listVideos(limit, offset))
+})
+
+// Delete video (admin only)
+app.delete('/api/v1/video/:id', localhostOnly, verifyAdminKey, (req, res) => {
+  try {
+    videoHost.deleteVideo(req.params.id)
+    res.json({ ok: true })
+  } catch (err) { res.status(500).json({ error: err.message }) }
+})
+
+// Video player page
+app.get('/v/:id', (req, res) => {
+  const video = videoHost.getVideo(req.params.id)
+  if (!video) return res.status(404).send('Video non trovato')
+  videoHost.incrementViews(req.params.id)
+  res.setHeader('Content-Type', 'text/html; charset=utf-8')
+  res.send(videoHost.buildPlayerPage(video))
+})
+
+// HLS manifest
+app.get('/v/:id/index.m3u8', (req, res) => {
+  const dir = videoHost.videoDir(req.params.id)
+  const f   = path.join(dir, 'index.m3u8')
+  if (!fs.existsSync(f)) return res.status(404).send('not found')
+  res.setHeader('Content-Type', 'application/x-mpegURL')
+  res.setHeader('Access-Control-Allow-Origin', '*')
+  res.setHeader('Cache-Control', 'no-cache')
+  res.sendFile(f)
+})
+
+// HLS segments + thumbnail
+app.get('/v/:id/:file', (req, res) => {
+  const { id, file } = req.params
+  if (!file.match(/^(seg_\d+\.ts|thumb\.jpg)$/)) return res.status(400).send('invalid')
+  const f = path.join(videoHost.videoDir(id), file)
+  if (!fs.existsSync(f)) return res.status(404).send('not found')
+  const mime = file.endsWith('.ts') ? 'video/mp2t' : 'image/jpeg'
+  res.setHeader('Content-Type', mime)
+  res.setHeader('Access-Control-Allow-Origin', '*')
+  res.setHeader('Cache-Control', 'public, max-age=31536000, immutable')
+  res.sendFile(f)
+})
+
+// ─── Mobile PWA + App Distribution ───────────────────────────────────────────
+const mobilePath = path.join(__dirname, 'mobile')
+app.use('/m', express.static(mobilePath, {
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.apk'))  res.setHeader('Content-Type', 'application/vnd.android.package-archive')
+    if (filePath.endsWith('.ipa'))  res.setHeader('Content-Type', 'application/octet-stream')
+    if (filePath.endsWith('.plist')) res.setHeader('Content-Type', 'text/xml')
+  }
+}))
+app.get('/install', (req, res) => res.sendFile(path.join(mobilePath, 'install.html')))
+// Update iOS manifest IPA url when IPA is uploaded (admin only)
+app.post('/admin/update-ios-manifest', localhostOnly, verifyAdminKey, (req, res) => {
+  const { ipa_url } = req.body
+  if (!ipa_url) return res.status(400).json({ error: 'ipa_url required' })
+  const plistPath = path.join(mobilePath, 'manifest.plist')
+  let plist = fs.readFileSync(plistPath, 'utf8')
+  plist = plist.replace(/IPA_URL_PLACEHOLDER|<string>https?:\/\/[^<]+\.ipa<\/string>/,
+    `<string>${ipa_url}</string>`)
+  fs.writeFileSync(plistPath, plist)
+  console.log(`[IOS] manifest.plist aggiornato → ${ipa_url}`)
+  res.json({ ok: true, ipa_url })
+})
+app.get('/m', (req, res) => res.sendFile(path.join(mobilePath, 'index.html')))
+
+>>>>>>> HEAD@{1}
 // Serve il frontend (HTML statico)
 // In production, Tauri passes the bundled frontend path via env var.
 // In dev, fall back to the local ../frontend directory.
@@ -1075,6 +1315,7 @@ function startServer(port = 8080) {
   setTimeout(() => startContentDiscovery(), 3000)
   return new Promise((resolve, reject) => {
     server = app.listen(port, '0.0.0.0', () => {
+<<<<<<< HEAD
       const { networkInterfaces } = require('os')
       const nets = networkInterfaces()
       const lan = Object.values(nets).flat().find(n => n.family === 'IPv4' && !n.internal)
@@ -1082,6 +1323,9 @@ function startServer(port = 8080) {
       if (lan) console.log(`[SERVER] Raggiungibile dalla rete: http://${lan.address}:${port}`)
       const onion = getOnionAddress()
       if (onion) console.log(`[SERVER] Indirizzo Tor: http://${onion}`)
+=======
+      console.log(`[SERVER] M4TR1X API in ascolto su http://localhost:${port}`)
+>>>>>>> HEAD@{1}
       resolve(server)
     })
     server.on('error', reject)
