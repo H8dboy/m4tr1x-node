@@ -50,6 +50,7 @@ const { startStream, stopStream, sendSignal, listStreams, registerRemoteStream, 
 const videoHost = require('./video_host')
 const photo     = require('./photo')
 const story     = require('./story')
+const p2p       = require('./p2p')
 
 // âââ Embedded Nostr Relay âââââââââââââââââââââââââââââââââââââââââââââââââââââ
 // Avviato in processo figlio per evitare che EADDRINUSE faccia crashare il server
@@ -1196,6 +1197,19 @@ app.get('/api/v1/story/:id', (req, res) => {
   res.json(s)
 })
 
+// ─── Routes: P2P ─────────────────────────────────────────────────────────────
+
+// GET /api/v1/p2p/config — tracker URL + loader config for clients
+app.get('/api/v1/p2p/config', (req, res) => {
+  const base = process.env.PRIVATE_NODE_URL || `http://${req.headers.host || 'localhost:' + (process.env.PORT || 8080)}`
+  res.json(p2p.getP2PConfig(base))
+})
+
+// GET /api/v1/p2p/stats — active swarms + peer count
+app.get('/api/v1/p2p/stats', (req, res) => {
+  res.json(p2p.getStats())
+})
+
 // ─── Routes: H8 Coin (H8C) ────────────────────────────────────────────────────
 
 const coin   = require('./h8coin')
@@ -1560,6 +1574,7 @@ function startServer(port = 8080) {
       if (lan) console.log(`[SERVER] Raggiungibile dalla rete: http://${lan.address}:${port}`)
       const onion = getOnionAddress()
       if (onion) console.log(`[SERVER] Indirizzo Tor: http://${onion}`)
+      p2p.attachToServer(server)
       resolve(server)
     })
     server.on('error', reject)

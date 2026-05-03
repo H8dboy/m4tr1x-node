@@ -294,6 +294,10 @@ video.film-vid { width: 100%; height: 100%; object-fit: contain }
 #err-list { padding:2px 0 }
 .err-entry { padding:3px 10px; border-bottom:1px solid rgba(255,0,60,0.1); color:#ff6680; word-break:break-all; line-height:1.4 }
 </style>
+  <!-- P2P video stack -->
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@1/dist/hls.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/p2p-media-loader-core@latest/build/p2p-media-loader-core.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/p2p-media-loader-hlsjs@latest/build/p2p-media-loader-hlsjs.min.js"></script>
 </head>
 <body>
 
@@ -731,7 +735,7 @@ async function loadFilm() {
           <div class="film-card-title">${esc(v.title||'Senza titolo')}</div>
           <div class="film-card-meta">${v.views||0} views · ${ago(v.created_at||0)}</div>
         </div>`;
-      card.onclick = () => window.open(NODE + '/v/' + v.id, '_blank');
+      card.onclick = () => openVideoPlayer(NODE + '/v/' + v.id + '/index.m3u8', v.title || 'Video');
       list.appendChild(card);
     });
   } catch(e) {
@@ -900,6 +904,77 @@ if (NODE) {
 
 // handle Enter on setup input
 document.getElementById('node-url-input').addEventListener('keydown', e => { if(e.key==='Enter') connectNode(); });
+</script>
+
+<!-- ─── P2P Video Player Overlay ──────────────────────────────────── -->
+<div id="p2p-player-overlay" style="display:none;position:fixed;inset:0;z-index:500;background:#000;flex-direction:column">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:rgba(0,0,0,0.75)">
+    <span id="p2p-player-title" style="color:#fff;font-size:.9em;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:65vw"></span>
+    <div style="display:flex;align-items:center;gap:10px">
+      <span id="p2p-peer-badge" style="font-size:.65em;color:#00ff88;display:none">● P2P</span>
+      <button onclick="closeVideoPlayer()" style="background:none;border:none;color:#fff;font-size:1.3em;cursor:pointer;padding:4px">✕</button>
+    </div>
+  </div>
+  <video id="p2p-video" style="width:100%;flex:1;background:#000;object-fit:contain" controls playsinline webkit-playsinline></video>
+  <div style="padding:5px 14px;background:rgba(0,0,0,0.5);font-size:.65em;color:#555" id="p2p-stats-bar">Caricamento...</div>
+</div>
+
+<script>
+let _p2pHls = null, _p2pStatsInt = null
+
+async function openVideoPlayer(hlsUrl, title) {
+  closeVideoPlayer()
+  document.getElementById('p2p-player-overlay').style.display = 'flex'
+  document.getElementById('p2p-player-title').textContent = title || ''
+  document.getElementById('p2p-stats-bar').textContent = 'Connessione...'
+  const video = document.getElementById('p2p-video')
+
+  let trackers = ['wss://tracker.btorrent.xyz','wss://tracker.openwebtorrent.com']
+  try {
+    const cfg = await fetch((NODE||'') + '/api/v1/p2p/config').then(r=>r.json()).catch(()=>({}))
+    if (cfg.loader && cfg.loader.trackerAnnounce) trackers = cfg.loader.trackerAnnounce
+  } catch {}
+
+  if (typeof p2pml === 'undefined' || !p2pml.hlsjs || !Hls || !Hls.isSupported()) {
+    // Native HLS fallback (iOS Safari supports m3u8 natively)
+    video.src = hlsUrl
+    video.play().catch(()=>{})
+    document.getElementById('p2p-stats-bar').textContent = 'Streaming HTTP'
+    return
+  }
+
+  const engine = new p2pml.hlsjs.Engine({ loader: { trackerAnnounce: trackers, simultaneousP2PDownloads: 3, cachedSegmentsCount: 15 } })
+  _p2pHls = new Hls({ ...p2pml.hlsjs.Engine.getHlsConfig(engine) })
+  engine.on(p2pml.core.Events.PeerConnect, () => _updateBadge(engine))
+  engine.on(p2pml.core.Events.PeerClose,   () => _updateBadge(engine))
+  _p2pHls.loadSource(hlsUrl)
+  _p2pHls.attachMedia(video)
+  _p2pHls.on(Hls.Events.MANIFEST_PARSED, () => video.play().catch(()=>{}))
+  _p2pStatsInt = setInterval(() => _updateBadge(engine), 4000)
+}
+
+function _updateBadge(engine) {
+  try {
+    const st = engine.loader && engine.loader.getStats ? engine.loader.getStats() : null
+    const badge = document.getElementById('p2p-peer-badge')
+    const n = st ? (st.peersCount || 0) : 0
+    badge.style.display = n > 0 ? 'inline' : 'none'
+    badge.textContent = `● P2P · ${n}`
+    if (st) {
+      const p2p = ((st.p2pDownloadSpeed||0)/1024/1024*8).toFixed(1)
+      const http = ((st.httpDownloadSpeed||0)/1024/1024*8).toFixed(1)
+      document.getElementById('p2p-stats-bar').textContent = `P2P ${p2p} Mbit/s · HTTP ${http} Mbit/s · ${n} peers`
+    }
+  } catch {}
+}
+
+function closeVideoPlayer() {
+  if (_p2pHls) { try{_p2pHls.destroy()}catch{} _p2pHls=null }
+  if (_p2pStatsInt) { clearInterval(_p2pStatsInt); _p2pStatsInt=null }
+  const v = document.getElementById('p2p-video')
+  v.pause(); v.src=''
+  document.getElementById('p2p-player-overlay').style.display='none'
+}
 </script>
 </body>
 </html>
