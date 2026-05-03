@@ -2,10 +2,10 @@
  * H8 Coin (H8C) — M4TR1X Native Currency
  *
  * Rules (immutable after genesis):
- *   - Total supply:    21,000,000 H8C (hard cap, enforced in code)
- *   - Genesis alloc:    3,500,000 H8C → founder  (~16.6%, same ratio as Satoshi)
- *   - Network reserve: 17,500,000 H8C → distributed via node rewards
- *   - Decimals:        8 (smallest unit = 1 satoshi-equivalent = 0.00000001 H8C)
+ *   - Total supply:   100,000,000 H8C (hard cap)
+ *   - Alpha node:      50,000,000 H8C → founder pre-mint (alpha launch)
+ *   - Network reserve: 50,000,000 H8C → distributed via purchases & node rewards
+ *   - Decimals:        8 (smallest unit = 0.00000001 H8C)
  *   - Signing:         secp256k1 (same keypair as Nostr identity)
  *   - Model:           account-based ledger (address → balance in satoshis)
  *   - No inflation:    no new coins after genesis, ever
@@ -30,9 +30,9 @@ secp.hashes.sha256      = sha256
 secp.hashes.hmacSha256  = (k, ...msgs) => hmac(sha256, k, secp.etc.concatBytes(...msgs))
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-const TOTAL_SUPPLY_SAT  = 2_100_000_000_000_000n   // 21,000,000 H8C in satoshis
-const FOUNDER_ALLOC_SAT =   350_000_000_000_000n   //  3,500,000 H8C in satoshis
-const RESERVE_ALLOC_SAT = 1_750_000_000_000_000n   // 17,500,000 H8C in satoshis
+const TOTAL_SUPPLY_SAT  = 10_000_000_000_000_000n  // 100,000,000 H8C in satoshis
+const FOUNDER_ALLOC_SAT =  5_000_000_000_000_000n  //  50,000,000 H8C — alpha node pre-mint
+const RESERVE_ALLOC_SAT =  5_000_000_000_000_000n  //  50,000,000 H8C — network reserve (purchases + rewards)
 const DECIMALS          = 8
 const COIN              = 100_000_000n              // 1 H8C = 1e8 satoshis
 const GENESIS_VERSION   = 1

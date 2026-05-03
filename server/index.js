@@ -1321,6 +1321,97 @@ app.delete('/api/v1/wallet/:address', localhostOnly, (req, res) => {
   res.json({ ok: true })
 })
 
+// ─── Routes: H8 Shop (buy H8C) ────────────────────────────────────────────────
+
+const shop = require('./h8shop')
+
+// GET  /api/v1/shop/info  — prices + enabled payment methods (public)
+app.get('/api/v1/shop/info', (req, res) => {
+  const cfg = shop.loadConfig()
+  const methods = Object.entries(cfg.methods)
+    .filter(([, m]) => m.enabled)
+    .map(([key, m]) => ({ key, label: m.label, notes: m.notes }))
+  res.json({
+    price_eur:     cfg.price_eur,
+    price_usd:     cfg.price_usd,
+    price_btc:     cfg.price_btc,
+    min_order_h8c: cfg.min_order_h8c,
+    max_order_h8c: cfg.max_order_h8c,
+    methods,
+    symbol: 'H8C',
+  })
+})
+
+// POST /api/v1/shop/buy  — create purchase order
+// body: { method, amount_h8c, buyer_address }
+app.post('/api/v1/shop/buy', (req, res) => {
+  try {
+    const { method, amount_h8c, buyer_address } = req.body
+    if (!method || !amount_h8c || !buyer_address) return res.status(400).json({ error: 'method, amount_h8c, buyer_address required' })
+    const order = shop.createOrder({ buyerAddress: buyer_address, method, amountH8C: amount_h8c })
+    res.status(201).json(order)
+  } catch (err) {
+    res.status(400).json({ error: err.message })
+  }
+})
+
+// GET  /api/v1/shop/order/:id  — check order status
+app.get('/api/v1/shop/order/:id', (req, res) => {
+  const order = shop.getOrder(req.params.id)
+  if (!order) return res.status(404).json({ error: 'order not found' })
+  res.json(order)
+})
+
+// GET  /api/v1/shop/orders/:address  — all orders for a buyer address
+app.get('/api/v1/shop/orders/:address', (req, res) => {
+  const limit = parseInt(req.query.limit || '20')
+  res.json(shop.listOrders({ buyerAddress: req.params.address, limit }))
+})
+
+// ─── Admin: Shop management (localhost only) ──────────────────────────────────
+
+// GET  /api/v1/admin/shop/orders  — all orders with optional ?status= filter
+app.get('/api/v1/admin/shop/orders', localhostOnly, verifyAdminKey, (req, res) => {
+  const { status, limit = 100, offset = 0 } = req.query
+  res.json(shop.listOrders({ status, limit: parseInt(limit), offset: parseInt(offset) }))
+})
+
+// GET  /api/v1/admin/shop/stats
+app.get('/api/v1/admin/shop/stats', localhostOnly, verifyAdminKey, (req, res) => {
+  res.json(shop.shopStats())
+})
+
+// POST /api/v1/admin/shop/fulfill/:id  — mark paid, issue coins
+app.post('/api/v1/admin/shop/fulfill/:id', localhostOnly, verifyAdminKey, async (req, res) => {
+  try {
+    const result = await shop.fulfillOrder(req.params.id, req.body.notes || '')
+    res.json({ ok: true, ...result })
+  } catch (err) {
+    res.status(400).json({ error: err.message })
+  }
+})
+
+// POST /api/v1/admin/shop/cancel/:id
+app.post('/api/v1/admin/shop/cancel/:id', localhostOnly, verifyAdminKey, (req, res) => {
+  try {
+    res.json(shop.cancelOrder(req.params.id, req.body.reason || ''))
+  } catch (err) {
+    res.status(400).json({ error: err.message })
+  }
+})
+
+// PUT  /api/v1/admin/shop/config  — update prices + payment method details
+app.put('/api/v1/admin/shop/config', localhostOnly, verifyAdminKey, (req, res) => {
+  try {
+    const current = shop.loadConfig()
+    const updated = { ...current, ...req.body }
+    shop.saveConfig(updated)
+    res.json({ ok: true, config: updated })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
 // ─── Routes: Native Video Hosting (NIP-71) ────────────────────────────────────
 
 // Upload + transcode + publish (Nostr NIP-71 kind:34235)
