@@ -1016,7 +1016,6 @@ app.get('/api/v1/tracks', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
 
-<<<<<<< HEAD
 // ─── Content location — find which node has a given content ID ───────────────
 
 app.get('/api/v1/node/onion', (req, res) => {
@@ -1108,7 +1107,6 @@ app.post('/api/v1/music/upload', upload.single('audio'), async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
 
-=======
 // ─── Routes: Photo Posts (NIP-68 kind:20) ────────────────────────────────────
 
 // Upload + strip EXIF + store Blossom + publish Nostr kind:20
@@ -1184,6 +1182,143 @@ app.get('/api/v1/story/:id', (req, res) => {
   const s = story.getStory(req.params.id)
   if (!s) return res.status(404).json({ error: 'not found' })
   res.json(s)
+})
+
+// ─── Routes: H8 Coin (H8C) ────────────────────────────────────────────────────
+
+const coin   = require('./h8coin')
+const wallet = require('./h8wallet')
+
+// Auto-init genesis on startup (using node's Nostr privkey if genesis not yet created)
+;(async () => {
+  try {
+    coin.initCoinDb()
+    if (!coin.isGenesisCreated()) {
+      const keys = require('./nostr').loadSavedKeys()
+      if (keys && keys.privkey) {
+        await coin.createGenesis(keys.privkey)
+        console.log('[H8C] Genesis initialized from node identity key.')
+      } else {
+        console.log('[H8C] No keys found — genesis skipped. Generate Nostr identity first.')
+      }
+    }
+  } catch (err) {
+    if (err.message !== 'GENESIS_ALREADY_EXISTS') console.error('[H8C] Genesis init error:', err.message)
+  }
+})()
+
+// GET  /api/v1/coin/supply    — tokenomics overview
+app.get('/api/v1/coin/supply', (req, res) => {
+  const info = coin.getSupplyInfo()
+  if (!info) return res.status(503).json({ error: 'genesis not created yet' })
+  res.json(info)
+})
+
+// GET  /api/v1/coin/genesis   — genesis record (immutable)
+app.get('/api/v1/coin/genesis', (req, res) => {
+  const g = coin.getGenesisRecord()
+  if (!g) return res.status(503).json({ error: 'genesis not created' })
+  res.json(g)
+})
+
+// GET  /api/v1/coin/balance/:address
+app.get('/api/v1/coin/balance/:address', (req, res) => {
+  const satoshis = coin.getBalance(req.params.address)
+  res.json({ address: req.params.address, satoshis: String(satoshis), h8c: coin.formatH8C(satoshis) })
+})
+
+// GET  /api/v1/coin/tx/:txid
+app.get('/api/v1/coin/tx/:txid', (req, res) => {
+  const tx = coin.getTx(req.params.txid)
+  if (!tx) return res.status(404).json({ error: 'tx not found' })
+  res.json(tx)
+})
+
+// GET  /api/v1/coin/history/:address
+app.get('/api/v1/coin/history/:address', (req, res) => {
+  const limit = parseInt(req.query.limit || '50')
+  res.json(coin.getTxHistory(req.params.address, limit))
+})
+
+// GET  /api/v1/coin/rich-list
+app.get('/api/v1/coin/rich-list', (req, res) => {
+  const limit = Math.min(parseInt(req.query.limit || '20'), 100)
+  res.json(coin.getRichList(limit))
+})
+
+// POST /api/v1/coin/send   — sign + broadcast (privkey provided by caller; desktop/node use only)
+app.post('/api/v1/coin/send', async (req, res) => {
+  try {
+    const { from_privkey, to_address, amount_h8c, memo } = req.body
+    if (!from_privkey || !to_address || !amount_h8c) return res.status(400).json({ error: 'from_privkey, to_address, amount_h8c required' })
+    const amountSat = coin.parseH8C(String(amount_h8c))
+    const tx = await coin.createTransaction({ fromPrivkey: from_privkey, toAddress: to_address, amountSat, memo: memo || '' })
+    res.json({ ok: true, ...tx })
+  } catch (err) {
+    res.status(400).json({ error: err.message })
+  }
+})
+
+// ─── Routes: H8 Wallet ────────────────────────────────────────────────────────
+
+// POST /api/v1/wallet/generate   — create new wallet (mnemonic + encrypted key file)
+app.post('/api/v1/wallet/generate', (req, res) => {
+  try {
+    const { name = '', password } = req.body
+    if (!password) return res.status(400).json({ error: 'password required' })
+    const w = wallet.generateWallet()
+    wallet.saveWallet({ address: w.address, pubkey: w.pubkey, privkeyHex: w.privkeyHex, name }, password)
+    res.json({ address: w.address, pubkey: w.pubkey, mnemonic: w.mnemonic, path: w.path, name })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// POST /api/v1/wallet/import   — import from BIP39 mnemonic
+app.post('/api/v1/wallet/import', (req, res) => {
+  try {
+    const { mnemonic, name = '', password } = req.body
+    if (!mnemonic || !password) return res.status(400).json({ error: 'mnemonic and password required' })
+    const w = wallet.importWallet(mnemonic)
+    wallet.saveWallet({ address: w.address, pubkey: w.pubkey, privkeyHex: w.privkeyHex, name }, password)
+    res.json({ address: w.address, pubkey: w.pubkey, path: wallet.DERIV_PATH, name })
+  } catch (err) {
+    res.status(400).json({ error: err.message })
+  }
+})
+
+// GET  /api/v1/wallet/list
+app.get('/api/v1/wallet/list', (req, res) => {
+  res.json(wallet.listWallets())
+})
+
+// GET  /api/v1/wallet/balance/:address
+app.get('/api/v1/wallet/balance/:address', (req, res) => {
+  res.json(wallet.walletBalance(req.params.address))
+})
+
+// GET  /api/v1/wallet/history/:address
+app.get('/api/v1/wallet/history/:address', (req, res) => {
+  const limit = parseInt(req.query.limit || '50')
+  res.json(wallet.walletHistory(req.params.address, limit))
+})
+
+// POST /api/v1/wallet/send   — send using password-unlocked wallet
+app.post('/api/v1/wallet/send', async (req, res) => {
+  try {
+    const { address, password, to_address, amount_h8c, memo } = req.body
+    if (!address || !password || !to_address || !amount_h8c) return res.status(400).json({ error: 'address, password, to_address, amount_h8c required' })
+    const tx = await wallet.walletSend({ address, password, toAddress: to_address, amountH8C: amount_h8c, memo: memo || '' })
+    res.json({ ok: true, ...tx })
+  } catch (err) {
+    res.status(400).json({ error: err.message })
+  }
+})
+
+// DELETE /api/v1/wallet/:address  (localhost-only for safety)
+app.delete('/api/v1/wallet/:address', localhostOnly, (req, res) => {
+  wallet.deleteWallet(req.params.address)
+  res.json({ ok: true })
 })
 
 // ─── Routes: Native Video Hosting (NIP-71) ────────────────────────────────────
@@ -1278,7 +1413,6 @@ app.post('/admin/update-ios-manifest', localhostOnly, verifyAdminKey, (req, res)
 })
 app.get('/m', (req, res) => res.sendFile(path.join(mobilePath, 'index.html')))
 
->>>>>>> HEAD@{1}
 // Serve il frontend (HTML statico)
 // In production, Tauri passes the bundled frontend path via env var.
 // In dev, fall back to the local ../frontend directory.
@@ -1315,7 +1449,6 @@ function startServer(port = 8080) {
   setTimeout(() => startContentDiscovery(), 3000)
   return new Promise((resolve, reject) => {
     server = app.listen(port, '0.0.0.0', () => {
-<<<<<<< HEAD
       const { networkInterfaces } = require('os')
       const nets = networkInterfaces()
       const lan = Object.values(nets).flat().find(n => n.family === 'IPv4' && !n.internal)
@@ -1323,9 +1456,6 @@ function startServer(port = 8080) {
       if (lan) console.log(`[SERVER] Raggiungibile dalla rete: http://${lan.address}:${port}`)
       const onion = getOnionAddress()
       if (onion) console.log(`[SERVER] Indirizzo Tor: http://${onion}`)
-=======
-      console.log(`[SERVER] M4TR1X API in ascolto su http://localhost:${port}`)
->>>>>>> HEAD@{1}
       resolve(server)
     })
     server.on('error', reject)
