@@ -1,21 +1,22 @@
 /**
  * H8 Shop — H8C purchase system
  *
- * Supported payment methods (alpha):
- *   - BTC  on-chain  → manual address, admin confirms after block confirmation
- *   - Lightning      → BOLT11 invoice (requires LNbits or Core Lightning)
- *   - PayPal         → manual reference code, admin confirms
- *   - Bank / SEPA    → IBAN + reference, admin confirms
- *   - Crypto swap    → generic (ETH/USDT/etc.) — manual address per currency
+ * Manual methods (admin fulfills after payment):
+ *   - BTC  on-chain  → static address, 1-confirm rule
+ *   - Lightning      → BOLT11 via LNbits
+ *   - PayPal         → email + reference
+ *   - Bank / SEPA    → IBAN + reference
+ *   - USDT           → TRC-20 / ERC-20 address
  *
- * Flow:
- *   1. User posts /api/v1/shop/buy  { method, amount_h8c, buyer_address }
- *   2. Server creates order → returns payment instructions (address/IBAN/etc.)
- *   3. Buyer pays externally
- *   4. Admin calls /api/v1/admin/shop/fulfill/:orderId  (localhost-only)
- *   5. Server issues H8C from reserve → buyer wallet
+ * Automatic methods (Stripe webhook auto-fulfills):
+ *   - stripe → Visa, Mastercard, Apple Pay, Google Pay
  *
- * Pricing: admin sets price per H8C in EUR/USD/BTC via config endpoint.
+ * Stripe flow:
+ *   1. POST /api/v1/shop/buy { method:"stripe", amount_h8c, buyer_address }
+ *      → returns { order_id, client_secret, publishable_key }
+ *   2. Frontend uses Stripe.js / Payment Element to collect card
+ *   3. Stripe calls POST /api/v1/shop/stripe/webhook on success
+ *   4. Webhook auto-fulfills order → H8C issued to buyer_address
  */
 
 'use strict'
@@ -103,6 +104,15 @@ const DEFAULT_CONFIG = {
       label:   'USDT',
       notes:   'Send USDT to the address shown.',
     },
+    stripe: {
+      enabled: false,
+      secret_key:       '',   // sk_live_... or sk_test_...
+      publishable_key:  '',   // pk_live_... or pk_test_...
+      webhook_secret:   '',   // whsec_... from Stripe Dashboard → Webhooks
+      currency:         'eur',
+      label:   'Card / Apple Pay / Google Pay',
+      notes:   'Visa, Mastercard, Apple Pay, Google Pay. Instant settlement.',
+    },
   }
 }
 
@@ -126,6 +136,14 @@ function calcOrderPrice(amountH8C) {
     usd: (amt * cfg.price_usd).toFixed(2),
     btc: (amt * cfg.price_btc).toFixed(8),
   }
+}
+
+// ─── Stripe helper — lazy-init so missing key doesn't crash the server ────────
+function getStripe() {
+  const cfg = loadConfig()
+  const key = cfg.methods.stripe.secret_key
+  if (!key) throw new Error('STRIPE_NOT_CONFIGURED')
+  return require('stripe')(key)
 }
 
 // ─── Payment instructions per method ─────────────────────────────────────────
@@ -155,12 +173,92 @@ function buildPaymentInstructions(method, orderId, prices) {
     case 'usdt':
       if (!m.address) throw new Error('USDT_ADDRESS_NOT_CONFIGURED')
       return { ...base, address: m.address, network: m.network, amount_usd: prices.usd }
+    case 'stripe':
+      // PaymentIntent is created async — caller handles it separately via createStripeIntent()
+      return { ...base, publishable_key: m.publishable_key, currency: m.currency,
+               amount_eur: prices.eur, amount_usd: prices.usd,
+               info: 'Use the returned client_secret with Stripe.js to complete payment.' }
     default:
       throw new Error(`UNKNOWN_METHOD: ${method}`)
   }
 }
 
+// ─── Create Stripe PaymentIntent (called after order row is inserted) ─────────
+async function createStripeIntent(orderId, amountH8C, currency) {
+  const cfg     = loadConfig()
+  const prices  = calcOrderPrice(amountH8C)
+  const stripe  = getStripe()
+  const cur     = (currency || cfg.methods.stripe.currency || 'eur').toLowerCase()
+  const amount  = cur === 'usd' ? Math.round(parseFloat(prices.usd) * 100)
+                                : Math.round(parseFloat(prices.eur) * 100)  // cents
+
+  const intent = await stripe.paymentIntents.create({
+    amount,
+    currency: cur,
+    metadata: { order_id: orderId, h8c_amount: String(amountH8C) },
+    description: `H8 Coin — ${amountH8C} H8C (Order ${orderId})`,
+    payment_method_types: ['card'],   // Apple Pay + Google Pay auto-enabled via Payment Element
+  })
+
+  // Store intent ID so webhook can match it back to the order
+  getDb().prepare("UPDATE shop_orders SET payment_ref=? WHERE id=?").run(intent.id, orderId)
+
+  return { client_secret: intent.client_secret, intent_id: intent.id, amount, currency: cur }
+}
+
+// ─── Handle Stripe webhook event ─────────────────────────────────────────────
+async function handleStripeWebhook(rawBody, sigHeader) {
+  const cfg = loadConfig()
+  const m   = cfg.methods.stripe
+  if (!m.webhook_secret) throw new Error('WEBHOOK_SECRET_NOT_CONFIGURED')
+
+  const stripe = getStripe()
+  let event
+  try {
+    event = stripe.webhooks.constructEvent(rawBody, sigHeader, m.webhook_secret)
+  } catch (err) {
+    throw new Error(`WEBHOOK_SIGNATURE_INVALID: ${err.message}`)
+  }
+
+  if (event.type === 'payment_intent.succeeded') {
+    const intent  = event.data.object
+    const orderId = intent.metadata.order_id
+
+    if (!orderId) {
+      console.warn('[H8SHOP] Stripe webhook: no order_id in metadata', intent.id)
+      return { received: true, action: 'skipped' }
+    }
+
+    const order = getDb().prepare('SELECT * FROM shop_orders WHERE id=?').get(orderId)
+    if (!order) {
+      console.warn('[H8SHOP] Stripe webhook: order not found', orderId)
+      return { received: true, action: 'order_not_found' }
+    }
+    if (order.status === 'fulfilled') {
+      return { received: true, action: 'already_fulfilled' }
+    }
+
+    const txid = await fulfillOrder(orderId, `Stripe auto-fulfill (intent: ${intent.id})`)
+    console.log(`[H8SHOP] ✓ Stripe auto-fulfilled ${orderId} — tx: ${txid.fulfilled_tx}`)
+    return { received: true, action: 'fulfilled', order_id: orderId }
+  }
+
+  if (event.type === 'payment_intent.payment_failed') {
+    const intent  = event.data.object
+    const orderId = intent.metadata.order_id
+    if (orderId) {
+      getDb().prepare("UPDATE shop_orders SET status='failed', notes=? WHERE id=? AND status='pending'")
+        .run(`Stripe payment failed: ${intent.last_payment_error?.message || 'unknown'}`, orderId)
+    }
+    return { received: true, action: 'marked_failed' }
+  }
+
+  return { received: true, action: 'ignored' }
+}
+
 // ─── Create order ─────────────────────────────────────────────────────────────
+// Returns a plain object for manual methods.
+// For 'stripe', returns a Promise (caller must await) — includes client_secret.
 function createOrder({ buyerAddress, method, amountH8C }) {
   initShopDb()
   const cfg = loadConfig()
@@ -184,7 +282,20 @@ function createOrder({ buyerAddress, method, amountH8C }) {
 
   console.log(`[H8SHOP] Order ${orderId} — ${amt} H8C via ${method} — buyer: ${buyerAddress}`)
 
-  return { order_id: orderId, amount_h8c: String(amt), buyer_address: buyerAddress, created_at: now, status: 'pending', payment: instructions }
+  const base = { order_id: orderId, amount_h8c: String(amt), buyer_address: buyerAddress, created_at: now, status: 'pending', payment: instructions }
+
+  if (method === 'stripe') {
+    const cur = cfg.methods.stripe.currency || 'eur'
+    return createStripeIntent(orderId, amt, cur).then(intent => ({
+      ...base,
+      client_secret:   intent.client_secret,
+      publishable_key: cfg.methods.stripe.publishable_key,
+      stripe_amount:   intent.amount,
+      stripe_currency: intent.currency,
+    }))
+  }
+
+  return base
 }
 
 // ─── Fulfill order (admin only) ───────────────────────────────────────────────
@@ -258,4 +369,5 @@ module.exports = {
   listOrders,
   shopStats,
   calcOrderPrice,
+  handleStripeWebhook,
 }

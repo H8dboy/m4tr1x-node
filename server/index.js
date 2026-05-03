@@ -107,6 +107,18 @@ app.use(cors({
   allowedHeaders: ['X-Nostr-Pubkey', 'X-API-Key', 'X-Admin-Key', 'Content-Type'],
 }))
 
+// Stripe webhook needs raw body — register BEFORE express.json()
+app.post('/api/v1/shop/stripe/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+  try {
+    const shopMod = require('./h8shop')
+    const result  = await shopMod.handleStripeWebhook(req.body, req.headers['stripe-signature'])
+    res.json(result)
+  } catch (err) {
+    console.error('[STRIPE WEBHOOK]', err.message)
+    res.status(400).json({ error: err.message })
+  }
+})
+
 app.use(express.json())
 app.use(globalLimit)
 
@@ -1344,11 +1356,12 @@ app.get('/api/v1/shop/info', (req, res) => {
 
 // POST /api/v1/shop/buy  — create purchase order
 // body: { method, amount_h8c, buyer_address }
-app.post('/api/v1/shop/buy', (req, res) => {
+// For method=stripe also returns client_secret + publishable_key
+app.post('/api/v1/shop/buy', async (req, res) => {
   try {
     const { method, amount_h8c, buyer_address } = req.body
     if (!method || !amount_h8c || !buyer_address) return res.status(400).json({ error: 'method, amount_h8c, buyer_address required' })
-    const order = shop.createOrder({ buyerAddress: buyer_address, method, amountH8C: amount_h8c })
+    const order = await Promise.resolve(shop.createOrder({ buyerAddress: buyer_address, method, amountH8C: amount_h8c }))
     res.status(201).json(order)
   } catch (err) {
     res.status(400).json({ error: err.message })
