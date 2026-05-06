@@ -1,114 +1,158 @@
 <div align="center">
 
-# M4TR1X
+# m4tr1x-node
 
-[![Release](https://img.shields.io/github/v/release/H8dboy/m4tr1x-electron)](https://github.com/H8dboy/m4tr1x-electron/releases)
-[![License](https://img.shields.io/github/license/H8dboy/m4tr1x-electron)](LICENSE)
-[![Build](https://github.com/H8dboy/m4tr1x-electron/actions/workflows/build.yml/badge.svg)](https://github.com/H8dboy/m4tr1x-electron/actions)
+[![License](https://img.shields.io/github/license/H8dboy/m4tr1x-node)](LICENSE)
+
+**The self-hosted backend that powers the M4TR1X network.**
 
 </div>
 
-M4TR1X is a decentralized social network. It runs on a network of community nodes — regular computers that anyone can set up — with no central server, no company behind it, and no algorithm deciding what you see.
+---
 
-You create one account. With that account you can post text, upload videos, share music, write in forums, send encrypted messages, and sell things — all in the same place. Your identity is tied to a cryptographic key that only you control, not to an email address or a phone number registered with a platform.
+## Why this exists
 
-Content lives on nodes, not on a datacenter. When you upload a video it goes to a node on the M4TR1X network and stays there. Node operators earn 30% of every tip that passes through their node automatically.
+When regulators want to enforce identity verification on a social platform, they send a letter to the company that runs the servers. M4TR1X has no such company and no such servers — only nodes run by individuals.
 
-The tipping currency is the H8 token — a closed utility token that only exists inside M4TR1X. Tipping costs something, so signal beats spam without needing a moderation team.
+The EU's push toward mandatory identity verification for social platforms — through the DSA, age verification proposals, and digital identity schemes — assumes that social infrastructure has a center: a company, a server, a database to hand over. m4tr1x-node is designed to have none of those things. Anyone can run one. No one owns the network.
 
-The network runs over Tor by default. If you are on a censored network, M4TR1X detects it and routes through Tor automatically.
+Every node that comes online makes the network more resilient and harder to disable by targeting a single point. Running a node is not just using the network — it is the network.
 
 ---
 
-## What you need to know before running it
+## What a node does
 
-**This is a Developer Preview (v2.3.0).** It is stable enough to self-host and contribute to. It is not yet recommended for high-risk use cases.
+A M4TR1X node is a self-hosted backend that:
 
-Every account uses ML-DSA65 post-quantum signatures (NIST FIPS-204). Your private key is encrypted on disk with AES-256-GCM. There is no account recovery if you lose your password — keep it safe.
+- Runs a **Nostr relay** — receives and stores signed events (posts, messages, metadata) from users
+- Runs a **Blossom blob store** — stores binary content (videos, photos, music) addressed by SHA-256 hash
+- Serves **HLS video streams** — transcodes and segments video for playback
+- Hosts **photo and story posts** — stores and serves image content for feeds and stories
+- Runs the **AI detector** — on-node inference to flag AI-generated video content
+
+All content is stored locally on the node operator's machine. There is no central storage. Content is replicated across nodes according to demand.
+
+---
+
+## Node operator economics
+
+Node operators earn **30% of every tip** that passes through their node, paid automatically in H8 tokens at the time of the transaction. No invoicing, no dashboard, no withdrawal request.
+
+---
+
+## Requirements
+
+- Node.js 18+
+- ffmpeg (for HLS transcoding)
+- Minimum 20 GB disk space (more is better)
+- A static IP or dynamic DNS (recommended for public-facing nodes)
 
 ---
 
 ## Install
 
-Download the binary for your OS from [Releases](https://github.com/H8dboy/m4tr1x-electron/releases/latest) and run it. Verify the SHA-256 against `checksums-*.txt` before running.
+```bash
+git clone https://github.com/H8dboy/m4tr1x-node.git
+cd m4tr1x-node
+npm install
+cp .env.example .env
+```
 
-Supported: Windows, macOS (Intel + Apple Silicon), Linux (Debian/Ubuntu).
+Edit `.env`:
 
-## Build from source
+```env
+NODE_PORT=3000
+STORAGE_PATH=./data
+TOR_ENABLED=true
+FOUNDER_PUBKEY=<founder_pubkey>
+NODE_PRIVKEY=<your_node_keypair_privkey>
+```
+
+Start:
 
 ```bash
-git clone https://github.com/H8dboy/m4tr1x-electron.git
-cd m4tr1x-electron
-npm install
-cd server && npm install && cd ..
-cp .env.example .env
 npm start
 ```
 
-The app runs at `http://localhost:8080/app`.
+The node will announce itself to the network and begin accepting connections.
 
-## Run a node
-
-Anyone can run a node. A node stores content (videos, music, posts) locally and makes it available to the network. Node operators earn 30% of tips automatically.
-
-See [docs/NODE_OPERATOR.md](docs/NODE_OPERATOR.md) for setup instructions.
+---
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────┐
-│  Electron main process                      │
-│    │  - CSP enforcement                     │
-│    │  - Sandboxed renderer (Chromium)       │
-│    │  - Tor SOCKS5 auto-detection           │
-│    │  - Starts Express server in-process    │
-│    ▼                                        │
-│  http://127.0.0.1:8080  (Express API)       │
-│    │                                        │
-│    ├── h8identity.js   ML-DSA65 keypairs    │
-│    ├── h8token.js      Hash-chain ledger    │
-│    ├── relay.js        Embedded relay :4848 │
-│    ├── peertube.js     Local video storage  │
-│    ├── mastodon.js     Local forum storage  │
-│    ├── funkwhale.js    Local music storage  │
-│    ├── crowdtrain.js   Distributed labels   │
-│    ├── ai_detector.js  ONNX deepfake detect │
-│    ├── tor.js          SOCKS5 auto-detect   │
-│    └── node_manager.js Node discovery       │
-│                                             │
-│  ws://0.0.0.0:4848  (M4TR1X relay)          │
-│    └── accessible to M4TR1X peers only      │
-└─────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────┐
+│                  m4tr1x-node                     │
+│                                                  │
+│  ┌─────────────┐  ┌──────────────────────────┐  │
+│  │ Nostr Relay │  │   Blossom Blob Store     │  │
+│  │ (WebSocket) │  │  (SHA-256 addressed)     │  │
+│  └──────┬──────┘  └────────────┬─────────────┘  │
+│         │                      │                 │
+│  ┌──────▼──────────────────────▼─────────────┐  │
+│  │              Express API                  │  │
+│  │  HLS transcoder │ Photo/story handler     │  │
+│  │  Tip processor  │ AI detector bridge      │  │
+│  └───────────────────────────────────────────┘  │
+│                                                  │
+│  ┌──────────────────────────────────────────┐   │
+│  │           Tor Hidden Service             │   │
+│  │  (automatic if TOR_ENABLED=true)         │   │
+│  └──────────────────────────────────────────┘   │
+└──────────────────────────────────────────────────┘
 ```
 
-Full details in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+---
 
-## Tokenomics
+## Modules
 
-H8 is a utility token that only works inside M4TR1X, similar to how Twitch Bits work inside Twitch. You cannot trade it on exchanges. Minting is controlled by the founder key. The full model is documented in [docs/TOKENOMICS.md](docs/TOKENOMICS.md).
+| Module | Description |
+|--------|-------------|
+| `relay/` | Nostr relay — stores and forwards signed events |
+| `blossom/` | Blob store — content addressed by SHA-256 |
+| `hls/` | Video transcoding and segmented streaming |
+| `media/` | Photo and story post handler |
+| `ai-detector/` | Bridge to [m4tr1x-ai-detector](https://github.com/H8dboy/m4tr1x-ai-detector) |
+| `tips/` | H8 token tip processing and operator payout |
+| `tor/` | Tor hidden service management |
 
-## Roadmap
+---
 
-**v2.3.0** — Developer Preview. First public node live.
+## Security
 
-**v2.3.1** — Upload access restricted to verified M4TR1X accounts.
+- Node identity: **ML-DSA-65 keypair** (NIST FIPS-204)
+- All content verified by **SHA-256 hash** before storage
+- Nostr events validated against cryptographic signatures before relay
+- No user credentials stored on the node — identity lives on the client
 
-**v2.4** — Public Beta. Onboarding wizard, DSA compliance reporting, mobile builds (Android/iOS).
+---
 
-**v3.0** — Independent security audit, multi-language UI, full-disk encryption integration.
+## Tor routing
+
+Enabled by default. On startup the node creates a Tor hidden service and publishes its `.onion` address to the network. Clients on censored networks route through Tor automatically. Disable with `TOR_ENABLED=false` in `.env`.
+
+---
+
+## Connecting the desktop app
+
+Once your node is running, open the M4TR1X desktop app ([m4tr1x-electron](https://github.com/H8dboy/m4tr1x-electron)) and add your node address under Settings → Nodes.
+
+---
+
+## Full documentation
+
+See [`docs/NODE_OPERATOR.md`](docs/NODE_OPERATOR.md) for the complete setup guide including firewall configuration, storage management, and performance tuning.
+
+---
 
 ## Contributing
 
 Read [CONTRIBUTING.md](CONTRIBUTING.md). Security issues go to [SECURITY.md](SECURITY.md).
 
-## License
-
-MIT. See [LICENSE](LICENSE).
-
 ---
 
-<div align="center">
+## License
 
-Built by [@H8dboy](https://github.com/H8dboy) — Brescia, Italy 🇮🇹
+MIT — see [LICENSE](LICENSE).
 
-</div>
+Part of the [M4TR1X project](https://github.com/H8dboy/m4tr1x-electron) — built by [@H8dboy](https://github.com/H8dboy) — Brescia, Italy
