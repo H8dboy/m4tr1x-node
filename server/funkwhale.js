@@ -1,18 +1,15 @@
 /**
  * M4TR1X - Music Module
  *
- * Priority: local node → other m4tr1x nodes → external Funkwhale instances
+ * Local node first, then other m4tr1x nodes. No external instances.
  */
 
 const path     = require('path')
 const fs       = require('fs')
-const https    = require('https')
-const http     = require('http')
 const { v4: uuidv4 } = require('uuid')
 const db       = require('./db')
 const nodeMgr  = require('./node_manager')
 
-// ─── Wire format ──────────────────────────────────────────────────────────────
 function trackToWire(t, nodeUrl = 'local') {
   const isLocal = nodeUrl === 'local'
   return {
@@ -35,103 +32,36 @@ function trackToWire(t, nodeUrl = 'local') {
   }
 }
 
-function externalTrackToWire(t, instance) {
-  return {
-    id:         t.id,
-    instance,
-    title:      t.title,
-    duration:   t.duration,
-    position:   null,
-    stream_url: t.listen_url || `https://${instance}/api/v1/listen/${t.id}/`,
-    cover:      t.album?.cover?.urls?.original || null,
-    artist:     { id: t.artist?.id, instance, name: t.artist?.name, url: t.artist?.url },
-    album:      t.album ? { id: t.album.id, instance, title: t.album.title } : null,
-    tags:       (t.tags || []).map(tag => tag.name || tag),
-    license:    t.license,
-    created_at: t.creation_date,
-    listen_url: t.listen_url || `https://${instance}/api/v1/listen/${t.id}/`,
-    local:      false,
-    m4tr1x:     false,
-    uploader:   t.artist?.name,
-  }
-}
-
-// ─── External Funkwhale fetch ─────────────────────────────────────────────────
-function fetchExternal(url, timeoutMs = 6000) {
-  return new Promise((resolve, reject) => {
-    const req = https.get(url, { headers: { 'User-Agent': 'M4TR1X-Node/2.0' } }, res => {
-      let raw = ''
-      res.on('data', d => { raw += d })
-      res.on('end', () => { try { resolve(JSON.parse(raw)) } catch { reject(new Error('Invalid JSON')) } })
-    })
-    req.setTimeout(timeoutMs, () => { req.destroy(); reject(new Error('timeout')) })
-    req.on('error', reject)
-  })
-}
-
-async function fetchExternalTracks(instance, query = null, limit = 20) {
-  try {
-    const base = `https://${instance}/api/v2/tracks/?page_size=${limit}&ordering=-creation_date`
-    const url  = query ? `${base}&q=${encodeURIComponent(query)}` : base
-    const data = await fetchExternal(url)
-    return (data.results || []).map(t => externalTrackToWire(t, instance))
-  } catch {
-    return []
-  }
-}
-
-// ─── Federation: fetch from other m4tr1x nodes ───────────────────────────────
 async function fetchFromM4tr1xNodes(query = null, limit = 20) {
-  const path = query
+  const apiPath = query
     ? `/api/v1/music/tracks?q=${encodeURIComponent(query)}&limit=${limit}`
     : `/api/v1/music/tracks?limit=${limit}`
-  const results = await nodeMgr.fetchFromNodes('music', path)
+  const results = await nodeMgr.fetchFromNodes('music', apiPath)
   return results.flatMap(({ node, data }) => {
     const tracks = Array.isArray(data) ? data : (data.results || [])
     return tracks.map(t => ({ ...t, instance: node.nodeUrl, m4tr1x: true, local: false }))
   })
 }
 
-// ─── Public API ───────────────────────────────────────────────────────────────
 async function getRecentTracks(instance, limit = 30) {
-  // 1. local
-  const local = db.getTracks({ limit }).map(t => trackToWire(t, 'local'))
-  // 2. other m4tr1x nodes
+  const local   = db.getTracks({ limit }).map(t => trackToWire(t, 'local'))
   const network = await fetchFromM4tr1xNodes(null, limit)
-  // 3. external as fallback only if we have fewer than limit results
-  const combined = [...local, ...network]
-  if (combined.length < limit && instance && instance !== 'local') {
-    const ext = await fetchExternalTracks(instance, null, limit - combined.length)
-    combined.push(...ext)
-  }
-  return combined.slice(0, limit)
+  return [...local, ...network].slice(0, limit)
 }
 
 async function searchTracks(query, instances = [], limit = 20) {
   const local   = db.searchTracks(query, limit).map(t => trackToWire(t, 'local'))
   const network = await fetchFromM4tr1xNodes(query, limit)
-  const combined = [...local, ...network]
-  if (combined.length < limit) {
-    const externalResults = await Promise.allSettled(
-      (instances || [])
-        .filter(i => i && i !== 'local')
-        .map(i => fetchExternalTracks(i, query, limit))
-    )
-    externalResults
-      .filter(r => r.status === 'fulfilled')
-      .forEach(r => combined.push(...r.value))
-  }
-  // deduplicate by id
   const seen = new Set()
-  return combined.filter(t => { if (seen.has(t.id)) return false; seen.add(t.id); return true }).slice(0, limit)
+  return [...local, ...network]
+    .filter(t => { if (seen.has(t.id)) return false; seen.add(t.id); return true })
+    .slice(0, limit)
 }
 
-async function getRecentAlbums(instance, limit = 20) {
-  return []
-}
+async function getRecentAlbums(instance, limit = 20) { return [] }
 
 async function getArtist(instance, artistId) {
-  return { id: artistId, instance: instance || 'local', name: artistId, albums: [] }
+  return { id: artistId, instance: 'local', name: artistId, albums: [] }
 }
 
 async function getAlbumTracks(instance, albumId) {
@@ -143,9 +73,7 @@ function getStreamUrl(instance, id) {
   return `${instance}/api/v1/music/stream/${id}`
 }
 
-async function getChannels(instance, limit = 20) {
-  return []
-}
+async function getChannels(instance, limit = 20) { return [] }
 
 async function discoverInstances() {
   const nodes = nodeMgr.discoverNodes('music')
