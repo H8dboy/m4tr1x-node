@@ -254,6 +254,64 @@ body::before {
 .sact-label { font-size:0.42em; color:rgba(255,255,255,0.55); letter-spacing:1px }
 .label-stats-panel { font-size:0.42em; color:var(--green); text-align:center; letter-spacing:1px; line-height:1.4; max-width:40px }
 
+/* ── Label buttons LEFT side ─────────────────────────────────────────────── */
+.slide-labels {
+  position:absolute; left:10px; bottom:120px;
+  display:flex; flex-direction:column; align-items:center; gap:10px; z-index:4;
+}
+.slbl {
+  display:flex; flex-direction:column; align-items:center; gap:3px;
+  cursor:pointer; transition:0.15s;
+}
+.slbl:active { transform:scale(0.82) }
+.slbl-icon {
+  width:42px; height:42px; border-radius:12px;
+  display:flex; align-items:center; justify-content:center;
+  font-size:1.1em; font-weight:700; transition:0.2s;
+  backdrop-filter:blur(12px);
+}
+.slbl-text { font-size:0.42em; letter-spacing:2px; font-family:monospace }
+
+/* REALE — verde */
+.real-lbl .slbl-icon {
+  background:rgba(0,255,136,0.08);
+  border:1.5px solid rgba(0,255,136,0.45);
+  color:#00ff88;
+  box-shadow:0 0 10px rgba(0,255,136,0.2), inset 0 0 8px rgba(0,255,136,0.05);
+}
+.real-lbl .slbl-text { color:rgba(0,255,136,0.8) }
+.real-lbl:hover .slbl-icon {
+  background:rgba(0,255,136,0.18);
+  box-shadow:0 0 22px rgba(0,255,136,0.55), inset 0 0 12px rgba(0,255,136,0.1);
+  transform:scale(1.1);
+}
+.slbl.label-voted-real .slbl-icon {
+  background:rgba(0,255,136,0.22);
+  box-shadow:0 0 28px rgba(0,255,136,0.7), inset 0 0 16px rgba(0,255,136,0.15);
+}
+
+/* AI — arancio→rosso */
+.ai-lbl .slbl-icon {
+  background:rgba(255,120,0,0.08);
+  border:1.5px solid rgba(255,140,0,0.5);
+  color:#ff8c00;
+  box-shadow:0 0 10px rgba(255,100,0,0.2), inset 0 0 8px rgba(255,100,0,0.05);
+}
+.ai-lbl .slbl-text { color:rgba(255,140,0,0.8) }
+.ai-lbl:hover .slbl-icon {
+  background:rgba(255,68,85,0.18);
+  border-color:#ff4455;
+  color:#ff4455;
+  box-shadow:0 0 22px rgba(255,68,85,0.55), inset 0 0 12px rgba(255,68,85,0.1);
+  transform:scale(1.1);
+}
+.slbl.label-voted-ai .slbl-icon {
+  background:rgba(255,68,85,0.22);
+  border-color:#ff4455;
+  color:#ff4455;
+  box-shadow:0 0 28px rgba(255,68,85,0.7), inset 0 0 16px rgba(255,68,85,0.15);
+}
+
 /* Heart pop */
 @keyframes heartPop {
   0%   { transform:translate(-50%,-50%) scale(0.3); opacity:1 }
