@@ -171,18 +171,54 @@ function locateContent(id) {
 
 function startContentDiscovery() {
   const since = Math.floor(Date.now() / 1000) - 1800  // last 30 min
-  subscribeToFilter([{ kinds: [1], '#t': ['m4tr1x-content'], since }], ev => {
-    try {
-      const data = JSON.parse(ev.content)
-      if (!data.id || !data.node) return
-      contentRegistry.set(data.id, { nodeUrl: data.node, nodeName: data.nodeName, ts: Date.now() })
-    } catch {}
-  }).catch(() => {})
+  try {
+    subscribeToFilter({ kinds: [1], '#t': ['m4tr1x-content'], since }, ev => {
+      try {
+        const data = JSON.parse(ev.content)
+        if (!data.id || !data.node) return
+        contentRegistry.set(data.id, { nodeUrl: data.node, nodeName: data.nodeName, ts: Date.now() })
+      } catch {}
+    })
+  } catch {}
 }
 
 // Returns the private node URL for shop/crypto calls
 function getPrivateNodeUrl() {
   return PRIVATE_NODE_URL
+}
+
+// ─── Query another m4tr1x node's API ─────────────────────────────────────────
+async function queryNode(nodeUrl, apiPath, timeoutMs = 5000) {
+  const https  = require('https')
+  const http   = require('http')
+  const url    = new URL(apiPath, nodeUrl)
+  const proto  = url.protocol === 'https:' ? https : http
+  return new Promise((resolve, reject) => {
+    const req = proto.get(url.toString(), { headers: { 'x-m4tr1x-node': '1' } }, res => {
+      let raw = ''
+      res.on('data', d => { raw += d })
+      res.on('end', () => {
+        try { resolve(JSON.parse(raw)) }
+        catch { reject(new Error('Invalid JSON from node')) }
+      })
+    })
+    req.setTimeout(timeoutMs, () => { req.destroy(); reject(new Error('Node timeout')) })
+    req.on('error', reject)
+  })
+}
+
+// ─── Fetch content from all m4tr1x nodes with a given capability ──────────────
+async function fetchFromNodes(capability, apiPath) {
+  const nodes   = discoverNodes(capability)
+  const local   = getLocalUrl()
+  const results = await Promise.allSettled(
+    nodes
+      .filter(n => n.nodeUrl && n.nodeUrl !== local)
+      .map(n => queryNode(n.nodeUrl, apiPath).then(data => ({ node: n, data })))
+  )
+  return results
+    .filter(r => r.status === 'fulfilled')
+    .map(r => r.value)
 }
 
 module.exports = {
@@ -198,5 +234,7 @@ module.exports = {
   getNodeConfig,
   pickNode,
   getPrivateNodeUrl,
+  queryNode,
+  fetchFromNodes,
   VALID_CAPS: [...VALID_CAPS],
 }
