@@ -338,7 +338,7 @@
           <div class="field"><label>Genre / Style</label><input type="text" id="up-music-genre" placeholder="rap / ambient / punk / jazz..."></div>
         </div>
         <div class="field"><label>Tags (space separated)</label><input type="text" id="up-tags" placeholder="evidence underground indie"></div>
-        <div class="field"><label>Blossom Server</label><select id="up-server"><option value="http://localhost:8080/blossom">M4TR1X Node (local)</option></select></div>
+        <div class="field"><label>Blossom Server</label><select id="up-server"><option value="/blossom">M4TR1X Node (local)</option></select></div>
         <div id="up-progress"><div class="prog-bar"><div class="prog-fill" id="prog-fill"></div></div><div class="prog-txt" id="prog-txt">Preparing...</div></div>
         <button class="btn-pub" id="btn-pub" onclick="doUpload()" disabled>PUBLISH ON M4TR1X</button>
       </div>
@@ -759,7 +759,7 @@
     relays: ['ws://localhost:4848','ws://fcicneomtw4mihstawh6spu6f6lpxo6m4dxu276hm3q5nqmdaod4jyqd.onion:4848'],
 
     // Blossom servers
-    blossom: {'M4TR1X Node':'http://localhost:8080/blossom'}
+    blossom: {'M4TR1X Node':'/blossom'}
   };
 
   // ========== DM ENCRYPTION ENGINE ==========
@@ -1801,11 +1801,11 @@
     try {
       const r = await fetch('/api/v1/train/vote', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ videoHash, voterPubkey: S.pubkey, label, confidence: 1.0 })
+        headers: { 'Content-Type': 'application/json', 'X-Nostr-Pubkey': S.pubkey },
+        body: JSON.stringify({ videoHash, label, confidence: 1.0 })
       });
       const data = await r.json();
-      if (data.ok || data.vote) {
+      if (data.success || data.ok || data.vote) {
         if (rBtn) rBtn.className = 'sact label-real-act' + (label === 'REAL' ? ' label-voted-real' : '');
         if (aBtn) aBtn.className = 'sact label-ai-act' + (label === 'AI_GENERATED' ? ' label-voted-ai' : '');
         toast(label === 'REAL' ? '\u2705 LABELED: REAL' : '\u26A0\uFE0F LABELED: AI');
@@ -2822,7 +2822,18 @@
   function broadcast(ev){Object.values(ws).forEach(r=>{if(r.ok&&r.w.readyState===1)r.w.send(JSON.stringify(['EVENT',ev]))})}
 
   // UTILS
-  function shareEv(eid){navigator.clipboard.writeText('https://snort.social/e/'+eid).then(()=>toast('LINK COPIED'))}
+  function shareEv(eid){
+    const link = window.location.origin + '/?e=' + eid;
+    if(navigator.clipboard && window.isSecureContext){
+      navigator.clipboard.writeText(link).then(()=>toast('🔗 LINK COPIATO')).catch(()=>_sharePrompt(link));
+    } else { _sharePrompt(link); }
+  }
+  function _sharePrompt(link){
+    const box=document.createElement('div');
+    box.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.78);z-index:9999;display:flex;align-items:center;justify-content:center';
+    box.innerHTML='<div style="background:#0d0d0d;border:1px solid rgba(0,255,136,0.3);border-radius:14px;padding:22px;max-width:88vw;text-align:center"><div style="font-family:monospace;font-size:0.68em;color:#00ff88;letter-spacing:2px;margin-bottom:12px">🔗 COPIA IL LINK</div><input readonly value="'+link+'" onclick="this.select()" style="width:100%;background:rgba(0,255,136,0.07);border:1px solid rgba(0,255,136,0.2);color:#fff;padding:8px 10px;border-radius:8px;font-size:0.72em;font-family:monospace;margin-bottom:14px"><br><button onclick="this.closest(\'div\').parentElement.remove()" style="background:none;border:1px solid rgba(255,255,255,0.18);color:rgba(255,255,255,0.7);padding:6px 20px;border-radius:8px;cursor:pointer;font-size:0.68em;letter-spacing:1px">CHIUDI</button></div>';
+    document.body.appendChild(box);
+  }
 
   // ========== HIGHLIGHTS ==========
   let _hlPk = null;

@@ -220,36 +220,39 @@ body::before {
 
 /* Slide actions (right col) */
 .slide-actions {
-  position:absolute; right:12px; bottom:92px;
-  display:flex; flex-direction:column; align-items:center; gap:16px; z-index:4;
+  position:absolute; right:10px; bottom:88px;
+  display:flex; flex-direction:column; align-items:center; gap:8px; z-index:4;
 }
 .sact {
-  display:flex; flex-direction:column; align-items:center; gap:4px;
+  display:flex; flex-direction:column; align-items:center; gap:3px;
   cursor:pointer; transition:0.15s;
 }
-.sact:active { transform:scale(0.82) }
+.sact:active { transform:scale(0.80) }
 .sact-icon {
-  width:48px; height:48px; border-radius:50%;
-  background:rgba(0,0,0,0.38); backdrop-filter:blur(10px);
-  border:1.5px solid rgba(255,255,255,0.18);
+  width:36px; height:36px; border-radius:50%;
+  background:rgba(0,0,0,0.45); backdrop-filter:blur(12px);
+  border:1px solid rgba(255,255,255,0.14);
   display:flex; align-items:center; justify-content:center;
-  font-size:1.25em; transition:0.2s;
+  font-size:0.95em; transition:0.2s;
 }
 .sact:hover .sact-icon {
   border-color:var(--green);
-  box-shadow:0 0 18px rgba(0,255,136,0.35); transform:scale(1.1);
+  box-shadow:0 0 12px rgba(0,255,136,0.3); transform:scale(1.12);
 }
-.sact.h8-tip-act:hover .sact-icon {
-  border-color:var(--pink); box-shadow:0 0 18px rgba(255,34,119,0.45);
-}
-.sact-label { font-size:0.5em; color:rgba(255,255,255,0.65); letter-spacing:1px }
-
-.sact.label-real-act:hover .sact-icon { border-color:#00ff88; box-shadow:0 0 14px rgba(0,255,136,0.5) }
-.sact.label-ai-act:hover  .sact-icon { border-color:var(--red); box-shadow:0 0 14px rgba(255,68,85,0.5) }
-.sact.label-voted-real .sact-icon { border-color:#00ff88; box-shadow:0 0 10px rgba(0,255,136,0.55); background:rgba(0,255,136,0.18) }
-.sact.label-voted-ai   .sact-icon { border-color:var(--red);  box-shadow:0 0 10px rgba(255,68,85,0.55);  background:rgba(255,68,85,0.18) }
-.bkm-active .sact-icon { color:var(--yellow); text-shadow:0 0 8px var(--yellow) }
-.label-stats-panel { font-size:0.47em; color:var(--green); text-align:center; letter-spacing:1px; line-height:1.4; max-width:52px }
+/* colori specifici per tipo */
+.sact.h8-tip-act .sact-icon   { border-color:rgba(255,34,119,0.35) }
+.sact.h8-tip-act:hover .sact-icon { border-color:var(--pink); box-shadow:0 0 12px rgba(255,34,119,0.4) }
+.sact.boost-act .sact-icon    { border-color:rgba(255,209,102,0.3) }
+.sact.boost-act:hover .sact-icon { border-color:var(--yellow); box-shadow:0 0 12px rgba(255,209,102,0.4) }
+.sact.label-real-act .sact-icon  { border-color:rgba(0,255,136,0.25) }
+.sact.label-real-act:hover .sact-icon { border-color:#00ff88; box-shadow:0 0 12px rgba(0,255,136,0.4) }
+.sact.label-ai-act .sact-icon    { border-color:rgba(255,68,85,0.25) }
+.sact.label-ai-act:hover .sact-icon  { border-color:var(--red); box-shadow:0 0 12px rgba(255,68,85,0.4) }
+.sact.label-voted-real .sact-icon { border-color:#00ff88; box-shadow:0 0 8px rgba(0,255,136,0.5); background:rgba(0,255,136,0.15) }
+.sact.label-voted-ai   .sact-icon { border-color:var(--red); box-shadow:0 0 8px rgba(255,68,85,0.5); background:rgba(255,68,85,0.15) }
+.bkm-active .sact-icon { color:var(--yellow); text-shadow:0 0 6px var(--yellow) }
+.sact-label { font-size:0.42em; color:rgba(255,255,255,0.55); letter-spacing:1px }
+.label-stats-panel { font-size:0.42em; color:var(--green); text-align:center; letter-spacing:1px; line-height:1.4; max-width:40px }
 
 /* Heart pop */
 @keyframes heartPop {
