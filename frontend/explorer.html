@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>M4TR1X — Explorer</title>
+  <style>
+    :root {
+      --green: #00ff88;
+      --green-dark: rgba(0,255,136,0.25);
+      --yellow: #ffc832;
+      --red: #ff2277;
+      --bg: #000;
+      --surface: #0a0a0a;
+      --surface2: #111;
+      --border: rgba(0,255,136,0.12);
+      --text: #e8e8e8;
+      --text-muted: rgba(255,255,255,0.35);
+      --font-mono: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0 }
+    body { background: var(--bg); color: var(--text); font-family: var(--font-mono); min-height: 100vh; }
+
+    header {
+      border-bottom: 1px solid var(--border);
+      padding: 20px 24px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    header a { text-decoration: none; color: var(--green); font-size: 0.72em; letter-spacing: 2px; opacity: 0.7 }
+    header a:hover { opacity: 1 }
+    .logo { font-size: 1.1em; letter-spacing: 4px; color: var(--green); text-shadow: 0 0 20px rgba(0,255,136,0.4) }
+    .logo span { color: var(--text-muted) }
+    .live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 8px var(--green); animation: pulse 2s infinite; margin-left: auto }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+    .container { max-width: 1100px; margin: 0 auto; padding: 32px 24px }
+
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 32px }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 20px;
+      position: relative;
+      overflow: hidden;
+    }
+    .card::before { content:''; position:absolute; inset:0; background:linear-gradient(135deg,rgba(0,255,136,0.03),transparent); pointer-events:none }
+    .card-label { font-size: 0.5em; letter-spacing: 3px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 10px }
+    .card-value { font-size: 2em; color: var(--green); letter-spacing: -1px; line-height: 1 }
+    .card-value.yellow { color: var(--yellow) }
+    .card-value.red { color: var(--red) }
+    .card-sub { font-size: 0.5em; color: var(--text-muted); margin-top: 6px; letter-spacing: 1px }
+
+    .section { margin-bottom: 32px }
+    .section-title { font-size: 0.55em; letter-spacing: 4px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 14px; padding-bottom: 8px; border-bottom: 1px solid var(--border) }
+
+    .alloc-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.04) }
+    .alloc-label { font-size: 0.6em; color: var(--text-muted); letter-spacing: 2px; width: 100px; flex-shrink: 0 }
+    .alloc-bar-wrap { flex: 1; height: 4px; background: rgba(255,255,255,0.06); border-radius: 2px; overflow: hidden }
+    .alloc-bar { height: 100%; border-radius: 2px; transition: width 1s ease }
+    .alloc-amount { font-size: 0.6em; color: var(--text); width: 120px; text-align: right; flex-shrink: 0 }
+    .alloc-pct { font-size: 0.5em; color: var(--text-muted); width: 40px; text-align: right; flex-shrink: 0 }
+
+    .recent-table { width: 100%; border-collapse: collapse; font-size: 0.55em }
+    .recent-table th { text-align: left; color: var(--text-muted); letter-spacing: 2px; padding: 6px 10px; border-bottom: 1px solid var(--border) }
+    .recent-table td { padding: 8px 10px; border-bottom: 1px solid rgba(255,255,255,0.04); font-family: var(--font-mono) }
+    .kind-badge { display: inline-block; padding: 2px 7px; border-radius: 4px; font-size: 0.9em; letter-spacing: 1px }
+    .kind-0  { background: rgba(0,255,136,0.1);  color: var(--green) }
+    .kind-1  { background: rgba(255,255,255,0.06); color: var(--text) }
+    .kind-20 { background: rgba(255,200,50,0.1);  color: var(--yellow) }
+    .kind-1063 { background: rgba(0,136,255,0.1); color: #4af }
+
+    .verify-row { display: flex; align-items: center; gap: 10px; padding: 12px 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; font-size: 0.6em }
+    .verify-ok  { color: var(--green) }
+    .verify-err { color: var(--red) }
+
+    .node-info { display: flex; gap: 12px; flex-wrap: wrap; font-size: 0.55em; color: var(--text-muted) }
+    .node-info span { background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; padding: 4px 10px }
+    .node-info .val { color: var(--text) }
+
+    .refresh-btn { background: none; border: 1px solid var(--border); color: var(--green); font-family: var(--font-mono); font-size: 0.55em; letter-spacing: 2px; padding: 6px 14px; cursor: pointer; border-radius: 6px; transition: 0.15s }
+    .refresh-btn:hover { border-color: var(--green); background: rgba(0,255,136,0.05) }
+    .last-update { font-size: 0.5em; color: var(--text-muted); margin-left: 10px }
+
+    footer { border-top: 1px solid var(--border); padding: 20px 24px; font-size: 0.5em; color: var(--text-muted); letter-spacing: 1px; display: flex; gap: 20px; flex-wrap: wrap }
+    footer a { color: var(--green); text-decoration: none; opacity: 0.6 }
+    footer a:hover { opacity: 1 }
+
+    .loading { color: var(--text-muted); font-size: 0.6em; letter-spacing: 2px; padding: 40px; text-align: center }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">M4TR1X <span>/ EXPLORER</span></div>
+  <a href="/">← BACK TO NODE</a>
+  <div class="live-dot" title="Live"></div>
+</header>
+
+<div class="container">
+
+  <div id="root"><div class="loading">[ LOADING NODE DATA... ]</div></div>
+
+</div>
+
+<footer>
+  <span>M4TR1X ALPHA NODE</span>
+  <a href="/api/v1/explorer/stats" target="_blank">RAW JSON</a>
+  <a href="/api/v1/h8/ledger" target="_blank">FULL LEDGER</a>
+  <a href="/api/v1/h8/chain/verify" target="_blank">VERIFY CHAIN</a>
+  <span style="margin-left:auto;opacity:0.3">Open source · Nostr · Tor · H8</span>
+</footer>
+
+<script>
+function fmt(n) {
+  if (n === null || n === undefined) return '—'
+  return Number(n).toLocaleString('en')
+}
+function ago(ts) {
+  const s = Math.floor(Date.now()/1000) - ts
+  if (s < 60) return s + 's ago'
+  if (s < 3600) return Math.floor(s/60) + 'm ago'
+  if (s < 86400) return Math.floor(s/3600) + 'h ago'
+  return Math.floor(s/86400) + 'd ago'
+}
+function kindLabel(k) {
+  const map = { 0:'PROFILE', 1:'POST', 3:'FOLLOWS', 6:'REPOST', 20:'PHOTO', 1063:'FILE', 9735:'ZAP' }
+  return map[k] || 'kind:'+k
+}
+function uptime(s) {
+  const h = Math.floor(s/3600), m = Math.floor((s%3600)/60)
+  return h+'h '+m+'m'
+}
+
+async function load() {
+  const [stats, chain] = await Promise.all([
+    fetch('/api/v1/explorer/stats').then(r=>r.json()),
+    fetch('/api/v1/h8/chain/verify').then(r=>r.json()),
+  ])
+
+  const t = stats.token
+  const allocs = [
+    { label:'FOUNDER',   amount: t.allocation.founder.amount,   color:'#00ff88', pct: 50 },
+    { label:'COMMUNITY', amount: t.allocation.community.amount,  color:'#ffc832', pct: 30 },
+    { label:'NODES',     amount: t.allocation.nodes.amount,      color:'#4af',    pct: 20 },
+  ]
+
+  document.getElementById('root').innerHTML = `
+
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px">
+      <button class="refresh-btn" onclick="load()">↻ REFRESH</button>
+      <span class="last-update">Updated ${new Date().toLocaleTimeString()}</span>
+    </div>
+
+    <div class="node-info" style="margin-bottom:24px">
+      <span>VERSION <span class="val">${stats.node.version}</span></span>
+      <span>UPTIME <span class="val">${uptime(stats.node.uptime_seconds)}</span></span>
+      ${stats.node.onion ? `<span>ONION <span class="val" style="font-size:0.85em">${stats.node.onion.replace('http://','').slice(0,20)}…</span></span>` : ''}
+      <span>RELAY EVENTS <span class="val">${fmt(stats.relay.total_events)}</span></span>
+    </div>
+
+    <!-- Token stats -->
+    <div class="section">
+      <div class="section-title">◈ H8 Token</div>
+      <div class="grid">
+        <div class="card">
+          <div class="card-label">Max Supply</div>
+          <div class="card-value">${fmt(t.max_supply)}</div>
+          <div class="card-sub">FIXED FOREVER</div>
+        </div>
+        <div class="card">
+          <div class="card-label">Total Minted</div>
+          <div class="card-value yellow">${fmt(t.total_minted)}</div>
+          <div class="card-sub">${t.total_minted === t.max_supply ? '100% — MINT CLOSED' : ((t.total_minted/t.max_supply*100).toFixed(1)+'% of supply')}</div>
+        </div>
+        <div class="card">
+          <div class="card-label">Total Tipped</div>
+          <div class="card-value">${fmt(t.total_tipped)}</div>
+          <div class="card-sub">TO CREATORS</div>
+        </div>
+        <div class="card">
+          <div class="card-label">Total Boosted</div>
+          <div class="card-value">${fmt(t.total_boosted)}</div>
+          <div class="card-sub">CONTENT BOOSTED</div>
+        </div>
+        <div class="card">
+          <div class="card-label">Chain Blocks</div>
+          <div class="card-value">${fmt(t.total_blocks)}</div>
+          <div class="card-sub">TRANSACTIONS</div>
+        </div>
+      </div>
+
+      <!-- Allocation bars -->
+      ${allocs.map(a => `
+        <div class="alloc-row">
+          <div class="alloc-label">${a.label}</div>
+          <div class="alloc-bar-wrap"><div class="alloc-bar" style="width:${a.pct}%;background:${a.color}"></div></div>
+          <div class="alloc-amount">${fmt(a.amount)} H8</div>
+          <div class="alloc-pct">${a.pct}%</div>
+        </div>
+      `).join('')}
+
+      <!-- Chain verify -->
+      <div class="verify-row" style="margin-top:14px">
+        ${chain.valid
+          ? `<span class="verify-ok">✓ CHAIN VALID</span> · ${fmt(chain.blocks)} blocks · ${chain.unsigned_blocks ? chain.unsigned_blocks+' unsigned (genesis)' : 'all signed'}`
+          : `<span class="verify-err">✗ CHAIN INVALID — block ${chain.firstInvalidBlock}: ${chain.reason}</span>`
+        }
+        <a href="/api/v1/h8/chain/verify" target="_blank" style="margin-left:auto;color:var(--text-muted);font-size:0.85em;text-decoration:none">FULL VERIFY →</a>
+      </div>
+    </div>
+
+    <!-- Relay stats -->
+    <div class="section">
+      <div class="section-title">⚡ Nostr Relay</div>
+      <div class="grid">
+        <div class="card">
+          <div class="card-label">Profiles</div>
+          <div class="card-value">${fmt(stats.relay.profiles)}</div>
+          <div class="card-sub">REGISTERED USERS</div>
+        </div>
+        <div class="card">
+          <div class="card-label">Posts</div>
+          <div class="card-value">${fmt(stats.relay.posts)}</div>
+          <div class="card-sub">KIND:1 EVENTS</div>
+        </div>
+        <div class="card">
+          <div class="card-label">Videos</div>
+          <div class="card-value">${fmt(stats.content.videos)}</div>
+          <div class="card-sub">UPLOADED TO NODE</div>
+        </div>
+        <div class="card">
+          <div class="card-label">Photos</div>
+          <div class="card-value">${fmt(stats.content.photos)}</div>
+          <div class="card-sub">${fmt(stats.content.nft_listed)} NFT LISTED</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Recent events -->
+    <div class="section">
+      <div class="section-title">⏱ Recent Activity</div>
+      <table class="recent-table">
+        <thead>
+          <tr>
+            <th>EVENT ID</th>
+            <th>PUBKEY</th>
+            <th>TYPE</th>
+            <th>WHEN</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${stats.relay.recent.map(e => `
+            <tr>
+              <td style="color:var(--text-muted)">${e.id}</td>
+              <td style="color:var(--text-muted)">${e.pubkey}</td>
+              <td><span class="kind-badge kind-${e.kind}">${kindLabel(e.kind)}</span></td>
+              <td style="color:var(--text-muted)">${ago(e.ts)}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+
+  `
+}
+
+load()
+// Auto-refresh every 30 seconds
+setInterval(load, 30000)
+</script>
+</body>
+</html>

@@ -461,6 +461,76 @@ app.get('/api/v1/h8/ledger', (req, res) => {
 app.get('/api/v1/h8/stats', (req, res) => {
   res.json(h8token.getLedgerStats())
 })
+
+// ─── Explorer API ─────────────────────────────────────────────────────────────
+app.get('/api/v1/explorer/stats', (req, res) => {
+  try {
+    const relayDbPath = process.env.USERDATA_PATH
+      ? path.join(process.env.USERDATA_PATH, 'relay.db')
+      : path.join(__dirname, '..', 'relay.db')
+    const relayDb = new (require('better-sqlite3'))(relayDbPath, { readonly: true })
+
+    const totalEvents   = relayDb.prepare('SELECT COUNT(*) as c FROM events').get().c
+    const totalProfiles = relayDb.prepare('SELECT COUNT(DISTINCT pubkey) as c FROM events WHERE kind=0').get().c
+    const totalPosts    = relayDb.prepare('SELECT COUNT(*) as c FROM events WHERE kind=1').get().c
+    const totalFiles    = relayDb.prepare('SELECT COUNT(*) as c FROM events WHERE kind=1063').get().c
+    const totalPhotosN  = relayDb.prepare('SELECT COUNT(*) as c FROM events WHERE kind=20').get().c
+    const recentEvents  = relayDb.prepare('SELECT id, pubkey, kind, created_at FROM events ORDER BY created_at DESC LIMIT 10').all()
+    relayDb.close()
+
+    const tokenStats = h8token.getLedgerStats()
+
+    const photoStats = (() => {
+      try {
+        const pdb = new (require('better-sqlite3'))(
+          path.join(process.env.M4TR1X_DATA_DIR || require('os').homedir() + '/.m4tr1x', 'm4tr1x.db'),
+          { readonly: true }
+        )
+        const total     = pdb.prepare('SELECT COUNT(*) as c FROM photos').get().c
+        const nft_listed = pdb.prepare('SELECT COUNT(*) as c FROM photos WHERE nft_price > 0').get().c
+        pdb.close()
+        return { total, nft_listed }
+      } catch { return { total: 0, nft_listed: 0 } }
+    })()
+
+    const videoStats = (() => {
+      try { return { total: db.getVideos({ limit: 9999 }).length } }
+      catch { return { total: 0 } }
+    })()
+
+    res.json({
+      node: {
+        version: require('../package.json').version,
+        uptime_seconds: Math.floor(process.uptime()),
+        onion: process.env.PRIVATE_NODE_URL || null,
+      },
+      relay: {
+        total_events: totalEvents,
+        profiles: totalProfiles,
+        posts: totalPosts,
+        files: totalFiles,
+        photos: totalPhotosN,
+        recent: recentEvents.map(e => ({
+          id: e.id.slice(0, 16) + '…',
+          pubkey: e.pubkey.slice(0, 16) + '…',
+          kind: e.kind,
+          ts: e.created_at,
+        })),
+      },
+      content: {
+        photos: photoStats.total,
+        nft_listed: photoStats.nft_listed,
+        videos: videoStats.total,
+      },
+      token: tokenStats,
+    })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+app.get('/explorer', (req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'frontend', 'explorer.html'))
+})
+
 // âââ Routes: Nostr ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
 app.post('/api/v1/nostr/keys', (req, res) => {
