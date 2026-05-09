@@ -745,26 +745,8 @@
 
   // ========== CONFIGURATION ==========
   const CONFIG = {
-    // Mastodon instances to federate with
-    mastodon: [
-      'https://mastodon.social',
-      'https://fosstodon.org',
-      'https://infosec.exchange'
-    ],
-    // PeerTube instances to federate with
-    peertube: [
-      'https://videos.scanlines.xyz',
-      'https://peertube.tv',
-      'https://tilvids.com'
-    ],
-    // Funkwhale instances to federate with
-    funkwhale: [
-      'https://funkwhale.it',
-      'https://tanukitunes.com'
-    ],
-    // Nostr relays — ws://localhost:4848 è il nodo M4TR1X locale (primo avvio)
+    // Nostr relays — local node only
     relays: ['ws://localhost:4848','ws://fcicneomtw4mihstawh6spu6f6lpxo6m4dxu276hm3q5nqmdaod4jyqd.onion:4848'],
-
     // Blossom servers
     blossom: {'M4TR1X Node':'/blossom'}
   };
@@ -1166,33 +1148,10 @@
       });
     });
 
-    // After 6s: render whatever we have from Nostr, or fallback to PeerTube clips
+    // After 6s: render whatever we have from Nostr, or show empty state
     setTimeout(() => {
       if (!rendered && fbBuf.length) { renderFb(fbBuf.splice(0)); return; }
-      if (!rendered) {
-        // Last resort: pull short videos from PeerTube as Signal placeholder
-        const pt = CONFIG.peertube[Math.floor(Math.random()*CONFIG.peertube.length)];
-        fetch(pt + '/api/v1/videos?count=10&sort=-trending&nsfw=false&durationMax=120')
-          .then(r => r.json())
-          .then(data => {
-            const vids = (data.data || []).filter(v => v.files?.length || v.streamingPlaylists?.length);
-            if (!vids.length) { noSignal(); return; }
-            rendered = true;
-            const ph = container.querySelector('.slide-placeholder');
-            if (ph) ph.innerHTML = '<div class="ph-text" style="font-size:0.55em;color:rgba(0,255,65,0.3)">[ PUBLIC — pubblica per vedere contenuti M4TR1X ]</div>';
-            vids.slice(0,6).forEach(v => {
-              const vurl = v.files?.[0]?.fileUrl || v.streamingPlaylists?.[0]?.playlistUrl || '';
-              if (!vurl) return;
-              const fakeEv = {
-                id: v.uuid || rnd(), pubkey: v.account?.host || 'peertube',
-                created_at: Math.floor(new Date(v.publishedAt||Date.now()).getTime()/1000),
-                content: v.description || v.name || '', tags: [['t','public']]
-              };
-              container.appendChild(mkSlide(fakeEv, vurl, sec));
-            });
-          })
-          .catch(() => noSignal());
-      }
+      if (!rendered) noSignal();
     }, 6000);
 
     function noSignal() {
@@ -1202,43 +1161,29 @@
     }
     setTimeout(noSignal, 18000);
   }
-  // ========== PEERTUBE INTEGRATION ==========
+  // ========== LOCAL VIDEO FEED ==========
   function loadPeerTube() {
     const c = document.getElementById('feed-film');
-    CONFIG.peertube.forEach(instance => {
-      fetch(instance + '/api/v1/videos?count=10&sort=-publishedAt&nsfw=false')
-        .then(r => r.json())
-        .then(data => {
-          const videos = data.data || data;
-          videos.forEach(video => {
-            const vidId = 'pt-' + video.uuid;
-            if (seen.film.has(vidId)) return;
-            seen.film.add(vidId);
-            const ph = c.querySelector('.slide-placeholder'); if (ph) ph.remove();
-            const el = document.createElement('div');
-            el.className = 'video-slide';
-            el.id = 'sl-' + vidId;
-            const embedUrl = instance + '/videos/embed/' + video.uuid + '?autoplay=1&muted=1';
-            const thumbUrl = video.thumbnailUrl || (video.thumbnailPath ? instance + video.thumbnailPath : '');
-            el.innerHTML = '<div class="peertube-embed"><iframe src="' + embedUrl + '" allow="autoplay" allowfullscreen sandbox="allow-same-origin allow-scripts allow-popups"></iframe></div>' +
-              '<div class="grad-top"></div><div class="grad-bot"></div>' +
-              '<div class="slide-info"><div class="slide-info-card"><div class="slide-author"><div class="slide-av" style="border-color:var(--blue)">\u{1F3AC}</div>' +
-              '<span class="slide-name">' + esc(video.account?.displayName || video.account?.name || 'Unknown') + '</span>' +
-              '<span class="slide-time">' + esc(video.account?.host || new URL(instance).hostname) + '</span></div>' +
-              '<div class="slide-meta">' + esc(video.name) + (video.category?.label ? '<span class="slide-genre">' + esc(video.category.label) + '</span>' : '') + '</div>' +
-              (video.description ? '<div class="slide-caption">' + esc(video.description.substring(0, 150)) + '</div>' : '') +
-              '<div class="slide-tags" style="color:var(--blue)">via PeerTube \u00B7 ' + esc(new URL(instance).hostname) + '</div></div>' +
-              '<div class="slide-actions">' +
-              '<div class="sact"><div class="sact-icon" style="border-color:var(--blue)">\u{1F517}</div><span class="sact-label">OPEN</span></div>' +
-              '<div class="sact h8-tip-act" id="h8tip-pt-' + vidId + '"><div class="sact-icon" style="color:#ff2277">\u2665</div><span class="sact-label">H8 TIP</span></div>' +
-              '</div>';
-            el.querySelector('.sact').onclick = () => { const u=instance+'/w/'+encodeURIComponent(video.uuid||''); if(/^https?:\/\//.test(u))window.open(u,'_blank','noopener,noreferrer'); };
-            el.querySelector('#h8tip-pt-' + vidId).onclick = () => openZap('pt-' + video.uuid, video.account?.name || 'peertube', null);
-            c.appendChild(el);
-          });
-        })
-        .catch(e => console.log('PeerTube ' + instance + ' error:', e));
-    });
+    fetch('/api/v1/video/list')
+      .then(r => r.json())
+      .then(videos => {
+        if (!Array.isArray(videos) || !videos.length) return;
+        videos.forEach(video => {
+          const vidId = 'local-' + video.id;
+          if (seen.film.has(vidId)) return;
+          seen.film.add(vidId);
+          const ph = c.querySelector('.slide-placeholder'); if (ph) ph.remove();
+          const fakeEv = {
+            id: video.id, pubkey: video.uploader_address || 'local',
+            created_at: video.created_at || Math.floor(Date.now()/1000),
+            content: video.description || video.title || '',
+            tags: [['t','m4tr1x-film'], ...(video.tags||[]).map(t=>['t',t])]
+          };
+          const streamUrl = '/api/v1/video/stream/' + video.id;
+          c.appendChild(mkSlide(fakeEv, streamUrl, 'film'));
+        });
+      })
+      .catch(e => console.warn('[FILM] local load error:', e));
   }
 
   function loadNostrFilm() {
@@ -1264,36 +1209,30 @@
     }, 8000);
   }
 
-  // ========== FUNKWHALE INTEGRATION ==========
+  // ========== LOCAL MUSIC FEED ==========
   function loadFunkwhale() {
     const list = document.getElementById('fw-track-list');
-    let foundAny = false;
-    CONFIG.funkwhale.forEach(instance => {
-      fetch(instance + '/api/v1/tracks/?page_size=20&ordering=-creation_date')
-        .then(r => r.json())
-        .then(data => {
-          const tracks = data.results || data;
-          tracks.forEach(track => {
-            foundAny = true;
-            const ph = list.querySelector('.slide-placeholder'); if (ph) ph.remove();
-            const el = document.createElement('div');
-            el.className = 'fw-track-item';
-            const coverUrl = track.album?.cover?.urls?.medium_square_crop || track.cover?.urls?.medium_square_crop || '';
-            const listenUrl = track.listen_url ? instance + track.listen_url : '';
-            const duration = track.duration ? Math.floor(track.duration / 60) + ':' + String(track.duration % 60).padStart(2, '0') : '';
-            const fwTrackId = 'fw-' + (track.id || track.mbid || track.title.replace(/\s/g,'_').substring(0,16));
-            el.innerHTML = '<div class="fw-cover">' + (coverUrl ? '<img src="' + coverUrl + '" onerror="this.parentElement.textContent=\'\u{1F3B5}\'">' : '\u{1F3B5}') + '</div>' +
-              '<div class="fw-info"><div class="fw-title">' + esc(track.title) + '</div>' +
-              '<div class="fw-artist">' + esc(track.artist?.name || 'Unknown') + ' \u00B7 ' + esc(new URL(instance).hostname) + '</div></div>' +
-              '<span class="fw-duration">' + duration + '</span>' +
-              '<button class="h8-tip-btn" style="background:none;border:1px solid rgba(255,34,119,0.4);color:#ff2277;padding:4px 10px;font-size:0.65em;cursor:pointer;margin-left:8px;font-family:inherit" onclick="event.stopPropagation();openZap(\'' + fwTrackId + '\',\'' + esc(track.artist?.name||'unknown') + '\',null)">\u2665 H8</button>';
-            el.onclick = () => playFunkwhale(track.title, track.artist?.name || 'Unknown', listenUrl, el);
-            list.appendChild(el);
-          });
-        })
-        .catch(e => console.log('Funkwhale ' + instance + ' error:', e));
-    });
-    setTimeout(() => { if (!foundAny) loadNostrMusic(); }, 5000);
+    fetch('/api/v1/music/tracks')
+      .then(r => r.json())
+      .then(tracks => {
+        if (!Array.isArray(tracks) || !tracks.length) { loadNostrMusic(); return; }
+        tracks.forEach(track => {
+          const ph = list.querySelector('.slide-placeholder'); if (ph) ph.remove();
+          const el = document.createElement('div');
+          el.className = 'fw-track-item';
+          const streamUrl = '/api/v1/music/stream/' + track.id;
+          const duration = track.duration ? Math.floor(track.duration/60) + ':' + String(track.duration%60).padStart(2,'0') : '';
+          const fwTrackId = 'local-' + track.id;
+          el.innerHTML = '<div class="fw-cover">\uD83C\uDFB5</div>' +
+            '<div class="fw-info"><div class="fw-title">' + esc(track.title||'Untitled') + '</div>' +
+            '<div class="fw-artist">' + esc(track.artist||'Unknown') + ' \u00B7 M4TR1X</div></div>' +
+            '<span class="fw-duration">' + duration + '</span>' +
+            '<button class="h8-tip-btn" style="background:none;border:1px solid rgba(255,34,119,0.4);color:#ff2277;padding:4px 10px;font-size:0.65em;cursor:pointer;margin-left:8px;font-family:inherit" onclick="event.stopPropagation();openZap(\'' + fwTrackId + '\',\'' + esc(track.artist||'unknown') + '\',null)">\u2665 H8</button>';
+          el.onclick = () => playFunkwhale(track.title||'Untitled', track.artist||'Unknown', streamUrl, el);
+          list.appendChild(el);
+        });
+      })
+      .catch(() => loadNostrMusic());
   }
 
   function loadNostrMusic() {

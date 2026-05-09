@@ -58,10 +58,10 @@ function initPhotoDb() {
       uploader     TEXT DEFAULT '',
       nostr_event  TEXT DEFAULT '',
       created_at   INTEGER DEFAULT (strftime('%s','now')),
-      likes        INTEGER DEFAULT 0
+      likes        INTEGER DEFAULT 0,
+      nft_price    INTEGER DEFAULT 0
     )
   `)
-  // Add music columns if upgrading from older schema
   const cols = getDb().prepare("PRAGMA table_info(photos)").all().map(r => r.name)
   if (!cols.includes('music_id')) {
     getDb().exec(`
@@ -70,6 +70,9 @@ function initPhotoDb() {
       ALTER TABLE photos ADD COLUMN music_artist TEXT DEFAULT '';
       ALTER TABLE photos ADD COLUMN music_url    TEXT DEFAULT '';
     `)
+  }
+  if (!cols.includes('nft_price')) {
+    getDb().exec(`ALTER TABLE photos ADD COLUMN nft_price INTEGER DEFAULT 0`)
   }
 }
 
@@ -88,7 +91,7 @@ function getPublicBase() {
 }
 
 function blobUrl(sha256) {
-  return `${getPublicBase()}/blossom/${sha256}`
+  return `/blossom/${sha256}`
 }
 
 // ─── Strip EXIF ───────────────────────────────────────────────────────────────
@@ -157,7 +160,7 @@ function resolveMusicTrack(musicId) {
 }
 
 // ─── Publish to Nostr (NIP-68 kind:20 + NIP-92 imeta) ────────────────────────
-async function publishPhotoNostr({ sha256, thumbSha256, width, height, size, mime, caption, alt, tags, created_at, music }) {
+async function publishPhotoNostr({ sha256, thumbSha256, width, height, size, mime, caption, alt, tags, created_at, music, nft_price }) {
   try {
     const nostr = require('./nostr')
     const keys  = nostr.loadSavedKeys()
@@ -199,6 +202,10 @@ async function publishPhotoNostr({ sha256, thumbSha256, width, height, size, mim
       ['t', 'm4tr1x'],
     ]
 
+    if (nft_price > 0) {
+      eventTags.push(['price', String(nft_price), 'H8'])
+    }
+
     // Music attachment tag: ["music", id, title, artist, stream_url]
     if (music) {
       eventTags.push(['music', music.id, music.title, music.artist, music.url])
@@ -219,7 +226,7 @@ async function publishPhotoNostr({ sha256, thumbSha256, width, height, size, mim
 }
 
 // ─── Core: publish a photo ────────────────────────────────────────────────────
-async function publishPhoto(srcPath, { caption = '', alt = '', tags = [], uploader = '', music_id = '' }) {
+async function publishPhoto(srcPath, { caption = '', alt = '', tags = [], uploader = '', music_id = '', nft_price = 0 }) {
   initPhotoDb()
 
   const id    = crypto.randomBytes(12).toString('hex')
@@ -236,15 +243,15 @@ async function publishPhoto(srcPath, { caption = '', alt = '', tags = [], upload
     INSERT INTO photos
       (id, sha256, thumb_sha256, caption, alt, tags,
        music_id, music_title, music_artist, music_url,
-       width, height, size_bytes, mime, uploader, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       width, height, size_bytes, mime, uploader, created_at, nft_price)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     id, img.sha256, img.thumbSha256, caption, alt, tagsJson,
     music ? music.id     : '',
     music ? music.title  : '',
     music ? music.artist : '',
     music ? music.url    : '',
-    img.width, img.height, img.size, img.mime, uploader, now
+    img.width, img.height, img.size, img.mime, uploader, now, nft_price || 0
   )
 
   const nostrId = await publishPhotoNostr({
@@ -254,7 +261,7 @@ async function publishPhoto(srcPath, { caption = '', alt = '', tags = [], upload
     height:      img.height,
     size:        img.size,
     mime:        img.mime,
-    caption, alt, tags, created_at: now, music,
+    caption, alt, tags, created_at: now, music, nft_price,
   })
 
   if (nostrId) {
@@ -271,6 +278,7 @@ async function publishPhoto(srcPath, { caption = '', alt = '', tags = [], upload
     height:    img.height,
     caption,
     tags,
+    nft_price: nft_price || 0,
     music:     music || null,
     nostr_event: nostrId,
     created_at: now,

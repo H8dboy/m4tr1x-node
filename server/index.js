@@ -417,6 +417,17 @@ app.post('/api/v1/h8/tip', paymentLimit, verifyApiKey, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
 
+// NFT photo purchase — frontend calls this when buying a photo
+app.post('/api/v1/h8tips/send', paymentLimit, async (req, res) => {
+  try {
+    const { from_h8address, to_pubkey, amount, memo, event_id } = req.body
+    if (!amount || amount <= 0) return res.status(400).json({ error: 'Invalid amount' })
+    if (!to_pubkey) return res.status(400).json({ error: 'to_pubkey required' })
+    const result = await h8token.tip(to_pubkey, parseInt(amount), memo || event_id || '')
+    res.json({ ok: true, txid: result.id || result.txid, amount, to: to_pubkey })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
 app.post('/api/v1/h8/boost', paymentLimit, verifyApiKey, async (req, res) => {
   try {
     const { contentId, amount } = req.body
@@ -1143,14 +1154,15 @@ app.post('/api/v1/photo/publish', photoUpload.single('photo'), async (req, res) 
   if (!req.file) return res.status(400).json({ error: 'immagine richiesta' })
   const srcPath = req.file.path
   try {
-    const { caption, alt, tags, uploader, music_id } = req.body
+    const { caption, alt, tags, uploader, music_id, nft_price } = req.body
     const tagList = tags ? tags.split(/[\s,]+/).filter(Boolean) : []
     const result = await photo.publishPhoto(srcPath, {
-      caption:  caption  || '',
-      alt:      alt      || '',
-      tags:     tagList,
-      uploader: uploader || '',
-      music_id: music_id || '',
+      caption:   caption   || '',
+      alt:       alt       || '',
+      tags:      tagList,
+      uploader:  uploader  || req.body.h8address || '',
+      music_id:  music_id  || '',
+      nft_price: parseInt(nft_price || '0'),
     })
     res.json({ ok: true, ...result })
   } catch (err) {
