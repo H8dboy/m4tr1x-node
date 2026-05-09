@@ -204,7 +204,7 @@ httpServer.on('error', e => {
     process.exit(1)
   }
 })
-httpServer.listen(RELAY_PORT, '0.0.0.0', () => {
+httpServer.listen(RELAY_PORT, '::', () => {
   console.log(`[RELAY] M4TR1X Node ready → ws://localhost:${RELAY_PORT}`)
 })
 
