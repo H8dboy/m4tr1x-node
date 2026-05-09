@@ -536,10 +536,11 @@
         <div class="prof-stat" style="cursor:pointer" onclick="openUserList('followers')"><div class="prof-stat-n" id="prof-followers">–</div><div class="prof-stat-l">FOLLOWERS</div></div>
         <div class="prof-stat" style="cursor:pointer" onclick="openUserList('following')"><div class="prof-stat-n" id="prof-following">–</div><div class="prof-stat-l">FOLLOWING</div></div>
       </div>
-      <!-- Grid tabs: Posts / Repost -->
+      <!-- Grid tabs: Posts / Repost / NFT -->
       <div style="display:flex;border-bottom:1px solid var(--green-dark);flex-shrink:0">
         <button id="gtab-posts" onclick="switchGridTab('posts')" style="flex:1;background:none;border:none;border-bottom:2px solid var(--green);color:var(--green);font-family:var(--font-mono);font-size:0.6em;letter-spacing:2px;padding:8px;cursor:pointer">POSTS</button>
         <button id="gtab-reposts" onclick="switchGridTab('reposts')" style="flex:1;background:none;border:none;border-bottom:2px solid transparent;color:var(--green-dark);font-family:var(--font-mono);font-size:0.6em;letter-spacing:2px;padding:8px;cursor:pointer">REPOST</button>
+        <button id="gtab-nft" onclick="switchGridTab('nft')" style="flex:1;background:none;border:none;border-bottom:2px solid transparent;color:#ffc832;opacity:0.45;font-family:var(--font-mono);font-size:0.6em;letter-spacing:2px;padding:8px;cursor:pointer">◈ NFT</button>
       </div>
       <div class="prof-grid" id="prof-grid"><div class="prof-grid-empty">[ LOADING POSTS... ]</div></div>
     </div>
@@ -1928,7 +1929,7 @@
     const badgeRow = document.getElementById('prof-badge-row');
     if (badgeRow) badgeRow.style.display = 'none';
     // Reset grid tabs
-    _gridPosts = []; _gridReposts = []; _gridMode = 'posts';
+    _gridPosts = []; _gridReposts = []; _gridNft = []; _gridMode = 'posts';
     switchGridTab('posts');
     panel.classList.add('open');
     // Load highlights
@@ -1974,8 +1975,11 @@
         const url = ev.tags.find(t => t[0] === 'url')?.[1]; if (!url) return;
         const nftTag = ev.tags.find(t => t[0] === 'price');
         const nftPrice = nftTag ? parseInt(nftTag[1]) : 0;
-        _gridPosts.push({ eid: ev.id, url, ts: ev.created_at, isRepost: false, isPhoto: ev.kind === 20, nftPrice });
+        const item = { eid: ev.id, url, ts: ev.created_at, isRepost: false, isPhoto: ev.kind === 20, nftPrice };
+        _gridPosts.push(item);
+        if (item.isPhoto && nftPrice > 0) _gridNft.push(item);
         if (_gridMode === 'posts') renderProfGrid(_gridPosts);
+        else if (_gridMode === 'nft') renderProfGrid(_gridNft);
       });
 
       // Repost (kind 6)
@@ -1998,6 +2002,8 @@
         grid.innerHTML = '<div class="prof-grid-empty">[ NO POSTS YET ]</div>';
       else if (_gridMode === 'reposts' && !_gridReposts.length)
         grid.innerHTML = '<div class="prof-grid-empty">[ NO REPOSTS ]</div>';
+      else if (_gridMode === 'nft' && !_gridNft.length)
+        grid.innerHTML = '<div class="prof-grid-empty">[ NO NFT PHOTOS ]</div>';
     }, 4000);
   }
 
@@ -2016,6 +2022,14 @@
           const nb = document.createElement('div');
           nb.className = 'nft-badge'; nb.textContent = '◈ ' + item.nftPrice + ' H8';
           div.appendChild(nb);
+          // BUY button shown on hover (only for other people's NFT photos)
+          if (!isMe) {
+            const bb = document.createElement('button');
+            bb.className = 'nft-buy-btn';
+            bb.textContent = 'BUY · ' + item.nftPrice + ' H8';
+            bb.onclick = e => { e.stopPropagation(); buyNftPhoto(item); };
+            div.appendChild(bb);
+          }
         }
       } else {
         const vid = document.createElement('video');
@@ -2051,6 +2065,34 @@
       grid.appendChild(div);
     });
   }
+  async function buyNftPhoto(item) {
+    if (!S.pubkey) { toast('LOGIN FIRST'); return; }
+    const ev = evCache[item.eid];
+    const creatorPk = ev?.pubkey;
+    if (!creatorPk) { toast('CREATOR NOT FOUND'); return; }
+    // Send H8 tip (zap) to creator for the NFT price
+    const confirmed = confirm('Buy this photo for ' + item.nftPrice + ' H8?\n\nA tip will be sent to the creator.');
+    if (!confirmed) return;
+    try {
+      const r = await fetch('/api/v1/h8tips/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          from_h8address: S.h8address,
+          to_pubkey: creatorPk,
+          amount: item.nftPrice,
+          memo: 'NFT purchase: ' + item.eid,
+          event_id: item.eid,
+        })
+      }).then(r => r.json());
+      if (r.ok || r.txid) {
+        toast('✓ PURCHASED · ' + item.nftPrice + ' H8 SENT');
+      } else {
+        toast('ERROR: ' + (r.error || 'Transaction failed'));
+      }
+    } catch(e) { toast('ERROR: ' + e.message); }
+  }
+
   function loadFollowCounts(pk) {
     // Count who follows pk (kind 3 events with p-tag = pk)
     let followerCount = 0; let followingCount = 0; const seen3 = new Set();
@@ -3082,17 +3124,29 @@
   }
 
   // ========== PROFILO GRID CON REPOST ==========
-  let _gridMode = 'posts';   // 'posts' | 'reposts'
+  let _gridMode = 'posts';   // 'posts' | 'reposts' | 'nft'
   let _gridPosts   = [];
   let _gridReposts = [];
+  let _gridNft     = [];
 
   function switchGridTab(mode) {
     _gridMode = mode;
-    document.getElementById('gtab-posts').style.borderBottomColor   = mode === 'posts'   ? 'var(--green)' : 'transparent';
-    document.getElementById('gtab-reposts').style.borderBottomColor = mode === 'reposts' ? 'var(--green)' : 'transparent';
-    document.getElementById('gtab-posts').style.color   = mode === 'posts'   ? 'var(--green)' : 'var(--green-dark)';
-    document.getElementById('gtab-reposts').style.color = mode === 'reposts' ? 'var(--green)' : 'var(--green-dark)';
-    renderProfGrid(mode === 'posts' ? _gridPosts : _gridReposts);
+    const tabs = { posts: 'gtab-posts', reposts: 'gtab-reposts', nft: 'gtab-nft' };
+    Object.entries(tabs).forEach(([m, id]) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const active = m === mode;
+      if (m === 'nft') {
+        el.style.borderBottomColor = active ? '#ffc832' : 'transparent';
+        el.style.color = '#ffc832';
+        el.style.opacity = active ? '1' : '0.45';
+      } else {
+        el.style.borderBottomColor = active ? 'var(--green)' : 'transparent';
+        el.style.color = active ? 'var(--green)' : 'var(--green-dark)';
+      }
+    });
+    const map = { posts: _gridPosts, reposts: _gridReposts, nft: _gridNft };
+    renderProfGrid(map[mode] || []);
   }
 
   // ========== REPOST ==========
