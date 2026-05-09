@@ -135,7 +135,7 @@ function deriveSigningKey() {
   if (!_unlocked) return null
   const sk   = Buffer.from(_unlocked.secretKey, 'hex')
   const seed = crypto.createHash('sha256').update(sk.slice(0, 64)).digest()
-  const { schnorr } = require('@noble/curves/secp256k1.js')
+  const { schnorr } = require('@noble/curves/secp256k1')
   return { privKey: seed, pubKeyHex: Buffer.from(schnorr.getPublicKey(seed)).toString('hex') }
 }
 

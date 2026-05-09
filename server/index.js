@@ -91,6 +91,16 @@ if (!fs.existsSync(BADGE_DOCS_DIR)) fs.mkdirSync(BADGE_DOCS_DIR, { recursive: tr
 // âââ App ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 const app = express()
 
+// Security headers
+app.use((req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff")
+  res.setHeader("X-Frame-Options", "DENY")
+  res.setHeader("X-XSS-Protection", "1; mode=block")
+  res.setHeader("Referrer-Policy", "no-referrer")
+  res.setHeader("Permissions-Policy", "geolocation=(), microphone=(), camera=()")
+  next()
+})
+
 // CORS â accetta localhost (Electron) + origini configurate
 app.use(cors({
   origin: (origin, cb) => {
@@ -107,6 +117,15 @@ app.use(cors({
   methods: ['GET', 'POST', 'DELETE'],
   allowedHeaders: ['X-Nostr-Pubkey', 'X-API-Key', 'X-Admin-Key', 'Content-Type'],
 }))
+
+// Rate limit globale su tutte le route pubbliche (100 req/min per IP)
+const globalLimit = rateLimit({
+  windowMs: 60 * 1000,
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Troppe richieste. Riprova tra un minuto.' },
+})
 
 // Stripe webhook needs raw body — register BEFORE express.json()
 app.post('/api/v1/shop/stripe/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
@@ -169,15 +188,6 @@ const paymentLimit = rateLimit({
   message: { error: 'Troppe transazioni. Riprova tra un minuto.' },
 })
 
-// Rate limit globale su tutte le route pubbliche (100 req/min per IP)
-const globalLimit = rateLimit({
-  windowMs: 60 * 1000,
-  max: 100,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: 'Troppe richieste. Riprova tra un minuto.' },
-})
-
 // Rate limit upload (20 upload/ora per IP)
 const uploadLimit = rateLimit({
   windowMs: 60 * 60 * 1000,
@@ -189,7 +199,9 @@ const uploadLimit = rateLimit({
 
 // âââ API Key middleware âââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 function verifyApiKey(req, res, next) {
-  if (API_KEY && req.headers['x-api-key'] !== API_KEY) {
+  const ip = req.ip || req.connection?.remoteAddress || ''
+  const isLocal = ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1'
+  if (API_KEY && !isLocal && req.headers['x-api-key'] !== API_KEY) {
     return res.status(401).json({ error: 'Invalid or missing API key' })
   }
   next()
@@ -357,16 +369,20 @@ app.get('/api/v1/h8/session-info', (req, res) => {
 // Firma un evento Nostr con la chiave derivata dall'identità H8.
 // Il client invia l'evento senza id/sig; il server aggiunge entrambi.
 app.post('/api/v1/h8/sign-event', (req, res) => {
-  const id = require('./h8identity').getUnlockedIdentity()
-  if (!id) return res.status(401).json({ error: 'wallet bloccato' })
-  const sk = deriveSigningKey()
-  const { schnorr } = require('@noble/curves/secp256k1.js')
-  const ev = req.body
-  ev.pubkey = sk.pubKeyHex
-  const serial = JSON.stringify([0, ev.pubkey, ev.created_at, ev.kind, ev.tags, ev.content])
-  ev.id = crypto.createHash('sha256').update(serial).digest('hex')
-  ev.sig = Buffer.from(schnorr.sign(ev.id, sk.privKey)).toString('hex')
-  res.json(ev)
+  try {
+    const id = require('./h8identity').getUnlockedIdentity()
+    if (!id) return res.status(401).json({ error: 'wallet bloccato' })
+    const sk = deriveSigningKey()
+    const { schnorr } = require('@noble/curves/secp256k1')
+    const ev = req.body
+    ev.pubkey = sk.pubKeyHex
+    const serial = JSON.stringify([0, ev.pubkey, ev.created_at, ev.kind, ev.tags, ev.content])
+    ev.id = crypto.createHash('sha256').update(serial).digest('hex')
+    ev.sig = Buffer.from(schnorr.sign(Buffer.from(ev.id, 'hex'), sk.privKey)).toString('hex')
+    res.json(ev)
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
 })
 
 // ─── H8 Token Economy ────────────────────────────────────────────────────────
@@ -1592,7 +1608,7 @@ function startServer(port = 8080) {
   setTimeout(() => startNodeDiscovery(), 2000)
   setTimeout(() => startContentDiscovery(), 3000)
   return new Promise((resolve, reject) => {
-    server = app.listen(port, '0.0.0.0', () => {
+    server = app.listen(port, '::', () => {
       const { networkInterfaces } = require('os')
       const nets = networkInterfaces()
       const lan = Object.values(nets).flat().find(n => n.family === 'IPv4' && !n.internal)

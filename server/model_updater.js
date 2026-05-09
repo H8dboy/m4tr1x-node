@@ -223,7 +223,7 @@ async function syncModelVersionFromNostr() {
     for (const event of events) {
       // Verifica che il publisher sia in lista fidata
       if (!TRUSTED_MODEL_PUBKEYS.has(event.pubkey)) {
-        console.warn(`[MODEL] Evento ignorato — pubkey non fidata: ${event.pubkey?.substring(0, 16)}...`)
+        console.warn(`[MODEL] Evento ignorato — pubkey non fidata: ${event.pubkey}`)
         continue
       }
 

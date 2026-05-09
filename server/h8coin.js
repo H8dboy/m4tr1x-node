@@ -21,9 +21,9 @@ const fs       = require('fs')
 const path     = require('path')
 const Database = require('better-sqlite3')
 const secp     = require('@noble/secp256k1')
-const { sha256 }      = require('@noble/hashes/sha2.js')
-const { hmac }        = require('@noble/hashes/hmac.js')
-const { bytesToHex, hexToBytes } = require('@noble/hashes/utils.js')
+const { sha256 }      = require('@noble/hashes/sha256')
+const { hmac }        = require('@noble/hashes/hmac')
+const { bytesToHex, hexToBytes } = require('@noble/hashes/utils')
 
 // Wire up synchronous hash for secp256k1 v3 verify
 secp.hashes.sha256      = sha256
