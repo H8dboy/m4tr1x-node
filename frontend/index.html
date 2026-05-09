@@ -316,10 +316,12 @@
         <button class="up-cat signal sel" onclick="selCat(this,'signal')">📡</button>
         <button class="up-cat film" onclick="selCat(this,'film')">🎬</button>
         <button class="up-cat music" onclick="selCat(this,'music')">🎵</button>
+        <button class="up-cat photo" onclick="selCat(this,'photo')">📸</button>
       </div>
       <div class="up-body">
-        <div class="up-disc film" id="disc-film">🎬 <strong>INDIE FILM CHANNEL</strong><br>Upload only your own content. Also streams from PeerTube federation. Powered by PeerTube API.</div>
-        <div class="up-disc music" id="disc-music">🎵 <strong>UNDERGROUND MUSIC</strong><br>Original music only. Also streams from Funkwhale federation. Powered by Funkwhale API.</div>
+        <div class="up-disc film" id="disc-film">🎬 <strong>INDIE FILM CHANNEL</strong><br>Upload your own films. Distributed across M4TR1X nodes.</div>
+        <div class="up-disc music" id="disc-music">🎵 <strong>UNDERGROUND MUSIC</strong><br>Original music only. M4TR1X network.</div>
+        <div class="up-disc photo" id="disc-photo">📸 <strong>PHOTO & NFT</strong><br>Publish photos. Set a price to sell as NFT via H8 tips.</div>
         <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
           <div class="dz-icon">📹</div>
           <strong style="font-size:0.82em">DROP VIDEO HERE</strong>
@@ -327,6 +329,7 @@
         </div>
         <input type="file" id="file-input" accept="video/*">
         <div class="prev-wrap" id="prev-wrap"><video id="prev-video" controls muted></video></div>
+        <div class="prev-wrap" id="prev-img-wrap" style="display:none"><img id="prev-img" style="max-width:100%;border-radius:10px;max-height:260px;object-fit:contain"></div>
         <div class="field"><label>Title / Caption</label><input type="text" id="up-caption" placeholder="What's happening?"></div>
         <div class="film-fields" id="film-fields">
           <div class="field"><label>Film Title</label><input type="text" id="up-film-title" placeholder="e.g. 'Dead Night' — short film 2024"></div>
@@ -336,6 +339,9 @@
         <div class="music-fields" id="music-fields">
           <div class="field"><label>Track Title</label><input type="text" id="up-music-title" placeholder="e.g. 'Signals' — single 2024"></div>
           <div class="field"><label>Genre / Style</label><input type="text" id="up-music-genre" placeholder="rap / ambient / punk / jazz..."></div>
+        </div>
+        <div class="photo-fields" id="photo-fields" style="display:none">
+          <div class="field"><label>NFT Price in H8 <span style="opacity:0.45;font-size:0.85em">(0 = free)</span></label><input type="number" id="up-nft-price" placeholder="0" min="0" step="1" value="0" style="width:100%"></div>
         </div>
         <div class="field"><label>Tags (space separated)</label><input type="text" id="up-tags" placeholder="evidence underground indie"></div>
         <div class="field"><label>Blossom Server</label><select id="up-server"><option value="/blossom">M4TR1X Node (local)</option></select></div>
@@ -1959,14 +1965,16 @@
 
     Object.values(ws).forEach(r => {
       if (!r.ok) return;
-      // Posts (kind 1063)
+      // Posts (kind 1063 videos + kind 20 photos)
       const sid1 = 'pp_' + rnd();
-      r.w.send(JSON.stringify(['REQ', sid1, { kinds: [1063], authors: [pk], limit: 24 }]));
+      r.w.send(JSON.stringify(['REQ', sid1, { kinds: [1063, 20], authors: [pk], limit: 30 }]));
       wsSub(sid1, ev => {
-        if (ev.kind !== 1063 || seenP.has(ev.id)) return;
+        if ((ev.kind !== 1063 && ev.kind !== 20) || seenP.has(ev.id)) return;
         seenP.add(ev.id); evCache[ev.id] = ev;
         const url = ev.tags.find(t => t[0] === 'url')?.[1]; if (!url) return;
-        _gridPosts.push({ eid: ev.id, url, ts: ev.created_at, isRepost: false });
+        const nftTag = ev.tags.find(t => t[0] === 'price');
+        const nftPrice = nftTag ? parseInt(nftTag[1]) : 0;
+        _gridPosts.push({ eid: ev.id, url, ts: ev.created_at, isRepost: false, isPhoto: ev.kind === 20, nftPrice });
         if (_gridMode === 'posts') renderProfGrid(_gridPosts);
       });
 
@@ -1997,12 +2005,24 @@
     const grid = document.getElementById('prof-grid');
     const isMe = _profTarget === S.pubkey;
     grid.innerHTML = '';
-    items.slice().sort((a,b) => b.ts - a.ts).slice(0, 24).forEach(item => {
-      const div = document.createElement('div'); div.className = 'prof-grid-item';
-      const vid = document.createElement('video');
-      vid.src = item.url; vid.muted = true; vid.preload = 'metadata';
-      vid.addEventListener('loadedmetadata', () => { vid.currentTime = 1; });
-      div.appendChild(vid);
+    items.slice().sort((a,b) => b.ts - a.ts).slice(0, 30).forEach(item => {
+      const div = document.createElement('div');
+      div.className = 'prof-grid-item' + (item.isPhoto ? ' photo-item' : '');
+      if (item.isPhoto) {
+        const img = document.createElement('img');
+        img.src = item.url; img.loading = 'lazy'; img.alt = '';
+        div.appendChild(img);
+        if (item.nftPrice > 0) {
+          const nb = document.createElement('div');
+          nb.className = 'nft-badge'; nb.textContent = '◈ ' + item.nftPrice + ' H8';
+          div.appendChild(nb);
+        }
+      } else {
+        const vid = document.createElement('video');
+        vid.src = item.url; vid.muted = true; vid.preload = 'metadata';
+        vid.addEventListener('loadedmetadata', () => { vid.currentTime = 1; });
+        div.appendChild(vid);
+      }
       // Badge repost
       if (item.isRepost) {
         const rb = document.createElement('div');
@@ -2412,12 +2432,94 @@
     document.getElementById('upload-modal').classList.add('open');
     selCat(document.querySelector('.up-cat.signal'),'signal');
   }
-  function closeUpload(){document.getElementById('upload-modal').classList.remove('open');document.getElementById('up-progress').style.display='none';document.getElementById('prog-fill').style.width='0%';S.file=null;document.getElementById('prev-wrap').style.display='none';document.getElementById('btn-pub').disabled=true;document.getElementById('drop-zone').innerHTML='<div class="dz-icon">\u{1F4F9}</div><strong style="font-size:0.82em">DROP VIDEO HERE</strong><p>or click to select \u00B7 MP4, MOV \u00B7 max 500MB</p>'}
-  function selCat(btn,cat){document.querySelectorAll('.up-cat').forEach(b=>b.classList.remove('sel'));btn.classList.add('sel');S.uploadCat=cat;document.getElementById('up-title').textContent=cat==='film'?'\u{1F3AC} UPLOAD':cat==='music'?'\u{1F3B5} UPLOAD':'\u2B06 UPLOAD';document.querySelectorAll('.up-disc').forEach(d=>d.style.display='none');if(cat!=='signal')document.getElementById('disc-'+cat).style.display='block';document.getElementById('film-fields').style.display=cat==='film'?'block':'none';document.getElementById('music-fields').style.display=cat==='music'?'block':'none'}
-  function handleFile(file){if(!file||!file.type.startsWith('video/')){toast('VIDEO ONLY');return}S.file=file;document.getElementById('prev-video').src=URL.createObjectURL(file);document.getElementById('prev-wrap').style.display='block';document.getElementById('drop-zone').innerHTML='<div class="dz-icon">\u2705</div><strong>'+file.name+'</strong><p>'+(file.size/1024/1024).toFixed(1)+' MB</p>';document.getElementById('btn-pub').disabled=false}
+  function closeUpload(){
+    document.getElementById('upload-modal').classList.remove('open');
+    document.getElementById('up-progress').style.display='none';
+    document.getElementById('prog-fill').style.width='0%';
+    S.file=null;
+    document.getElementById('prev-wrap').style.display='none';
+    document.getElementById('prev-img-wrap').style.display='none';
+    document.getElementById('btn-pub').disabled=true;
+    document.getElementById('file-input').accept='video/*';
+    document.getElementById('drop-zone').innerHTML='<div class="dz-icon">\uD83D\uDCF9</div><strong style="font-size:0.82em">DROP VIDEO HERE</strong><p>or click to select \u00B7 MP4, MOV \u00B7 max 500MB</p>';
+  }
+  function selCat(btn,cat){
+    document.querySelectorAll('.up-cat').forEach(b=>b.classList.remove('sel'));
+    btn.classList.add('sel'); S.uploadCat=cat;
+    const titles={film:'\uD83C\uDFAC UPLOAD',music:'\uD83C\uDFB5 UPLOAD',photo:'\uD83D\uDCF8 UPLOAD',signal:'\u2B06 UPLOAD'};
+    document.getElementById('up-title').textContent=titles[cat]||'\u2B06 UPLOAD';
+    document.querySelectorAll('.up-disc').forEach(d=>d.style.display='none');
+    if(cat!=='signal')document.getElementById('disc-'+cat).style.display='block';
+    document.getElementById('film-fields').style.display=cat==='film'?'block':'none';
+    document.getElementById('music-fields').style.display=cat==='music'?'block':'none';
+    document.getElementById('photo-fields').style.display=cat==='photo'?'block':'none';
+    const fi=document.getElementById('file-input');
+    const dz=document.getElementById('drop-zone');
+    S.file=null;
+    document.getElementById('prev-wrap').style.display='none';
+    document.getElementById('prev-img-wrap').style.display='none';
+    document.getElementById('btn-pub').disabled=true;
+    if(cat==='photo'){
+      fi.accept='image/*';
+      dz.innerHTML='<div class="dz-icon">\uD83D\uDCF8</div><strong style="font-size:0.82em">DROP PHOTO HERE</strong><p>or click to select \u00B7 JPG, PNG, WebP \u00B7 max 50MB</p>';
+    } else {
+      fi.accept='video/*';
+      dz.innerHTML='<div class="dz-icon">\uD83D\uDCF9</div><strong style="font-size:0.82em">DROP VIDEO HERE</strong><p>or click to select \u00B7 MP4, MOV \u00B7 max 500MB</p>';
+    }
+  }
+  function handleFile(file){
+    if(S.uploadCat==='photo'){
+      if(!file||!file.type.startsWith('image/')){toast('IMAGE ONLY');return}
+      S.file=file;
+      document.getElementById('prev-img').src=URL.createObjectURL(file);
+      document.getElementById('prev-img-wrap').style.display='block';
+      document.getElementById('prev-wrap').style.display='none';
+      document.getElementById('drop-zone').innerHTML='<div class="dz-icon">\u2705</div><strong>'+file.name+'</strong><p>'+(file.size/1024/1024).toFixed(1)+' MB</p>';
+      document.getElementById('btn-pub').disabled=false;
+    } else {
+      if(!file||!file.type.startsWith('video/')){toast('VIDEO ONLY');return}
+      S.file=file;
+      document.getElementById('prev-video').src=URL.createObjectURL(file);
+      document.getElementById('prev-wrap').style.display='block';
+      document.getElementById('prev-img-wrap').style.display='none';
+      document.getElementById('drop-zone').innerHTML='<div class="dz-icon">\u2705</div><strong>'+file.name+'</strong><p>'+(file.size/1024/1024).toFixed(1)+' MB</p>';
+      document.getElementById('btn-pub').disabled=false;
+    }
+  }
+
+  async function doPhotoUpload(){
+    const btn=document.getElementById('btn-pub');btn.disabled=true;btn.textContent='UPLOADING...';
+    const prog=document.getElementById('up-progress');prog.style.display='block';
+    const fill=document.getElementById('prog-fill');const ptxt=document.getElementById('prog-txt');
+    try{
+      ptxt.textContent='Processing photo...';fill.style.width='20%';
+      const fd=new FormData();
+      fd.append('photo',S.file);
+      fd.append('caption',document.getElementById('up-caption').value||'');
+      fd.append('alt',document.getElementById('up-caption').value||'');
+      const tagStr=document.getElementById('up-tags').value||'';
+      fd.append('tags',tagStr);
+      fd.append('nft_price',document.getElementById('up-nft-price').value||'0');
+      if(S.h8address)fd.append('h8address',S.h8address);
+      const xhr=new XMLHttpRequest();
+      xhr.upload.onprogress=e=>{if(e.lengthComputable)fill.style.width=(20+Math.round(e.loaded/e.total*60))+'%'};
+      const result=await new Promise((res,rej)=>{
+        xhr.onload=()=>{try{res(JSON.parse(xhr.responseText))}catch(e){rej(new Error('Invalid server response'))}};
+        xhr.onerror=()=>rej(new Error('Network error'));
+        xhr.open('POST','/api/v1/photo/publish');
+        if(S.pubkey)xhr.setRequestHeader('X-Nostr-Pubkey',S.pubkey);
+        xhr.send(fd);
+      });
+      if(result.error)throw new Error(result.error);
+      fill.style.width='100%';ptxt.textContent='PHOTO PUBLISHED ✓';
+      toast('PHOTO PUBLISHED'+(result.nft_price>0?' · NFT: '+result.nft_price+' H8':''));
+      setTimeout(()=>{ closeUpload(); switchSec('signal'); },1200);
+    }catch(e){toast('ERROR: '+e.message);ptxt.textContent='FAILED';fill.style.width='0%';btn.disabled=false;btn.textContent='PUBLISH ON M4TR1X'}
+  }
 
   async function doUpload(){
     if(!S.file)return;
+    if(S.uploadCat==='photo'){ await doPhotoUpload(); return; }
     const btn=document.getElementById('btn-pub');btn.disabled=true;btn.textContent='ANALYZING...';
     const prog=document.getElementById('up-progress');prog.style.display='block';
     const fill=document.getElementById('prog-fill');const ptxt=document.getElementById('prog-txt');
@@ -2482,40 +2584,12 @@
       const vurl=result.url||result.nip94_event?.tags?.find(t=>t[0]==='url')?.[1];
       if(!vurl)throw new Error('No URL from server');
 
-      // ── STEP 2.5: PEERTUBE UPLOAD (solo categoria film, se connesso) ─────────
-      let peertubeUrl=null;
-      if(S.uploadCat==='film'&&S.h8address){
-        try{
-          ptxt.textContent='📹 Uploading to PeerTube...';
-          const ptForm=new FormData();
-          ptForm.append('video',S.file);
-          ptForm.append('h8address',S.h8address);
-          const filmTitle=document.getElementById('up-film-title')?.value||S.file.name;
-          const filmGenre=document.getElementById('up-film-genre')?.value||'';
-          ptForm.append('name',filmTitle);
-          ptForm.append('description',document.getElementById('up-caption')?.value||'');
-          const tagStr=document.getElementById('up-tags')?.value||'';
-          ptForm.append('tags','m4tr1x m4tr1x-film'+(filmGenre?' '+filmGenre:'')+(tagStr?' '+tagStr:''));
-          const ptRes=await fetch('/api/v1/peertube/upload',{method:'POST',body:ptForm});
-          if(ptRes.ok){
-            const ptData=await ptRes.json();
-            peertubeUrl=ptData.watch_url;
-            fill.style.width='92%';
-            ptxt.textContent='📹 PeerTube ✓ — Publishing on Nostr...';
-          }
-        }catch(ptErr){
-          // PeerTube non connesso o errore — non blocca la pubblicazione
-          console.warn('[UPLOAD] PeerTube skip:',ptErr.message);
-          ptxt.textContent='Publishing on Nostr...';
-        }
-      }
-
       // ── STEP 3: NOSTR EVENT con verdetto AI incluso ───────────────────────
       const cap=document.getElementById('up-caption').value;
       const tagList=document.getElementById('up-tags').value.split(/\s+/).filter(Boolean).map(t=>['t',t.replace('#','')]);
       tagList.push(['t',CAT_TAG[S.uploadCat]]);
       tagList.push(['t','m4tr1x']); // hashtag per discovery cross-platform (Mastodon federation)
-      if(S.uploadCat==='film'){const ft=document.getElementById('up-film-title').value;const fg=document.getElementById('up-film-genre').value;const fy=document.getElementById('up-film-year').value;if(ft)tagList.push(['film-title',ft]);if(fg)tagList.push(['genre',fg]);if(fy)tagList.push(['year',fy]);if(peertubeUrl)tagList.push(['peertube',peertubeUrl])}
+      if(S.uploadCat==='film'){const ft=document.getElementById('up-film-title').value;const fg=document.getElementById('up-film-genre').value;const fy=document.getElementById('up-film-year').value;if(ft)tagList.push(['film-title',ft]);if(fg)tagList.push(['genre',fg]);if(fy)tagList.push(['year',fy]);}
       if(S.uploadCat==='music'){const mt=document.getElementById('up-music-title').value;const mg=document.getElementById('up-music-genre').value;if(mt)tagList.push(['music-title',mt]);if(mg)tagList.push(['genre',mg])}
 
       const verdictEmoji=aiVerdict?aiVerdict.verdict_emoji:'';
