@@ -446,16 +446,20 @@ app.get('/api/v1/h8/boost/:contentId', verifyApiKey, (req, res) => {
   res.json({ contentId: req.params.contentId, score: h8token.getBoostScore(req.params.contentId) })
 })
 
-app.get('/api/v1/h8/chain/verify', verifyApiKey, (req, res) => {
+app.get('/api/v1/h8/chain/verify', (req, res) => {
   res.json(h8token.verifyChain())
 })
 
-app.post('/api/v1/admin/h8/mint', localhostOnly, verifyAdminKey, async (req, res) => {
-  try {
-    const { toAddress, amount } = req.body
-    if (!toAddress || !amount) return res.status(400).json({ error: 'toAddress e amount richiesti' })
-    res.json(await h8token.mintTokens(toAddress, parseInt(amount)))
-  } catch (e) { res.status(500).json({ error: e.message }) }
+// Public ledger — anyone can read and verify the full transaction history
+app.get('/api/v1/h8/ledger', (req, res) => {
+  const limit  = Math.min(parseInt(req.query.limit  || '100'), 500)
+  const offset = parseInt(req.query.offset || '0')
+  res.json(h8token.getPublicLedger(limit, offset))
+})
+
+// Public supply stats — total minted, allocation, max supply
+app.get('/api/v1/h8/stats', (req, res) => {
+  res.json(h8token.getLedgerStats())
 })
 // âââ Routes: Nostr ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
