@@ -1756,7 +1756,15 @@ function startServer(port = 8080) {
   setTimeout(() => startNodeDiscovery(), 2000)
   setTimeout(() => startContentDiscovery(), 3000)
   if (process.env.HEAD_NODE_URL) {
-    setTimeout(() => federation.startFederation({ headUrl: process.env.HEAD_NODE_URL, selfUrl: getLocalUrl() }), 5000)
+    setTimeout(() => {
+      const { getCurrentPubkey } = require('./nostr')
+      federation.startFederation({
+        headUrl:    process.env.HEAD_NODE_URL,
+        selfUrl:    getLocalUrl(),
+        selfOnion:  getOnionAddress() ? `http://${getOnionAddress()}` : null,
+        selfPubkey: getCurrentPubkey(),
+      })
+    }, 5000)
   }
   if (process.env.HEAD_NODE === 'true') {
     setTimeout(() => require('./db_backup').startBackup(), 3000)

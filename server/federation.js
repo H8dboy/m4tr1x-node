@@ -4,9 +4,11 @@ const net = require('net')
 
 // nodeUrl → { videos, tracks, photos, ts }
 const _cache = new Map()
-let _selfUrl   = null
-let _headUrl   = null
-let _syncTimer = null
+let _selfUrl    = null   // LAN URL e.g. http://192.168.x.x:8080
+let _selfOnion  = null   // .onion URL registered in head node
+let _selfPubkey = null
+let _headUrl    = null
+let _syncTimer  = null
 
 // ─── SOCKS5 TCP tunnel for .onion ────────────────────────────────────────────
 function _socks5Connect(hostname, port) {
@@ -107,10 +109,20 @@ async function syncAllNodes() {
   const data = await _get(`${_headUrl.replace(/\/$/, '')}/api/v1/head/nodes`)
   if (!Array.isArray(data)) return
 
-  const self = (_selfUrl || '').replace(/\/$/, '')
+  const self      = (_selfUrl   || '').replace(/\/$/, '').toLowerCase()
+  const selfOnion = (_selfOnion || '').replace(/^https?:\/\//, '').split('/')[0].toLowerCase()
+
   await Promise.allSettled(
     data
-      .filter(n => n.node_url && n.node_url.replace(/\/$/, '') !== self)
+      .filter(n => {
+        if (!n.node_url) return false
+        if (_selfPubkey && n.pubkey === _selfPubkey) return false
+        const nUrl   = n.node_url.replace(/\/$/, '').toLowerCase()
+        const nOnion = (n.onion || '').replace(/^https?:\/\//, '').split('/')[0].toLowerCase()
+        if (self      && nUrl   === self)      return false
+        if (selfOnion && nOnion === selfOnion) return false
+        return true
+      })
       .map(n => {
         const onion = n.onion ? n.onion.replace(/^https?:\/\//, '') : null
         return syncNode(n.node_url, onion ? `http://${onion}` : null)
@@ -120,9 +132,11 @@ async function syncAllNodes() {
 }
 
 // ─── Start federation sync loop ───────────────────────────────────────────────
-function startFederation({ headUrl, selfUrl, intervalMs = 5 * 60 * 1000 } = {}) {
-  _headUrl = headUrl || process.env.HEAD_NODE_URL
-  _selfUrl = selfUrl
+function startFederation({ headUrl, selfUrl, selfOnion, selfPubkey, intervalMs = 5 * 60 * 1000 } = {}) {
+  _headUrl    = headUrl || process.env.HEAD_NODE_URL
+  _selfUrl    = selfUrl
+  _selfOnion  = selfOnion || null
+  _selfPubkey = selfPubkey || null
   if (!_headUrl) return
   if (_syncTimer) clearInterval(_syncTimer)
   setTimeout(() => syncAllNodes().catch(() => {}), 30000)
