@@ -1161,29 +1161,37 @@
     }
     setTimeout(noSignal, 18000);
   }
-  // ========== LOCAL VIDEO FEED ==========
+  // ========== LOCAL + FEDERATED VIDEO FEED ==========
+  function _addVideoSlide(video, c) {
+    const vidId = 'local-' + video.id;
+    if (seen.film.has(vidId)) return;
+    seen.film.add(vidId);
+    const ph = c.querySelector('.slide-placeholder'); if (ph) ph.remove();
+    const fakeEv = {
+      id: video.id, pubkey: video.uploader_address || 'local',
+      created_at: video.created_at || Math.floor(Date.now()/1000),
+      content: video.description || video.title || '',
+      tags: [['t','m4tr1x-film'], ...(video.tags||[]).map(t=>['t',t])]
+    };
+    // use _base (remote node) for stream URL if this is a federated item
+    const streamUrl = video._base
+      ? video._base + '/api/v1/video/stream/' + video.id
+      : '/api/v1/video/stream/' + video.id;
+    c.appendChild(mkSlide(fakeEv, streamUrl, 'film'));
+  }
+
   function loadPeerTube() {
     const c = document.getElementById('feed-film');
+    // local content
     fetch('/api/v1/video/list')
       .then(r => r.json())
-      .then(videos => {
-        if (!Array.isArray(videos) || !videos.length) return;
-        videos.forEach(video => {
-          const vidId = 'local-' + video.id;
-          if (seen.film.has(vidId)) return;
-          seen.film.add(vidId);
-          const ph = c.querySelector('.slide-placeholder'); if (ph) ph.remove();
-          const fakeEv = {
-            id: video.id, pubkey: video.uploader_address || 'local',
-            created_at: video.created_at || Math.floor(Date.now()/1000),
-            content: video.description || video.title || '',
-            tags: [['t','m4tr1x-film'], ...(video.tags||[]).map(t=>['t',t])]
-          };
-          const streamUrl = '/api/v1/video/stream/' + video.id;
-          c.appendChild(mkSlide(fakeEv, streamUrl, 'film'));
-        });
-      })
+      .then(videos => { if (Array.isArray(videos)) videos.forEach(v => _addVideoSlide(v, c)); })
       .catch(e => console.warn('[FILM] local load error:', e));
+    // federated content from other nodes
+    fetch('/api/v1/feed/global?type=film&limit=50')
+      .then(r => r.json())
+      .then(videos => { if (Array.isArray(videos)) videos.forEach(v => _addVideoSlide(v, c)); })
+      .catch(() => {});
   }
 
   function loadNostrFilm() {
@@ -1209,30 +1217,43 @@
     }, 8000);
   }
 
-  // ========== LOCAL MUSIC FEED ==========
+  // ========== LOCAL + FEDERATED MUSIC FEED ==========
+  function _addTrackItem(track, list) {
+    const fwTrackId = (track._node ? 'fed-' : 'local-') + track.id;
+    if (seen.music && seen.music.has(fwTrackId)) return;
+    if (seen.music) seen.music.add(fwTrackId);
+    const ph = list.querySelector('.slide-placeholder'); if (ph) ph.remove();
+    const el = document.createElement('div');
+    el.className = 'fw-track-item';
+    const streamUrl = track._base
+      ? track._base + '/api/v1/music/stream/' + track.id
+      : '/api/v1/music/stream/' + track.id;
+    const duration = track.duration ? Math.floor(track.duration/60) + ':' + String(track.duration%60).padStart(2,'0') : '';
+    const nodeLabel = track._node ? ' \u00B7 ' + (track._node.replace(/^https?:\/\//, '').split(':')[0]) : ' \u00B7 M4TR1X';
+    el.innerHTML = '<div class="fw-cover">\uD83C\uDFB5</div>' +
+      '<div class="fw-info"><div class="fw-title">' + esc(track.title||'Untitled') + '</div>' +
+      '<div class="fw-artist">' + esc(track.artist||'Unknown') + nodeLabel + '</div></div>' +
+      '<span class="fw-duration">' + duration + '</span>' +
+      '<button class="h8-tip-btn" style="background:none;border:1px solid rgba(255,34,119,0.4);color:#ff2277;padding:4px 10px;font-size:0.65em;cursor:pointer;margin-left:8px;font-family:inherit" onclick="event.stopPropagation();openZap(\'' + fwTrackId + '\',\'' + esc(track.artist||'unknown') + '\',null)">\u2665 H8</button>';
+    el.onclick = () => playFunkwhale(track.title||'Untitled', track.artist||'Unknown', streamUrl, el);
+    list.appendChild(el);
+  }
+
   function loadFunkwhale() {
     const list = document.getElementById('fw-track-list');
+    let hasLocal = false;
     fetch('/api/v1/music/tracks')
       .then(r => r.json())
       .then(tracks => {
-        if (!Array.isArray(tracks) || !tracks.length) { loadNostrMusic(); return; }
-        tracks.forEach(track => {
-          const ph = list.querySelector('.slide-placeholder'); if (ph) ph.remove();
-          const el = document.createElement('div');
-          el.className = 'fw-track-item';
-          const streamUrl = '/api/v1/music/stream/' + track.id;
-          const duration = track.duration ? Math.floor(track.duration/60) + ':' + String(track.duration%60).padStart(2,'0') : '';
-          const fwTrackId = 'local-' + track.id;
-          el.innerHTML = '<div class="fw-cover">\uD83C\uDFB5</div>' +
-            '<div class="fw-info"><div class="fw-title">' + esc(track.title||'Untitled') + '</div>' +
-            '<div class="fw-artist">' + esc(track.artist||'Unknown') + ' \u00B7 M4TR1X</div></div>' +
-            '<span class="fw-duration">' + duration + '</span>' +
-            '<button class="h8-tip-btn" style="background:none;border:1px solid rgba(255,34,119,0.4);color:#ff2277;padding:4px 10px;font-size:0.65em;cursor:pointer;margin-left:8px;font-family:inherit" onclick="event.stopPropagation();openZap(\'' + fwTrackId + '\',\'' + esc(track.artist||'unknown') + '\',null)">\u2665 H8</button>';
-          el.onclick = () => playFunkwhale(track.title||'Untitled', track.artist||'Unknown', streamUrl, el);
-          list.appendChild(el);
-        });
+        if (Array.isArray(tracks) && tracks.length) { hasLocal = true; tracks.forEach(t => _addTrackItem(t, list)); }
+        else loadNostrMusic();
       })
       .catch(() => loadNostrMusic());
+    // always also load federated tracks
+    fetch('/api/v1/feed/global?type=music&limit=50')
+      .then(r => r.json())
+      .then(tracks => { if (Array.isArray(tracks)) tracks.forEach(t => _addTrackItem(t, list)); })
+      .catch(() => {});
   }
 
   function loadNostrMusic() {

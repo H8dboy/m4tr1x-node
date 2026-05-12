@@ -47,10 +47,11 @@ const {
 
 const { declareNode, resignNode, discoverNodes, startNodeDiscovery, startContentDiscovery, announceContent, locateContent, getLocalUrl, getOnionAddress, getNodeConfig, pickNode, getPrivateNodeUrl, VALID_CAPS } = require('./node_manager')
 const { startStream, stopStream, sendSignal, listStreams, registerRemoteStream, removeRemoteStream } = require('./livestream')
-const videoHost = require('./video_host')
-const photo     = require('./photo')
-const story     = require('./story')
-const p2p       = require('./p2p')
+const videoHost  = require('./video_host')
+const photo      = require('./photo')
+const story      = require('./story')
+const p2p        = require('./p2p')
+const federation = require('./federation')
 
 // âââ Embedded Nostr Relay âââââââââââââââââââââââââââââââââââââââââââââââââââââ
 // Avviato in processo figlio per evitare che EADDRINUSE faccia crashare il server
@@ -438,7 +439,15 @@ app.post('/api/v1/h8/tip', paymentLimit, verifyApiKey, async (req, res) => {
   try {
     const { creatorAddress, amount, contentId } = req.body
     if (!creatorAddress || !amount) return res.status(400).json({ error: 'creatorAddress e amount richiesti' })
-    res.json(await h8token.tip(creatorAddress, parseInt(amount), contentId || ''))
+    const result = await h8token.tip(creatorAddress, parseInt(amount), contentId || '')
+    // Notify head node for tip statistics (fire-and-forget)
+    if (process.env.HEAD_NODE_URL) {
+      require('./heartbeat')._postToHead('/api/v1/head/tip', {
+        from: result.from || '', to: creatorAddress,
+        amount: parseInt(amount), content_id: contentId || '',
+      }).catch(() => {})
+    }
+    res.json(result)
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
 
@@ -449,6 +458,12 @@ app.post('/api/v1/h8tips/send', paymentLimit, async (req, res) => {
     if (!amount || amount <= 0) return res.status(400).json({ error: 'Invalid amount' })
     if (!to_pubkey) return res.status(400).json({ error: 'to_pubkey required' })
     const result = await h8token.tip(to_pubkey, parseInt(amount), memo || event_id || '')
+    if (process.env.HEAD_NODE_URL) {
+      require('./heartbeat')._postToHead('/api/v1/head/tip', {
+        from: from_h8address || '', to: to_pubkey,
+        amount: parseInt(amount), content_id: event_id || '',
+      }).catch(() => {})
+    }
     res.json({ ok: true, txid: result.id || result.txid, amount, to: to_pubkey })
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
@@ -1634,6 +1649,13 @@ app.get('/api/v1/video/list', (req, res) => {
   res.json(videoHost.listVideos(limit, offset))
 })
 
+// Global federated feed — merges content from all registered nodes
+app.get('/api/v1/feed/global', (req, res) => {
+  const type  = req.query.type  || 'film'
+  const limit = Math.min(parseInt(req.query.limit || '50'), 200)
+  res.json(federation.getGlobalFeed(type, limit))
+})
+
 // Delete video (admin only)
 app.delete('/api/v1/video/:id', localhostOnly, verifyAdminKey, (req, res) => {
   try {
@@ -1733,6 +1755,12 @@ function startServer(port = 8080) {
   setTimeout(() => checkAndUpdateModel().catch(() => {}), 5000)
   setTimeout(() => startNodeDiscovery(), 2000)
   setTimeout(() => startContentDiscovery(), 3000)
+  if (process.env.HEAD_NODE_URL) {
+    setTimeout(() => federation.startFederation({ headUrl: process.env.HEAD_NODE_URL, selfUrl: getLocalUrl() }), 5000)
+  }
+  if (process.env.HEAD_NODE === 'true') {
+    setTimeout(() => require('./db_backup').startBackup(), 3000)
+  }
   // Heartbeat al nodo testa (se configurato)
   if (process.env.HEAD_NODE_URL) {
     const hb = require('./heartbeat')

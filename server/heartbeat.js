@@ -9,8 +9,11 @@ let _nodeName   = null
 let _nodeData   = null
 let _walletAddr = null
 let _walletName = null
-let _intervalId = null
-let _startTime  = Date.now()
+let _intervalId  = null
+let _startTime   = Date.now()
+let _baseMs      = 60000
+let _failCount   = 0
+const _MAX_MS    = 10 * 60 * 1000  // 10 min cap
 
 let _counters = { requests: 0, users_active: new Set(), uploads: 0, errors: 0 }
 
@@ -148,9 +151,28 @@ async function _beat() {
 
   const base   = _headUrl.replace(/\/$/, '')
   const status = await _post(`${base}/api/v1/head/heartbeat`, payload)
-  if (status !== 200) {
-    console.warn(`[HEARTBEAT] Head node unreachable (${status}) — will retry`)
+
+  if (status === 200) {
+    _failCount = 0
+  } else {
+    _failCount++
+    const nextMs = Math.min(_baseMs * Math.pow(2, _failCount), _MAX_MS)
+    console.warn(`[HEARTBEAT] Head unreachable (${status}) — retry in ${nextMs / 1000}s (fail #${_failCount})`)
+    if (_intervalId) { clearTimeout(_intervalId); _intervalId = null }
+    _intervalId = setTimeout(_loopBeat, nextMs)
+    return
   }
+
+  _intervalId = setTimeout(_loopBeat, _baseMs)
+}
+
+function _loopBeat() {
+  _beat().catch(() => {
+    _failCount++
+    const nextMs = Math.min(_baseMs * Math.pow(2, _failCount), _MAX_MS)
+    if (_intervalId) { clearTimeout(_intervalId); _intervalId = null }
+    _intervalId = setTimeout(_loopBeat, nextMs)
+  })
 }
 
 function startHeartbeat({ headUrl, pubkey, nodeName, nodeData = {}, walletAddress = null, walletName = null, intervalMs = 60000 }) {
@@ -161,18 +183,19 @@ function startHeartbeat({ headUrl, pubkey, nodeName, nodeData = {}, walletAddres
   _nodeData   = nodeData
   _walletAddr = walletAddress
   _walletName = walletName
+  _baseMs     = intervalMs
+  _failCount  = 0
 
-  if (_intervalId) clearInterval(_intervalId)
-  _intervalId = setInterval(_beat, intervalMs)
+  if (_intervalId) { clearTimeout(_intervalId); _intervalId = null }
 
-  console.log(`[HEARTBEAT] Started → ${headUrl} every ${intervalMs / 1000}s`)
+  console.log(`[HEARTBEAT] Started → ${headUrl} base interval ${intervalMs / 1000}s`)
 
-  // Register node + wallet 10s after startup, then send first heartbeat
-  setTimeout(() => _registerNode().then(() => _beat()).catch(() => {}), 10000)
+  // Register node + wallet 10s after startup, then enter beat loop
+  setTimeout(() => _registerNode().then(() => _loopBeat()).catch(() => {}), 10000)
 }
 
 function stopHeartbeat() {
-  if (_intervalId) { clearInterval(_intervalId); _intervalId = null }
+  if (_intervalId) { clearTimeout(_intervalId); _intervalId = null }
 }
 
 // Call this whenever a user registers, updates profile, or unlocks wallet.
