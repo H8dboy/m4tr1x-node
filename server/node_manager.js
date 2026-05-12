@@ -13,7 +13,8 @@ const { publishNote, getCurrentPubkey, loadSavedKeys, subscribeToFilter } = requ
 const NODE_KIND    = 30078
 const NODE_TAG     = 'm4tr1x-node'
 const NODE_NAME    = process.env.NODE_NAME || 'alpha'
-const VALID_CAPS   = new Set(['film', 'music', 'reels', 'topic'])
+const VALID_CAPS   = new Set(['film', 'music', 'reels', 'topic', 'head'])
+const IS_HEAD_NODE = process.env.HEAD_NODE === 'true'
 
 // Private M4TR1X node URL — all shop/crypto calls route here
 const PRIVATE_NODE_URL = process.env.PRIVATE_NODE_URL || null
@@ -145,16 +146,32 @@ async function announceContent({ id, type, title, category, uploader }) {
   const keys = loadSavedKeys()
   if (!keys) return
   const nodeUrl = getLocalUrl()
+  const onion   = getOnionAddress()
+
+  // Nostr broadcast
   publishNote(
     JSON.stringify({ id, type, title, category, uploader, node: nodeUrl, nodeName: NODE_NAME }),
     keys.privkey,
     [
       ['t', 'm4tr1x-content'],
       ['content-id', id],
-      ['content-type', type],        // 'video' | 'audio'
+      ['content-type', type],
       ['node-url', nodeUrl],
     ]
   ).catch(() => {})
+
+  // Head node registry
+  if (process.env.HEAD_NODE_URL) {
+    require('./heartbeat')._postToHead('/api/v1/head/content', {
+      content_id:      id,
+      content_type:    type || category || 'video',
+      title:           title || '',
+      creator_address: uploader || '',
+      node_url:        nodeUrl || '',
+      onion:           onion ? `http://${onion}` : (process.env.PRIVATE_NODE_URL || ''),
+    }).catch(() => {})
+  }
+
   console.log(`[NODE] Content announced: ${type}/${id} on ${nodeUrl}`)
 }
 

@@ -142,6 +142,23 @@ app.post('/api/v1/shop/stripe/webhook', express.raw({ type: 'application/json' }
 app.use(express.json())
 app.use(globalLimit)
 
+// Track every request + active user for head node heartbeat
+app.use((req, res, next) => {
+  if (process.env.HEAD_NODE_URL) {
+    const hb = require('./heartbeat')
+    hb.trackRequest()
+    const addr = req.headers['x-nostr-pubkey'] || req.headers['x-h8-address'] || req.query?.address
+    if (addr) hb.trackUser(addr)
+    // Track errors via response status
+    const orig = res.json.bind(res)
+    res.json = function(body) {
+      if (res.statusCode >= 500) hb.trackError()
+      return orig(body)
+    }
+  }
+  next()
+})
+
 // âââ Multer (upload file) âââââââââââââââââââââââââââââââââââââââââââââââââââââ
 const upload = multer({
   dest: UPLOAD_DIR,
@@ -334,6 +351,10 @@ app.post('/api/v1/h8/wallet/create', verifyApiKey, async (req, res) => {
     if (!password) return res.status(400).json({ error: 'Password richiesta' })
     if (identityExists()) return res.status(409).json({ error: 'IdentitÃ  H8 giÃ  esistente' })
     const result = await generateIdentity(password)
+    if (process.env.HEAD_NODE_URL) {
+      const hb = require('./heartbeat')
+      hb.registerUser({ address: result.address, name: req.body.name || '', pubkey: getCurrentPubkey() })
+    }
     res.status(201).json({ address: result.address, message: 'H8 identity creata. Salva la tua password.' })
   } catch (err) {
     res.status(500).json({ error: err.message })
@@ -346,6 +367,10 @@ app.post('/api/v1/h8/wallet/unlock', verifyApiKey, async (req, res) => {
     const { password } = req.body
     if (!password) return res.status(400).json({ error: 'Password richiesta' })
     const result = await unlockIdentity(password)
+    if (process.env.HEAD_NODE_URL) {
+      const hb = require('./heartbeat')
+      hb.registerUser({ address: result.address, name: result.name || '', pubkey: getCurrentPubkey() })
+    }
     res.json({ status: 'unlocked', address: result.address, balance: null })
   } catch (err) {
     res.status(401).json({ error: err.message })
@@ -575,6 +600,11 @@ app.post('/api/v1/nostr/profile', async (req, res) => {
     const profKeys = loadSavedKeys()
     if (!profKeys) return res.status(401).json({ error: 'Nostr keys not configured' })
     const event = await publishProfile(req.body, profKeys.privkey)
+    if (process.env.HEAD_NODE_URL && req.body.name) {
+      const hb = require('./heartbeat')
+      const id = require('./h8identity').getUnlockedIdentity()
+      hb.registerUser({ address: id ? id.address : profKeys.pubkey, name: req.body.name, pubkey: profKeys.pubkey })
+    }
     res.json(event)
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
@@ -1230,6 +1260,7 @@ app.post('/api/v1/photo/publish', photoUpload.single('photo'), async (req, res) 
   try {
     const { caption, alt, tags, uploader, music_id, nft_price } = req.body
     const tagList = tags ? tags.split(/[\s,]+/).filter(Boolean) : []
+    if (process.env.HEAD_NODE_URL) require('./heartbeat').trackUpload()
     const result = await photo.publishPhoto(srcPath, {
       caption:   caption   || '',
       alt:       alt       || '',
@@ -1398,6 +1429,10 @@ app.post('/api/v1/wallet/generate', (req, res) => {
     if (!password) return res.status(400).json({ error: 'password required' })
     const w = wallet.generateWallet(bip39_passphrase)
     wallet.saveWallet({ address: w.address, pubkey: w.pubkey, privkeyHex: w.privkey, name }, password)
+    if (process.env.HEAD_NODE_URL) {
+      const hb = require('./heartbeat')
+      hb.registerUser({ address: w.address, name: name || '', pubkey: w.pubkey })
+    }
     res.json({ address: w.address, pubkey: w.pubkey, mnemonic: w.mnemonic, path: w.path, name,
                warning: 'Write down the mnemonic NOW — it will never be shown again.' })
   } catch (err) {
@@ -1413,6 +1448,10 @@ app.post('/api/v1/wallet/import', (req, res) => {
     if (!mnemonic || !password) return res.status(400).json({ error: 'mnemonic and password required' })
     const w = wallet.importWallet(mnemonic, bip39_passphrase)
     wallet.saveWallet({ address: w.address, pubkey: w.pubkey, privkeyHex: w.privkey, name }, password)
+    if (process.env.HEAD_NODE_URL) {
+      const hb = require('./heartbeat')
+      hb.registerUser({ address: w.address, name: name || '', pubkey: w.pubkey })
+    }
     res.json({ address: w.address, pubkey: w.pubkey, path: wallet.DERIV_PATH, name })
   } catch (err) {
     res.status(400).json({ error: err.message })
@@ -1578,6 +1617,7 @@ app.post('/api/v1/video/publish', upload.single('video'), async (req, res) => {
     if (!title) { fs.unlinkSync(tempPath); return res.status(400).json({ error: 'title richiesto' }) }
     const tagList = tags ? tags.split(/[\s,]+/).filter(Boolean) : []
     const result = await videoHost.publishVideo(tempPath, { title, description: description || '', tags: tagList, uploader: uploader || '' })
+    if (process.env.HEAD_NODE_URL) require('./heartbeat').trackUpload()
     res.json({ ok: true, ...result })
   } catch (err) {
     console.error('[VIDEO] Publish error:', err.message)
@@ -1693,6 +1733,32 @@ function startServer(port = 8080) {
   setTimeout(() => checkAndUpdateModel().catch(() => {}), 5000)
   setTimeout(() => startNodeDiscovery(), 2000)
   setTimeout(() => startContentDiscovery(), 3000)
+  // Heartbeat al nodo testa (se configurato)
+  if (process.env.HEAD_NODE_URL) {
+    const hb = require('./heartbeat')
+    const { getCurrentPubkey } = require('./nostr')
+    setTimeout(() => {
+      const pubkey = getCurrentPubkey()
+      if (pubkey) {
+        const onion   = getOnionAddress()
+        const wallets = wallet.listWallets()
+        const firstW  = wallets && wallets.length > 0 ? wallets[0] : null
+        const h8info  = identityExists() ? getPublicInfo() : null
+        hb.startHeartbeat({
+          headUrl:       process.env.HEAD_NODE_URL,
+          pubkey,
+          nodeName:      process.env.NODE_NAME || 'alpha',
+          nodeData: {
+            onion:        onion ? `http://${onion}` : (process.env.PRIVATE_NODE_URL || null),
+            capabilities: ['media', 'relay', 'nostr'],
+            version:      require('../package.json').version,
+          },
+          walletAddress: firstW ? firstW.address : (h8info ? h8info.address : null),
+          walletName:    firstW ? (firstW.name || 'default') : (h8info ? 'h8identity' : null),
+        })
+      }
+    }, 8000)
+  }
   return new Promise((resolve, reject) => {
     server = app.listen(port, '::', () => {
       const { networkInterfaces } = require('os')
