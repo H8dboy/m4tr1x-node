@@ -256,7 +256,7 @@ body::before {
 
 /* ── Label buttons LEFT side ─────────────────────────────────────────────── */
 .slide-labels {
-  position:absolute; left:10px; bottom:120px;
+  position:absolute; left:10px; top:80px;
   display:flex; flex-direction:column; align-items:center; gap:10px; z-index:4;
 }
 .slbl {
