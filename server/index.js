@@ -1794,6 +1794,21 @@ function startServer(port = 8080) {
         const wallets = wallet.listWallets()
         const firstW  = wallets && wallets.length > 0 ? wallets[0] : null
         const h8info  = identityExists() ? getPublicInfo() : null
+
+        // Look up real Nostr display name from local relay
+        const _nostrName = (() => {
+          try {
+            const relayDbPath = process.env.USERDATA_PATH
+              ? path.join(process.env.USERDATA_PATH, 'relay.db')
+              : path.join(DATA_DIR, 'relay.db')
+            const rdb  = new (require('better-sqlite3'))(relayDbPath, { readonly: true })
+            const row  = rdb.prepare('SELECT content FROM events WHERE kind=0 AND pubkey=? ORDER BY created_at DESC LIMIT 1').get(pubkey)
+            rdb.close()
+            if (row) { const p = JSON.parse(row.content); return p.name || p.display_name || null }
+          } catch {}
+          return null
+        })()
+
         hb.startHeartbeat({
           headUrl:       process.env.HEAD_NODE_URL,
           pubkey,
@@ -1804,8 +1819,29 @@ function startServer(port = 8080) {
             version:      require('../package.json').version,
           },
           walletAddress: firstW ? firstW.address : (h8info ? h8info.address : null),
-          walletName:    firstW ? (firstW.name || 'default') : (h8info ? 'h8identity' : null),
+          walletName:    _nostrName || (firstW ? (firstW.name || 'default') : (h8info ? h8info.name || null : null)),
         })
+
+        // Register all users who have a Nostr profile in the local relay
+        setTimeout(() => {
+          try {
+            const relayDbPath = process.env.USERDATA_PATH
+              ? path.join(process.env.USERDATA_PATH, 'relay.db')
+              : path.join(DATA_DIR, 'relay.db')
+            const rdb = new (require('better-sqlite3'))(relayDbPath, { readonly: true })
+            const profiles = rdb.prepare('SELECT pubkey, content FROM events WHERE kind=0').all()
+            rdb.close()
+            const id = require('./h8identity').getUnlockedIdentity()
+            profiles.forEach(row => {
+              try {
+                const p = JSON.parse(row.content)
+                const name = p.name || p.display_name
+                if (!name) return
+                hb.registerUser({ address: id?.address || row.pubkey, name, pubkey: row.pubkey })
+              } catch {}
+            })
+          } catch {}
+        }, 20000)  // after heartbeat registration
       }
     }, 8000)
   }
