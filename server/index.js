@@ -250,7 +250,21 @@ app.post('/blossom/upload', blossomUpload.single('file'), async (req, res) => {
   const dest = path.join(BLOBS_DIR, sha256)
   fs.renameSync(req.file.path, dest)
   const base = (process.env.PRIVATE_NODE_URL || 'http://localhost:8080').replace(/\/$/, '')
-  res.json({ url: `${base}/blossom/${sha256}`, sha256, size: req.file.size, type: req.file.mimetype })
+  const url  = `${base}/blossom/${sha256}`
+  const mime = req.file.mimetype || ''
+
+  // Announce to head node and track upload for any media file
+  if (mime.startsWith('video/') || mime.startsWith('image/') || mime.startsWith('audio/')) {
+    const uploader = req.headers['x-nostr-pubkey'] || req.headers['x-h8-address'] || ''
+    const type = mime.startsWith('video/') ? 'video' : mime.startsWith('audio/') ? 'audio' : 'photo'
+    if (process.env.HEAD_NODE_URL) {
+      const hb = require('./heartbeat')
+      hb.trackUpload()
+      announceContent({ id: sha256, type, title: req.file.originalname || sha256.slice(0,12), uploader }).catch(() => {})
+    }
+  }
+
+  res.json({ url, sha256, size: req.file.size, type: mime })
 })
 
 app.get('/blossom/:sha256', (req, res) => {
