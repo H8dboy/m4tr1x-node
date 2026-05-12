@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>M4TR1X — Head Node</title>
+<style>
+* { box-sizing:border-box; margin:0; padding:0; }
+:root { --bg:#0a0a0f; --panel:#111118; --border:#1e1e2e; --green:#00ff88; --blue:#00aaff; --red:#ff4466; --yellow:#ffcc44; --text:#e0e0e0; --muted:#555; }
+body { background:var(--bg); color:var(--text); font-family:'Courier New',monospace; font-size:13px; }
+header { display:flex; align-items:center; gap:14px; padding:14px 24px; border-bottom:1px solid var(--border); background:var(--panel); }
+header h1 { font-size:17px; color:var(--green); letter-spacing:3px; }
+.hdr-sub { color:var(--muted); font-size:11px; margin-top:2px; word-break:break-all; }
+.hdr-sub span { color:var(--blue); }
+.dot { width:9px; height:9px; border-radius:50%; flex-shrink:0; }
+.dot.on  { background:var(--green); box-shadow:0 0 7px var(--green); }
+.dot.off { background:var(--red);   box-shadow:0 0 7px var(--red); }
+nav { display:flex; border-bottom:1px solid var(--border); background:var(--panel); }
+nav button { background:none; border:none; color:var(--muted); padding:10px 20px; cursor:pointer; font-family:inherit; font-size:12px; letter-spacing:1px; border-bottom:2px solid transparent; }
+nav button.active { color:var(--green); border-bottom-color:var(--green); }
+nav button:hover { color:var(--text); }
+.page { display:none; padding:20px 24px; }
+.page.active { display:block; }
+.stats { display:grid; grid-template-columns:repeat(6,1fr); gap:10px; margin-bottom:20px; }
+@media(max-width:900px){ .stats { grid-template-columns:repeat(3,1fr); } }
+.stat { background:var(--panel); border:1px solid var(--border); border-radius:8px; padding:14px; text-align:center; }
+.stat .num   { font-size:26px; font-weight:bold; }
+.stat .label { color:var(--muted); margin-top:3px; font-size:10px; text-transform:uppercase; letter-spacing:1px; }
+.green { color:var(--green); } .blue { color:var(--blue); } .red { color:var(--red); } .yellow { color:var(--yellow); } .muted { color:var(--muted); }
+h2 { font-size:11px; text-transform:uppercase; letter-spacing:2px; color:var(--blue); margin-bottom:10px; border-bottom:1px solid var(--border); padding-bottom:7px; }
+table { width:100%; border-collapse:collapse; margin-bottom:24px; }
+th { text-align:left; color:var(--muted); font-size:10px; text-transform:uppercase; letter-spacing:1px; padding:7px 10px; border-bottom:1px solid var(--border); }
+td { padding:8px 10px; border-bottom:1px solid #13131c; font-size:12px; word-break:break-all; }
+tr:hover td { background:#13131c; }
+.badge { display:inline-block; padding:2px 7px; border-radius:4px; font-size:10px; text-transform:uppercase; margin-right:2px; }
+.badge-film  { background:#1a2a1a; color:#44ff88; border:1px solid #44ff8833; }
+.badge-music { background:#1a1a2a; color:#4488ff; border:1px solid #4488ff33; }
+.badge-reels { background:#2a1a1a; color:#ff8844; border:1px solid #ff884433; }
+.badge-topic { background:#2a2a1a; color:#ffcc44; border:1px solid #ffcc4433; }
+.badge-head  { background:#2a1a2a; color:#ff44ff; border:1px solid #ff44ff33; }
+.badge-video { background:#2a1a1a; color:#ff8844; border:1px solid #ff884433; }
+.badge-photo { background:#1a2a2a; color:#44ffcc; border:1px solid #44ffcc33; }
+.pill { display:inline-block; padding:2px 9px; border-radius:10px; font-size:10px; font-weight:bold; }
+.pill-on  { background:#0a2a1a; color:var(--green); border:1px solid #00ff8844; }
+.pill-off { background:#2a0a0f; color:var(--red);   border:1px solid #ff446644; }
+.ev-node_online     { color:var(--green); }
+.ev-node_offline    { color:var(--red); }
+.ev-high_errors     { color:var(--yellow); }
+.ev-node_registered { color:var(--blue); }
+.addr     { color:var(--green); font-size:11px; }
+.onion-cell { color:var(--blue); font-size:11px; }
+.time     { color:var(--muted); font-size:10px; white-space:nowrap; }
+.ago      { color:var(--muted); font-size:10px; }
+.empty    { color:var(--muted); text-align:center; padding:20px; font-size:11px; }
+.chart-wrap  { background:var(--panel); border:1px solid var(--border); border-radius:8px; padding:16px; margin-bottom:20px; }
+.chart-title { color:var(--muted); font-size:10px; text-transform:uppercase; letter-spacing:1px; margin-bottom:10px; }
+.chart-empty { color:var(--muted); font-size:11px; text-align:center; padding:30px; }
+footer { text-align:center; color:var(--muted); font-size:10px; padding:12px; border-top:1px solid var(--border); display:flex; justify-content:space-between; padding:10px 24px; }
+.progress-bar { height:4px; background:var(--border); border-radius:2px; overflow:hidden; margin-top:8px; }
+.progress-fill { height:100%; background:var(--green); border-radius:2px; transition:width 1s linear; }
+</style>
+</head>
+<body>
+<header>
+  <div class="dot off" id="dot"></div>
+  <div>
+    <h1>M4TR1X // HEAD NODE</h1>
+    <div class="hdr-sub" id="hdr-sub">connecting...</div>
+  </div>
+</header>
+<nav>
+  <button class="active" onclick="tab(event,'overview')">Overview</button>
+  <button onclick="tab(event,'nodes')">Nodes</button>
+  <button onclick="tab(event,'users')">Users &amp; Wallets</button>
+  <button onclick="tab(event,'content')">Content</button>
+  <button onclick="tab(event,'events')">Events</button>
+  <button onclick="tab(event,'growth')">Growth</button>
+</nav>
+
+<div class="page active" id="page-overview">
+  <div class="stats">
+    <div class="stat"><div class="num green"  id="s-online">—</div><div class="label">Online Nodes</div></div>
+    <div class="stat"><div class="num red"    id="s-offline">—</div><div class="label">Offline Nodes</div></div>
+    <div class="stat"><div class="num blue"   id="s-users">—</div><div class="label">Registered Users</div></div>
+    <div class="stat"><div class="num green"  id="s-active">—</div><div class="label">Active Users</div></div>
+    <div class="stat"><div class="num yellow" id="s-content">—</div><div class="label">Content Items</div></div>
+    <div class="stat"><div class="num red"    id="s-errors">—</div><div class="label">Errors / hr</div></div>
+  </div>
+  <h2>Network Health</h2>
+  <table>
+    <thead><tr><th>Node</th><th>Status</th><th>Uptime</th><th>Req/hr</th><th>Active Users</th><th>Uploads/hr</th><th>Errors</th><th>Last Beat</th></tr></thead>
+    <tbody id="tbl-health"><tr><td colspan="8" class="empty">Waiting for heartbeats...</td></tr></tbody>
+  </table>
+</div>
+
+<div class="page" id="page-nodes">
+  <h2>Registered Nodes</h2>
+  <table>
+    <thead><tr><th>Name</th><th>Capabilities</th><th>Address</th><th>Content</th><th>Users</th><th>Registered</th><th>Last Seen</th></tr></thead>
+    <tbody id="tbl-nodes"><tr><td colspan="7" class="empty">No nodes yet</td></tr></tbody>
+  </table>
+</div>
+
+<div class="page" id="page-users">
+  <h2>Users &amp; Wallets</h2>
+  <table>
+    <thead><tr><th>User</th><th>H8 Address</th><th>Node</th><th>Pubkey</th><th>Registered</th><th>Last Seen</th></tr></thead>
+    <tbody id="tbl-users"><tr><td colspan="6" class="empty">No users yet</td></tr></tbody>
+  </table>
+</div>
+
+<div class="page" id="page-content">
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+    <h2 style="margin:0">Content Registry</h2>
+    <select id="filter-node" style="background:var(--panel);color:var(--text);border:1px solid var(--border);border-radius:5px;padding:4px 8px;font-family:inherit;font-size:11px">
+      <option value="">All nodes</option>
+    </select>
+    <span id="content-count" style="color:var(--muted);font-size:11px"></span>
+  </div>
+  <table>
+    <thead><tr><th>ID</th><th>Type</th><th>Title</th><th>Creator</th><th>Node</th><th>Announced</th></tr></thead>
+    <tbody id="tbl-content"><tr><td colspan="6" class="empty">No content yet</td></tr></tbody>
+  </table>
+</div>
+
+<div class="page" id="page-events">
+  <h2>Network Events</h2>
+  <table>
+    <thead><tr><th>Time</th><th>Ago</th><th>Type</th><th>Node</th><th>Detail</th></tr></thead>
+    <tbody id="tbl-events"><tr><td colspan="5" class="empty">No events yet</td></tr></tbody>
+  </table>
+</div>
+
+<div class="page" id="page-growth">
+  <div class="chart-wrap"><div class="chart-title">Registered Users (cumulative)</div><canvas id="chart-users" height="80"></canvas><div class="chart-empty" id="chart-users-empty" style="display:none">Not enough data yet — charts fill after multiple hourly snapshots</div></div>
+  <div class="chart-wrap"><div class="chart-title">Requests / hr</div><canvas id="chart-reqs" height="80"></canvas><div class="chart-empty" id="chart-reqs-empty" style="display:none">Not enough data yet</div></div>
+  <div class="chart-wrap"><div class="chart-title">Active Nodes</div><canvas id="chart-nodes" height="80"></canvas><div class="chart-empty" id="chart-nodes-empty" style="display:none">Not enough data yet</div></div>
+</div>
+
+<footer>
+  <span id="footer-left">loading...</span>
+  <span id="footer-right"></span>
+</footer>
+
+<script>
+function tab(e, name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'))
+  document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'))
+  document.getElementById('page-'+name).classList.add('active')
+  e.target.classList.add('active')
+  if (name === 'growth') setTimeout(drawCharts, 50)
+}
+
+const fmt   = iso => iso ? new Date(iso).toLocaleString('it-IT') : '—'
+const short = (s,n=24) => s && s.length>n ? s.slice(0,n)+'…' : (s||'—')
+const esc   = s => (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+
+function ago(iso) {
+  if (!iso) return '—'
+  const d = Math.floor((Date.now() - new Date(iso).getTime()) / 1000)
+  if (d < 5)   return 'just now'
+  if (d < 60)  return d + 's ago'
+  if (d < 3600) return Math.floor(d/60) + 'm ago'
+  if (d < 86400) return Math.floor(d/3600) + 'h ago'
+  return Math.floor(d/86400) + 'd ago'
+}
+
+function uptime(s) {
+  s = s || 0
+  const d = Math.floor(s/86400), h = Math.floor((s%86400)/3600), m = Math.floor((s%3600)/60)
+  if (d) return `${d}d ${h}h ${m}m`
+  if (h) return `${h}h ${m}m`
+  return `${m}m ${s%60}s`
+}
+
+function caps(arr) {
+  try { arr = typeof arr==='string' ? JSON.parse(arr) : arr } catch {}
+  return (arr||[]).map(c=>`<span class="badge badge-${c}">${c}</span>`).join('')
+}
+
+// cache data for charts
+let _history = []
+
+async function load() {
+  try {
+    const [status, netStatus, summary, nodes, users, content, events] = await Promise.all([
+      fetch('/api/v1/head/status').then(r=>r.json()),
+      fetch('/api/v1/head/network/status').then(r=>r.json()),
+      fetch('/api/v1/head/network/summary').then(r=>r.json()),
+      fetch('/api/v1/head/nodes').then(r=>r.json()),
+      fetch('/api/v1/head/users').then(r=>r.json()),
+      fetch('/api/v1/head/content').then(r=>r.json()),
+      fetch('/api/v1/head/network/events?limit=50').then(r=>r.json()),
+    ])
+
+    // Header
+    document.getElementById('dot').className = 'dot on'
+    const onionTxt = status.onion
+      ? `<span>${status.onion}</span>`
+      : `<span style="color:var(--muted)">Tor not running</span> &nbsp;·&nbsp; head node`
+    document.getElementById('hdr-sub').innerHTML = onionTxt
+
+    // Overview stats
+    document.getElementById('s-online').textContent  = summary.online_nodes  ?? netStatus.filter(n=>n.online).length
+    document.getElementById('s-offline').textContent = (nodes.length - (summary.online_nodes ?? netStatus.filter(n=>n.online).length))
+    document.getElementById('s-users').textContent   = summary.total_users   ?? users.length
+    document.getElementById('s-content').textContent = summary.total_content ?? content.length
+    // active users = sum of users_active from last heartbeats
+    const activeUsers = netStatus.reduce((a,n)=>a+(n.users_active||0),0)
+    document.getElementById('s-active').textContent  = activeUsers
+    const totalErrors = netStatus.reduce((a,n)=>a+(n.errors_1h||0),0)
+    document.getElementById('s-errors').textContent  = totalErrors
+
+    // Health table
+    document.getElementById('tbl-health').innerHTML = netStatus.length
+      ? netStatus.map(n=>`<tr>
+          <td><b>${esc(n.node_name||'unnamed')}</b></td>
+          <td><span class="pill ${n.online?'pill-on':'pill-off'}">${n.online?'ONLINE':'OFFLINE'}</span></td>
+          <td>${uptime(n.uptime_s)}</td>
+          <td>${n.requests_1h||0}</td>
+          <td>${n.users_active||0}</td>
+          <td>${n.uploads_1h||0}</td>
+          <td class="${(n.errors_1h||0)>0?'red':''}">${n.errors_1h||0}</td>
+          <td class="ago">${ago(n.ts)}</td>
+        </tr>`).join('')
+      : '<tr><td colspan="8" class="empty">Waiting for heartbeats from nodes...</td></tr>'
+
+    // Nodes table
+    document.getElementById('tbl-nodes').innerHTML = nodes.length
+      ? nodes.map(n=>{
+          const onionKey = (n.onion||'').replace(/^https?:\/\//,'').split('/')[0]
+          const nContent = content.filter(c =>
+            (n.onion && c.onion && c.onion.includes(onionKey)) ||
+            (n.node_url && c.node_url === n.node_url)
+          ).length
+          const nUsers = users.filter(u =>
+            (n.onion && u.node_url && u.node_url.includes(onionKey)) ||
+            (n.node_url && u.node_url === n.node_url)
+          ).length
+          const addr = n.onion || n.node_url || '—'
+          return `<tr>
+            <td><b>${esc(n.name||'unnamed')}</b></td>
+            <td>${caps(n.capabilities)}</td>
+            <td class="onion-cell" style="font-size:10px">${short(addr,46)}</td>
+            <td style="color:var(--blue);font-weight:bold">${nContent}</td>
+            <td style="color:var(--green);font-weight:bold">${nUsers}</td>
+            <td class="time">${fmt(n.registered_at)}</td>
+            <td class="ago">${ago(n.last_seen)}</td>
+          </tr>`
+        }).join('')
+      : '<tr><td colspan="7" class="empty">No nodes registered yet</td></tr>'
+
+    // Users table
+    document.getElementById('tbl-users').innerHTML = users.length
+      ? users.map(u=>{
+          const displayName = u.name && u.name !== 'h8identity'
+            ? `<b style="color:var(--green)">${esc(u.name)}</b>`
+            : `<span style="color:var(--muted);font-style:italic">unnamed</span>`
+          // find node name
+          const onionKey = (u.node_url||'').replace(/^https?:\/\//,'').split('/')[0]
+          const nodeName = nodes.find(n =>
+            (n.onion && onionKey && n.onion.includes(onionKey)) ||
+            n.node_url === u.node_url
+          )?.name || short(u.node_url,20)
+          return `<tr>
+            <td>${displayName}</td>
+            <td class="addr">${u.address}</td>
+            <td style="color:var(--blue)">${esc(nodeName)}</td>
+            <td style="color:var(--muted);font-size:10px">${u.pubkey?short(u.pubkey,22):'—'}</td>
+            <td class="time">${fmt(u.registered_at)}</td>
+            <td class="ago">${ago(u.last_seen)}</td>
+          </tr>`
+        }).join('')
+      : '<tr><td colspan="6" class="empty">No users registered yet</td></tr>'
+
+    // Content tab
+    const filterSel   = document.getElementById('filter-node')
+    const currentFilt = filterSel.value
+    filterSel.innerHTML = '<option value="">All nodes</option>' +
+      nodes.map(n=>`<option value="${n.onion||n.node_url}"${(n.onion||n.node_url)===currentFilt?' selected':''}>${esc(n.name||'unnamed')}</option>`).join('')
+
+    const nodeLabel = (nodeUrl, onion) => {
+      const key = (onion||'').replace(/^https?:\/\//,'').split('/')[0]
+      const m = nodes.find(n =>
+        (key && n.onion && n.onion.includes(key)) ||
+        (nodeUrl && n.node_url === nodeUrl)
+      )
+      return m ? m.name : short(onion||nodeUrl,18)
+    }
+
+    const renderContent = filter => {
+      const filtered = filter
+        ? content.filter(c => c.onion===filter || c.node_url===filter)
+        : content
+      document.getElementById('content-count').textContent = filtered.length + ' item' + (filtered.length!==1?'s':'')
+      document.getElementById('tbl-content').innerHTML = filtered.length
+        ? filtered.map(c=>`<tr>
+            <td style="color:var(--muted);font-size:10px">${short(c.content_id,14)}</td>
+            <td><span class="badge badge-${c.content_type||'video'}">${c.content_type||'video'}</span></td>
+            <td><b>${esc(short(c.title,34)) || '<i style="color:var(--muted)">untitled</i>'}</b></td>
+            <td class="addr">${short(c.creator_address,20)}</td>
+            <td><b style="color:var(--blue)">${esc(nodeLabel(c.node_url,c.onion))}</b></td>
+            <td class="ago">${ago(c.announced_at)}</td>
+          </tr>`).join('')
+        : '<tr><td colspan="6" class="empty">No content for this node</td></tr>'
+    }
+    filterSel.onchange = () => renderContent(filterSel.value)
+    renderContent(currentFilt)
+
+    // Events
+    document.getElementById('tbl-events').innerHTML = events.length
+      ? events.map(e=>`<tr>
+          <td class="time">${fmt(e.ts)}</td>
+          <td class="ago">${ago(e.ts)}</td>
+          <td class="ev-${e.type}">${(e.type||'').replace(/_/g,' ')}</td>
+          <td>${esc(e.node_name||'—')}</td>
+          <td style="color:var(--muted);font-size:11px">${esc(short(e.detail,50)||'—')}</td>
+        </tr>`).join('')
+      : '<tr><td colspan="5" class="empty">No events yet</td></tr>'
+
+  } catch(err) {
+    document.getElementById('dot').className = 'dot off'
+    document.getElementById('hdr-sub').textContent = 'Server unreachable — ' + err.message
+  }
+  document.getElementById('footer-left').textContent = 'Last update: ' + new Date().toLocaleTimeString('it-IT')
+}
+
+// ─── Charts ───────────────────────────────────────────────────────────────────
+function drawLineChart(id, data, color) {
+  const emptyEl = document.getElementById(id + '-empty')
+  const canvas  = document.getElementById(id)
+  if (!canvas) return
+  if (!data || data.length < 2) {
+    canvas.style.display = 'none'
+    if (emptyEl) emptyEl.style.display = 'block'
+    return
+  }
+  canvas.style.display = 'block'
+  if (emptyEl) emptyEl.style.display = 'none'
+  canvas.width  = canvas.parentElement.clientWidth - 32
+  canvas.height = parseInt(canvas.getAttribute('height')) || 80
+  const ctx = canvas.getContext('2d'), W = canvas.width, H = canvas.height
+  ctx.clearRect(0,0,W,H)
+  const max = Math.max(...data, 1), step = W / (data.length - 1)
+  ctx.strokeStyle = '#1e1e2e'; ctx.lineWidth = 1
+  for (let i=0; i<=4; i++) {
+    const y = H - (i/4)*H
+    ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke()
+    ctx.fillStyle = '#444'; ctx.font = '9px Courier New'
+    ctx.fillText(Math.round(max*i/4), 2, y-2)
+  }
+  const pts = data.map((v,i)=>({ x: i*step, y: H - (v/max)*(H-14) }))
+  ctx.beginPath(); ctx.moveTo(pts[0].x, H)
+  pts.forEach(p => ctx.lineTo(p.x, p.y))
+  ctx.lineTo(pts[pts.length-1].x, H); ctx.closePath()
+  ctx.fillStyle = color + '22'; ctx.fill()
+  ctx.beginPath(); ctx.strokeStyle = color; ctx.lineWidth = 2
+  pts.forEach((p,i) => i===0 ? ctx.moveTo(p.x,p.y) : ctx.lineTo(p.x,p.y))
+  ctx.stroke()
+  // last value label
+  const last = pts[pts.length-1]
+  ctx.fillStyle = color; ctx.font = 'bold 10px Courier New'
+  ctx.fillText(data[data.length-1], Math.max(last.x-18,2), Math.max(last.y-4,12))
+}
+
+async function drawCharts() {
+  try {
+    const h = await fetch('/api/v1/head/network/history?hours=48').then(r=>r.json())
+    _history = Array.isArray(h) ? h.reverse() : []  // oldest first
+    drawLineChart('chart-users', _history.map(x=>x.total_users||0),    '#00ff88')
+    drawLineChart('chart-reqs',  _history.map(x=>x.total_requests||0), '#00aaff')
+    drawLineChart('chart-nodes', _history.map(x=>x.active_nodes||0),   '#ffcc44')
+  } catch(e) { console.warn('[charts]', e) }
+}
+
+// ─── Auto-refresh with countdown ─────────────────────────────────────────────
+const REFRESH = 30
+let countdown = REFRESH
+setInterval(() => {
+  countdown--
+  document.getElementById('footer-right').textContent = 'Refresh in ' + countdown + 's'
+  if (countdown <= 0) { countdown = REFRESH; load() }
+}, 1000)
+
+load()
+</script>
+</body>
+</html>

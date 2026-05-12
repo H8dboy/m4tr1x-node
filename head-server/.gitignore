@@ -1,0 +1,12 @@
+node_modules/
+.env
+*.db
+*.db-shm
+*.db-wal
+*.log
+*.enc
+*.key
+
+# Private shop/payment module — not open source
+h8shop.js
+head_auth.js
