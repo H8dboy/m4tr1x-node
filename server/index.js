@@ -1830,7 +1830,8 @@ function startServer(port = 8080) {
           pubkey,
           nodeName:      process.env.NODE_NAME || 'alpha',
           nodeData: {
-            onion:        onion ? `http://${onion}` : (process.env.PRIVATE_NODE_URL || null),
+            onion:        onion ? `http://${onion}` : null,
+            nodeUrl:      getLocalUrl(),
             capabilities: ['media', 'relay', 'nostr'],
             version:      require('../package.json').version,
           },

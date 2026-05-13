@@ -888,8 +888,6 @@
   };
   // ========== STATE ==========
   const S={pubkey:window._pk,h8address:window._h8address||window._pk,method:window._method,privkey:null,muted:true,section:'signal',loaded:{signal:false,film:false,music:false,forum:false,shop:false,dm:false,live:true},cmtEventId:null,zapEventId:null,zapPubkey:null,zapCreatorH8Id:null,file:null,uploadCat:'signal',tokenBalance:0,tokenAmount:0,dmTarget:null,fwPlaying:null};
-  const RELAYS=CONFIG.relays;
-  const BLOSSOM=CONFIG.blossom;
   const CAT_TAG={signal:'m4tr1x-signal',film:'m4tr1x-film',music:'m4tr1x-music'};
   const ws={};const seen={signal:new Set(),film:new Set(),music:new Set(),forum:new Set(),shop:new Set()};const profCache={};const evCache={};
 
@@ -1030,7 +1028,7 @@
     }catch(e){}
   }
   function connectRelays(){
-    RELAYS.forEach(url=>connectRelay(url));
+    CONFIG.relays.forEach(url=>connectRelay(url));
     setTimeout(()=>{
       const anyOk=Object.values(ws).some(r=>r.ok);
       if(!S.loaded.signal){
@@ -1191,7 +1189,7 @@
   }
   // ========== LOCAL + FEDERATED VIDEO FEED ==========
   function _addVideoSlide(video, c) {
-    const vidId = 'local-' + video.id;
+    const vidId = (video._node || 'local') + '-' + video.id;
     if (seen.film.has(vidId)) return;
     seen.film.add(vidId);
     const ph = c.querySelector('.slide-placeholder'); if (ph) ph.remove();

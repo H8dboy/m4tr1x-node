@@ -107,14 +107,15 @@ async function _post(url, body) {
 async function _registerNode() {
   if (!_headUrl || !_pubkey) return
   const base    = _headUrl.replace(/\/$/, '')
-  const nodeUrl = _nodeData?.onion || null
+  const onion   = _nodeData?.onion   || ''   // actual .onion URL (may be empty)
+  const lanUrl  = _nodeData?.nodeUrl || ''   // LAN URL (http://192.168.x.x:port)
 
   // Register the node itself
   const nodePayload = {
     pubkey:       _pubkey,
     name:         _nodeName || 'unknown',
-    onion:        nodeUrl || '',
-    node_url:     nodeUrl || '',
+    onion:        onion,
+    node_url:     lanUrl || onion,           // LAN URL preferred; fall back to onion
     capabilities: _nodeData?.capabilities || ['media', 'relay'],
     ws_port:      4848,
   }
@@ -126,7 +127,7 @@ async function _registerNode() {
     const userPayload = {
       address:  _walletAddr,
       pubkey:   _pubkey,
-      node_url: nodeUrl || '',
+      node_url: lanUrl || onion,
       name:     _walletName || 'default',
     }
     const walletStatus = await _post(`${base}/api/v1/head/user`, userPayload)
@@ -203,7 +204,7 @@ function stopHeartbeat() {
 function registerUser({ address, name, pubkey }) {
   if (!_headUrl || !address) return
   const base    = _headUrl.replace(/\/$/, '')
-  const nodeUrl = _nodeData?.onion || ''
+  const nodeUrl = _nodeData?.nodeUrl || _nodeData?.onion || ''
   const payload = { address, pubkey: pubkey || _pubkey || '', node_url: nodeUrl, name: name || '' }
   _post(`${base}/api/v1/head/user`, payload)
     .then(s => { if (s !== 200) console.warn(`[HEARTBEAT] User registration HTTP ${s}`) })
