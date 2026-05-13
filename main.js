@@ -69,12 +69,13 @@ function waitForServer(port, maxMs = 15000) {
 
 // ─── Content Security Policy ──────────────────────────────────────────────────
 function setupCSP() {
-  // Read node onion address for CSP (may be null if Tor not running)
   const _nodeOnion = (() => {
     try { return require('./server/node_manager').getOnionAddress() } catch { return null }
   })()
+  const _publicUrl = process.env.PUBLIC_NODE_URL || ''
   const _onionOrigin = _nodeOnion ? `http://${_nodeOnion}` : ''
   const _onionWs     = _nodeOnion ? `ws://${_nodeOnion}:4848` : ''
+  const _publicWss   = _publicUrl ? _publicUrl.replace(/^https?:\/\//, 'wss://') + '/relay' : ''
 
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
     callback({
@@ -82,16 +83,13 @@ function setupCSP() {
         ...details.responseHeaders,
         'Content-Security-Policy': [
           [
-            `default-src 'self' http://localhost:8080 ${_onionOrigin}`.trim(),
+            `default-src 'self' http://localhost:8080 ${_onionOrigin} ${_publicUrl}`.trim(),
             "script-src 'self' 'unsafe-inline'",
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
             "font-src 'self' https://fonts.gstatic.com",
-            // .onion for federated images/avatars + localhost
-            `img-src 'self' data: blob: http://localhost:8080 ${_onionOrigin} https:`.trim(),
-            // .onion for federated video/audio streams
-            `media-src 'self' blob: http://localhost:8080 ${_onionOrigin} https:`.trim(),
-            // .onion for API calls + websocket relays
-            `connect-src 'self' http://localhost:8080 ${_onionOrigin} ws://localhost:4848 ${_onionWs} wss: https:`.trim(),
+            `img-src 'self' data: blob: http://localhost:8080 ${_onionOrigin} ${_publicUrl} https:`.trim(),
+            `media-src 'self' blob: http://localhost:8080 ${_onionOrigin} ${_publicUrl} https:`.trim(),
+            `connect-src 'self' http://localhost:8080 ${_onionOrigin} ${_publicUrl} ws://localhost:4848 ${_onionWs} ${_publicWss} wss: https:`.trim(),
             "frame-src https:",
             "object-src 'none'",
             "base-uri 'self'",

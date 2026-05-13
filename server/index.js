@@ -1095,7 +1095,10 @@ app.post('/api/v1/profile/post', async (req, res) => {
 // ─── Config ───────────────────────────────────────────────────────────────────
 app.get('/api/v1/config', (req, res) => {
   const port     = process.env.PORT || 8080
-  const localUrl = getLocalUrl(port)
+  // Always the LAN/localhost URL — not the public domain
+  const { networkInterfaces } = require('os')
+  const _lan = Object.values(networkInterfaces()).flat().find(n => n.family === 'IPv4' && !n.internal)
+  const localUrl = _lan ? `http://${_lan.address}:${port}` : `http://localhost:${port}`
   const privUrl  = getPrivateNodeUrl() || localUrl
 
   // Resolve onion: prefer Tor hostname file, fall back to PRIVATE_NODE_URL hostname
@@ -1107,17 +1110,24 @@ app.get('/api/v1/config', (req, res) => {
     } catch {}
   }
 
+  const publicUrl = process.env.PUBLIC_NODE_URL || null
+
   const relays = ['ws://localhost:4848']
   if (onion) relays.push(`ws://${onion}:4848`)
+  if (publicUrl) {
+    const wsPublic = publicUrl.replace(/^https?:\/\//, 'wss://') + '/relay'
+    if (!relays.includes(wsPublic)) relays.push(wsPublic)
+  }
 
   res.json({
     privateNodeUrl: privUrl,
+    publicNodeUrl:  publicUrl,
     headNodeUrl:    process.env.HEAD_NODE_URL || null,
     nodeOnion:      onion   || null,
     nodeUrl:        localUrl,
     nodeName:       process.env.NODE_NAME || 'alpha',
     relays,
-    blossom:        localUrl + '/blossom',
+    blossom:        (publicUrl || localUrl) + '/blossom',
   })
 })
 
