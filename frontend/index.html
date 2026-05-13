@@ -996,6 +996,17 @@
     });
     delete _subs[sid]; delete _esubs[sid];
   }
+  // Rewrite self-node .onion URLs to localhost so content loads without Tor
+  function localizeUrl(url) {
+    if (!url) return url;
+    const onion = CONFIG.nodeOnion;
+    if (onion && url.includes(onion)) {
+      return url.replace('http://' + onion, 'http://localhost:8080')
+                .replace('https://' + onion, 'http://localhost:8080');
+    }
+    return url;
+  }
+
   function wsDispatch(e) {
     try {
       const d = JSON.parse(e.data);
@@ -1122,7 +1133,7 @@
         if(seen[sec].has(ev.id))return;
         if(!ev.tags.some(t=>t[0]==='t'&&t[1]==='m4tr1x-signal'))return;
         const uTag=ev.tags.find(t=>t[0]==='url');const mTag=ev.tags.find(t=>t[0]==='m');
-        if(!uTag)return;const vurl=uTag[1];
+        if(!uTag)return;const vurl=localizeUrl(uTag[1]);
         const mime=mTag?.[1]||'';
         const isVideo=mime.startsWith('video')||!!vurl.match(/\.(mp4|mov|webm|avi|mkv)(\?|$)/i);
         if(!isVideo)return;
@@ -1167,7 +1178,7 @@
         const isVideo = mime.startsWith('video') || !!uTag[1].match(/\.(mp4|mov|webm|mkv)(\?|$)/i);
         if (!isVideo) return;
         fbSeen.add(ev.id); seen[sec].add(ev.id);
-        fbBuf.push({ev, vurl: uTag[1]});
+        fbBuf.push({ev, vurl: localizeUrl(uTag[1])});
       }, () => {
         // EOSE from this relay: if we have items, render now
         if (fbBuf.length >= 3) renderFb(fbBuf.splice(0));
@@ -1235,7 +1246,7 @@
         if (seen.film.has(ev.id)) return;
         const uTag = ev.tags.find(t => t[0] === 'url'); if (!uTag) return;
         if (!ev.tags.some(t => t[0] === 't' && t[1] === 'm4tr1x-film')) return;
-        seen.film.add(ev.id); buf.push({ev, vurl: uTag[1]}); scheduleRender();
+        seen.film.add(ev.id); buf.push({ev, vurl: localizeUrl(uTag[1])}); scheduleRender();
       });
     });
     setTimeout(() => {
@@ -1296,7 +1307,7 @@
         const mime = ev.tags.find(t => t[0] === 'm')?.[1] || '';
         const ph = document.querySelector('#fw-track-list .slide-placeholder');
         if (ph) ph.style.display = 'none';
-        renderNostrMusicSlide(ev, uTag[1], mime, c);
+        renderNostrMusicSlide(ev, localizeUrl(uTag[1]), mime, c);
       });
     });
   }
