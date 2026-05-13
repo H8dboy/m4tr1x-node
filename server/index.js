@@ -1094,10 +1094,18 @@ app.post('/api/v1/profile/post', async (req, res) => {
 // Cerca il bundle in ordine: build CommonJS â bundle UMD â fallback 404
 // ─── Config ───────────────────────────────────────────────────────────────────
 app.get('/api/v1/config', (req, res) => {
-  const port      = process.env.PORT || 8080
-  const onion     = getOnionAddress()
-  const localUrl  = getLocalUrl(port)
-  const privUrl   = getPrivateNodeUrl() || localUrl
+  const port     = process.env.PORT || 8080
+  const localUrl = getLocalUrl(port)
+  const privUrl  = getPrivateNodeUrl() || localUrl
+
+  // Resolve onion: prefer Tor hostname file, fall back to PRIVATE_NODE_URL hostname
+  let onion = getOnionAddress()
+  if (!onion && process.env.PRIVATE_NODE_URL) {
+    try {
+      const u = new URL(process.env.PRIVATE_NODE_URL)
+      if (u.hostname.endsWith('.onion')) onion = u.hostname
+    } catch {}
+  }
 
   const relays = ['ws://localhost:4848']
   if (onion) relays.push(`ws://${onion}:4848`)
@@ -1109,7 +1117,7 @@ app.get('/api/v1/config', (req, res) => {
     nodeUrl:        localUrl,
     nodeName:       process.env.NODE_NAME || 'alpha',
     relays,
-    blossom:        privUrl + '/blossom',
+    blossom:        localUrl + '/blossom',
   })
 })
 
