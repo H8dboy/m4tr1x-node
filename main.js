@@ -69,19 +69,29 @@ function waitForServer(port, maxMs = 15000) {
 
 // ─── Content Security Policy ──────────────────────────────────────────────────
 function setupCSP() {
+  // Read node onion address for CSP (may be null if Tor not running)
+  const _nodeOnion = (() => {
+    try { return require('./server/node_manager').getOnionAddress() } catch { return null }
+  })()
+  const _onionOrigin = _nodeOnion ? `http://${_nodeOnion}` : ''
+  const _onionWs     = _nodeOnion ? `ws://${_nodeOnion}:4848` : ''
+
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
     callback({
       responseHeaders: {
         ...details.responseHeaders,
         'Content-Security-Policy': [
           [
-            "default-src 'self' http://localhost:8080",
+            `default-src 'self' http://localhost:8080 ${_onionOrigin}`.trim(),
             "script-src 'self' 'unsafe-inline'",
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
             "font-src 'self' https://fonts.gstatic.com",
-            "img-src 'self' data: https:",
-            "media-src 'self' https:",
-            "connect-src 'self' http://localhost:8080 ws://localhost:4848 wss: https:",
+            // .onion for federated images/avatars + localhost
+            `img-src 'self' data: blob: http://localhost:8080 ${_onionOrigin} https:`.trim(),
+            // .onion for federated video/audio streams
+            `media-src 'self' blob: http://localhost:8080 ${_onionOrigin} https:`.trim(),
+            // .onion for API calls + websocket relays
+            `connect-src 'self' http://localhost:8080 ${_onionOrigin} ws://localhost:4848 ${_onionWs} wss: https:`.trim(),
             "frame-src https:",
             "object-src 'none'",
             "base-uri 'self'",
@@ -176,7 +186,18 @@ async function createWindow() {
 ipcMain.handle('get-app-version',    () => app.getVersion())
 ipcMain.handle('get-platform',       () => process.platform)
 ipcMain.handle('get-user-data-path', () => app.getPath('userData'))
-ipcMain.handle('get-tor-status',     () => torStatus)   // frontend can show the 🧅 icon
+ipcMain.handle('get-tor-status',     () => torStatus)
+ipcMain.handle('get-node-config', () => {
+  try {
+    const nm = require('./server/node_manager')
+    return {
+      onion:       nm.getOnionAddress(),
+      nodeUrl:     nm.getLocalUrl(),
+      nodeName:    process.env.NODE_NAME || 'alpha',
+      headNodeUrl: process.env.HEAD_NODE_URL || null,
+    }
+  } catch { return {} }
+})
 
 // ─── Lifecycle ────────────────────────────────────────────────────────────────
 app.whenReady().then(createWindow)

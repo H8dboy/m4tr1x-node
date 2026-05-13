@@ -11,5 +11,6 @@ contextBridge.exposeInMainWorld('m4tr1x_native', {
   getPlatform:     () => ipcRenderer.invoke('get-platform'),
   getUserDataPath: () => ipcRenderer.invoke('get-user-data-path'),
   getTorStatus:    () => ipcRenderer.invoke('get-tor-status'),
+  getNodeConfig:   () => ipcRenderer.invoke('get-node-config'),
   isElectron:      true,
 })

@@ -744,12 +744,23 @@
   })();
 
   // ========== CONFIGURATION ==========
+  // CONFIG populated from server at startup — no hardcoded URLs
   const CONFIG = {
-    // Nostr relays — local node only
-    relays: ['ws://localhost:4848','ws://fcicneomtw4mihstawh6spu6f6lpxo6m4dxu276hm3q5nqmdaod4jyqd.onion:4848'],
-    // Blossom servers
-    blossom: {'M4TR1X Node':'/blossom'}
+    relays:  ['ws://localhost:4848'],
+    blossom: {'M4TR1X Node':'/blossom'},
+    headNodeUrl: null,
+    nodeOnion:   null,
+    nodeName:    'alpha',
   };
+  // Load real config from server (non-blocking — fills CONFIG before connectRelays())
+  const _cfgPromise = fetch('/api/v1/config').then(r=>r.json()).then(cfg=>{
+    if(cfg.relays?.length)  CONFIG.relays  = cfg.relays;
+    if(cfg.blossom)         CONFIG.blossom = {'M4TR1X Node': cfg.blossom};
+    if(cfg.headNodeUrl)     CONFIG.headNodeUrl = cfg.headNodeUrl;
+    if(cfg.nodeOnion)       CONFIG.nodeOnion   = cfg.nodeOnion;
+    if(cfg.nodeName)        CONFIG.nodeName    = cfg.nodeName;
+    return cfg;
+  }).catch(()=>({}));
 
   // ========== DM ENCRYPTION ENGINE ==========
   // Transitional layer — Session 2 sostituirà con NIP-44 nativo
@@ -883,22 +894,47 @@
   const ws={};const seen={signal:new Set(),film:new Set(),music:new Set(),forum:new Set(),shop:new Set()};const profCache={};const evCache={};
 
   // ========== INIT ==========
-  // ── Mobile detection (Tauri on Android/iOS has no local server) ─────────────
+  // ── Mobile detection + Electron node config ──────────────────────────────────
   var IS_MOBILE = false;
   (async function detectMobile(){
     if(window.m4tr1x_native && window.m4tr1x_native.isMobile){
       try{ IS_MOBILE = await window.m4tr1x_native.isMobile(); }catch(e){}
     }
-    // On mobile, hide features that require the local Express server
     if(IS_MOBILE){
       document.querySelectorAll('.desktop-only').forEach(el=>el.style.display='none');
+    }
+    // Pull Tor status + node config from Electron IPC (no-op in browser mode)
+    if(window.m4tr1x_native){
+      try {
+        const tor = await window.m4tr1x_native.getTorStatus().catch(()=>null);
+        if(tor?.torEnabled){
+          // Show 🧅 in header or title bar hint
+          const hdr = document.getElementById('user-avatar-top');
+          if(hdr) hdr.title = 'Tor active — maximum privacy';
+        }
+        const nc = await window.m4tr1x_native.getNodeConfig().catch(()=>null);
+        if(nc){
+          if(nc.onion && !CONFIG.nodeOnion)   CONFIG.nodeOnion   = nc.onion;
+          if(nc.headNodeUrl && !CONFIG.headNodeUrl) CONFIG.headNodeUrl = nc.headNodeUrl;
+          if(nc.nodeName)  CONFIG.nodeName  = nc.nodeName;
+        }
+      } catch(e){}
     }
   })();
 
   window.addEventListener('load',()=>{
-    // Load private node URL then initialize wallet
-    fetch('/api/v1/config').then(r=>r.json()).then(cfg=>{
-      if(cfg.privateNodeUrl) S.privateNodeUrl=cfg.privateNodeUrl;
+    // Wait for config, then init wallet and relays in the right order
+    _cfgPromise.then(cfg=>{
+      if(cfg.privateNodeUrl) S.privateNodeUrl = cfg.privateNodeUrl;
+      // Init wallet after config is ready
+      fetch((S.privateNodeUrl||'')+'/api/v1/h8/wallet/status').then(r=>r.json()).then(d=>{
+        if(d?.address) S.h8address=d.address;
+        if(d?.balance !== undefined) { S.tokenBalance=d.balance; updateTopbarH8(d.balance); }
+        if(d?.locked===false && d?.balance > 0) {
+          document.getElementById('token-balance').textContent = d.balance;
+        }
+      }).catch(()=>{});
+      refreshH8Balance();
     }).catch(()=>{});
 
     // Live badge polling every 30s
@@ -914,18 +950,10 @@
     setTimeout(pollLiveBadge,2000);
     setInterval(pollLiveBadge,30000);
 
-    // Carica H8 address e stato wallet in sessione
-    fetch((S.privateNodeUrl||'')+'/api/v1/h8/wallet/status').then(r=>r.json()).then(d=>{
-      if(d?.address) S.h8address=d.address;
-      if(d?.balance !== undefined) { S.tokenBalance=d.balance; updateTopbarH8(d.balance); }
-      if(d?.locked===false && d?.balance > 0) {
-        document.getElementById('token-balance').textContent = d.balance;
-      }
-    }).catch(()=>{});
-    refreshH8Balance();
     document.getElementById('token-balance').textContent=S.tokenBalance;
     try{const p=JSON.parse(localStorage.getItem('m4tr1x_profile')||'{}');if(p.picture)setAvatar(document.getElementById('user-avatar-top'),p.picture,'width:100%;height:100%;object-fit:cover;border-radius:50%')}catch(e){}
-    connectRelays();
+    // Connect relays after config loads so we use the server-provided relay URLs
+    _cfgPromise.then(()=>connectRelays()).catch(()=>connectRelays());
     const dz=document.getElementById('drop-zone');
     dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('drag')});
     dz.addEventListener('dragleave',()=>dz.classList.remove('drag'));

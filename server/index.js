@@ -1094,7 +1094,23 @@ app.post('/api/v1/profile/post', async (req, res) => {
 // Cerca il bundle in ordine: build CommonJS â bundle UMD â fallback 404
 // ─── Config ───────────────────────────────────────────────────────────────────
 app.get('/api/v1/config', (req, res) => {
-  res.json({ privateNodeUrl: getPrivateNodeUrl() || `http://localhost:${process.env.PORT || 8080}` })
+  const port      = process.env.PORT || 8080
+  const onion     = getOnionAddress()
+  const localUrl  = getLocalUrl(port)
+  const privUrl   = getPrivateNodeUrl() || localUrl
+
+  const relays = ['ws://localhost:4848']
+  if (onion) relays.push(`ws://${onion}:4848`)
+
+  res.json({
+    privateNodeUrl: privUrl,
+    headNodeUrl:    process.env.HEAD_NODE_URL || null,
+    nodeOnion:      onion   || null,
+    nodeUrl:        localUrl,
+    nodeName:       process.env.NODE_NAME || 'alpha',
+    relays,
+    blossom:        privUrl + '/blossom',
+  })
 })
 
 // ─── Node Manager API ─────────────────────────────────────────────────────────
