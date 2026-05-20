@@ -13,6 +13,7 @@ const Database = require('better-sqlite3')
 const http     = require('http')
 const path     = require('path')
 const crypto   = require('crypto')
+const { verifyNostrEvent } = require('./nostr-verify')
 
 const RELAY_PORT = 4848
 const DB_PATH    = process.env.USERDATA_PATH
@@ -165,6 +166,11 @@ wss.on('connection', ws => {
     if (type === 'EVENT') {
       const ev = args[0]
       if (!ev?.id || !ev?.pubkey || !ev?.sig) return
+      // NIP-01 §3: reject events with invalid ID or Schnorr signature
+      if (!verifyNostrEvent(ev)) {
+        ws.send(JSON.stringify(['OK', ev.id, false, 'invalid: bad signature']))
+        return
+      }
       const saved = saveEvent(ev)
       ws.send(JSON.stringify(['OK', ev.id, true, saved ? '' : 'duplicate']))
       if (saved) broadcast(ev, ws)
