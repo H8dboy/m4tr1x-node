@@ -427,8 +427,10 @@ app.post('/api/v1/h8/sign-event', (req, res) => {
 })
 
 // ─── H8 Token Economy ────────────────────────────────────────────────────────
-const h8token = require('./h8token')
+const h8token    = require('./h8token')
+const ledgerSync = require('./ledger_sync')
 h8token.initLedger()
+ledgerSync.startBlockSync()
 
 app.get('/api/v1/h8/balance', verifyApiKey, (req, res) => {
   const addr = req.query.address || require('./h8identity').getUnlockedIdentity()?.address

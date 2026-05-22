@@ -21,6 +21,13 @@ const h8id      = require('./h8identity')
 const { sha3_256 }  = require('@noble/hashes/sha3')
 const { bytesToHex } = require('@noble/hashes/utils')
 
+// Lazy import to avoid circular deps: ledger_sync → nostr → h8identity etc.
+let _sync = null
+function getSync() {
+  if (!_sync) _sync = require('./ledger_sync')
+  return _sync
+}
+
 // ─── Supply constants ─────────────────────────────────────────────────────────
 const MAX_SUPPLY       = 100_000_000
 const FOUNDER_SHARE    =  50_000_000
@@ -173,7 +180,14 @@ async function appendBlock({ from, to, amount, tx_type, content_id = null, note 
   db.prepare(`INSERT INTO ledger (ts, from_addr, to_addr, amount, tx_type, content_id, note, prev_hash, hash, signature, from_pubkey) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
     .run(ts, from, to, amount, tx_type, content_id, note, prevHash, hash, signature, fromPubkey)
 
-  return { block_index: idx, ts, from_addr: from, to_addr: to, amount, tx_type, hash }
+  const block = { block_index: idx, ts, from_addr: from, to_addr: to, amount, tx_type, content_id, hash, signature, signer_pubkey: fromPubkey }
+
+  // Announce signed block to the network in background (non-blocking)
+  if (signature && fromPubkey) {
+    setImmediate(() => getSync().announceBlock(block).catch(() => {}))
+  }
+
+  return block
 }
 
 // ─── Balance ──────────────────────────────────────────────────────────────────
@@ -182,16 +196,33 @@ function getBalance(address) {
   const db = getDb()
   const inc = db.prepare('SELECT COALESCE(SUM(amount),0) as s FROM ledger WHERE to_addr=?').get(address).s
   const out = db.prepare('SELECT COALESCE(SUM(amount),0) as s FROM ledger WHERE from_addr=? AND from_addr!=?').get(address, MINT_ADDRESS).s
-  return inc - out
+  const localBal = inc - out
+
+  // Include verified transactions from other nodes
+  let remoteBal = 0
+  try { remoteBal = getSync().getRemoteBalance(address) } catch {}
+
+  return localBal + remoteBal
 }
 
 // ─── History ──────────────────────────────────────────────────────────────────
 function getHistory(address, limit = 50) {
   if (!validAddress(address)) return []
-  return getDb().prepare(`
-    SELECT block_index, ts, from_addr, to_addr, amount, tx_type, content_id, note, hash, signature
+  const local = getDb().prepare(`
+    SELECT block_index, ts, from_addr, to_addr, amount, tx_type, content_id, note, hash,
+           'local' AS source
     FROM ledger WHERE from_addr=? OR to_addr=? ORDER BY ts DESC LIMIT ?
   `).all(address, address, limit)
+
+  let remote = []
+  try { remote = getSync().getRemoteHistory(address, limit) } catch {}
+
+  // Merge and dedup by hash, sort by ts
+  const seen = new Set(local.map(b => b.hash))
+  return [
+    ...local,
+    ...remote.filter(b => !seen.has(b.hash)),
+  ].sort((a, b) => b.ts - a.ts).slice(0, limit)
 }
 
 // ─── Public ledger (full, paginated) ─────────────────────────────────────────
