@@ -6,7 +6,8 @@
 
 const { SimplePool, finalizeEvent, generateSecretKey, getPublicKey,
   nip04, nip44, nip19 } = require('nostr-tools')
-const { webcrypto } = require('crypto')
+const nodeCrypto = require('crypto')
+const { webcrypto } = nodeCrypto
 const path  = require('path')
 const fs    = require('fs')
 const os    = require('os')
@@ -18,6 +19,9 @@ if (!globalThis.crypto) globalThis.crypto = webcrypto
 // ── Key storage ───────────────────────────────────────────────────────────────
 const DATA_DIR  = process.env.M4TR1X_DATA_DIR || path.join(os.homedir(), '.m4tr1x')
 const KEYS_FILE = path.join(DATA_DIR, 'nostr_keys.json')
+
+// Session state — cleared on lock or process restart
+let _unlockedPrivkey = null
 
 function getKeysPath () { return KEYS_FILE }
 
@@ -32,23 +36,106 @@ function generateKeys () {
   }
 }
 
-function saveKeys (keys) {
-  if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true })
-  fs.writeFileSync(KEYS_FILE, JSON.stringify(keys, null, 2), { mode: 0o600 })
+// ── Nostr key encryption (scrypt + AES-256-GCM, same pattern as h8identity) ──
+
+function _encryptPrivkey (privkeyHex, password) {
+  const salt   = nodeCrypto.randomBytes(32)
+  const key    = nodeCrypto.scryptSync(password, salt, 32, { N: 131072, r: 8, p: 1, maxmem: 256 * 1024 * 1024 })
+  const iv     = nodeCrypto.randomBytes(12)
+  const cipher = nodeCrypto.createCipheriv('aes-256-gcm', key, iv)
+  const enc    = Buffer.concat([cipher.update(privkeyHex, 'utf8'), cipher.final()])
+  return {
+    salt:      salt.toString('hex'),
+    iv:        iv.toString('hex'),
+    authTag:   cipher.getAuthTag().toString('hex'),
+    encrypted: enc.toString('hex'),
+  }
 }
 
+function _decryptPrivkey (stored, password) {
+  const key      = nodeCrypto.scryptSync(password, Buffer.from(stored.salt, 'hex'), 32, { N: 131072, r: 8, p: 1, maxmem: 256 * 1024 * 1024 })
+  const decipher = nodeCrypto.createDecipheriv('aes-256-gcm', key, Buffer.from(stored.iv, 'hex'))
+  decipher.setAuthTag(Buffer.from(stored.authTag, 'hex'))
+  return decipher.update(Buffer.from(stored.encrypted, 'hex'), null, 'utf8') + decipher.final('utf8')
+}
+
+function saveKeys (keys, password) {
+  if (!password) throw new Error('Password richiesta per salvare le chiavi Nostr')
+  if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true })
+  const stored = {
+    version: 2,
+    pubkey:  keys.pubkey,
+    npub:    keys.npub,
+    ..._encryptPrivkey(keys.privkey, password),
+  }
+  fs.writeFileSync(KEYS_FILE, JSON.stringify(stored, null, 2), { mode: 0o600 })
+}
+
+// Returns only public info — privkey requires unlockNostrKeys(password)
 function loadSavedKeys () {
   if (!fs.existsSync(KEYS_FILE)) return null
-  try { return JSON.parse(fs.readFileSync(KEYS_FILE, 'utf8')) } catch { return null }
+  try {
+    const stored = JSON.parse(fs.readFileSync(KEYS_FILE, 'utf8'))
+    return { pubkey: stored.pubkey, npub: stored.npub }
+  } catch { return null }
 }
 
-function loadKeys (privkeyHex) {
+function loadKeys (privkeyHex, password) {
+  if (!password) throw new Error('Password richiesta per salvare le chiavi Nostr')
   const sk = Buffer.from(privkeyHex, 'hex')
   const pk = getPublicKey(sk)
-  const keys = { privkey: privkeyHex, pubkey: pk,
-    npub: nip19.npubEncode(pk), nsec: nip19.nsecEncode(sk) }
-  saveKeys(keys)
-  return keys
+  const keys = { privkey: privkeyHex, pubkey: pk, npub: nip19.npubEncode(pk) }
+  saveKeys(keys, password)
+  _unlockedPrivkey = privkeyHex
+  return { pubkey: pk, npub: nip19.npubEncode(pk) }
+}
+
+/**
+ * Decrypts the Nostr private key and holds it in memory for the session.
+ * Auto-migrates old plaintext format: backs up the old file as .bak, then
+ * re-saves encrypted. Password is used as the new encryption password.
+ */
+function unlockNostrKeys (password) {
+  if (!fs.existsSync(KEYS_FILE)) throw new Error('Nostr keys non trovate. Importa o genera prima le chiavi.')
+  const raw    = fs.readFileSync(KEYS_FILE, 'utf8')
+  const stored = JSON.parse(raw)
+
+  if (!stored.version || stored.version < 2) {
+    // Old plaintext format — migrate automatically
+    if (!stored.privkey) throw new Error('File chiavi Nostr corrotto: nessuna privkey trovata.')
+    const privkeyHex = stored.privkey
+    fs.writeFileSync(KEYS_FILE + '.bak', raw, { mode: 0o600 })
+    const pk       = stored.pubkey || getPublicKey(Buffer.from(privkeyHex, 'hex'))
+    const newStored = {
+      version: 2,
+      pubkey:  pk,
+      npub:    stored.npub || nip19.npubEncode(pk),
+      ..._encryptPrivkey(privkeyHex, password),
+    }
+    fs.writeFileSync(KEYS_FILE, JSON.stringify(newStored, null, 2), { mode: 0o600 })
+    console.log('[nostr] Chiavi migrate da plaintext a formato cifrato. Backup: nostr_keys.json.bak')
+    _unlockedPrivkey = privkeyHex
+    return { pubkey: pk, npub: newStored.npub }
+  }
+
+  let privkeyHex
+  try {
+    privkeyHex = _decryptPrivkey(stored, password)
+  } catch {
+    throw new Error('Password errata o file chiavi Nostr corrotto.')
+  }
+  _unlockedPrivkey = privkeyHex
+  console.log('[nostr] Chiavi Nostr sbloccate.')
+  return { pubkey: stored.pubkey, npub: stored.npub }
+}
+
+function lockNostrKeys () {
+  _unlockedPrivkey = null
+  console.log('[nostr] Chiavi Nostr bloccate.')
+}
+
+function getUnlockedNostrPrivkey () {
+  return _unlockedPrivkey
 }
 
 function getCurrentPubkey () {
@@ -297,6 +384,9 @@ module.exports = {
   loadSavedKeys,
   getKeysPath,
   getCurrentPubkey,
+  unlockNostrKeys,
+  lockNostrKeys,
+  getUnlockedNostrPrivkey,
   connectToRelays,
   getConnectedRelays,
   publishEvent,

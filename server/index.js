@@ -25,6 +25,7 @@ const {
 } = require('./h8identity')
 const {
   generateKeys, loadSavedKeys, loadKeys, getCurrentPubkey,
+  unlockNostrKeys, lockNostrKeys, getUnlockedNostrPrivkey,
   connectToRelays, getConnectedRelays,
   publishNote, publishVideoAttestation,
   fetchFeed, sendEncryptedDM, fetchDMs, publishProfile,
@@ -592,10 +593,26 @@ app.post('/api/v1/nostr/keys', (req, res) => {
 })
 
 app.post('/api/v1/nostr/load-keys', (req, res) => {
-  const { privkey } = req.body
-  if (!privkey) return res.status(400).json({ error: 'privkey richiesta' })
-  loadKeys(privkey)
-  res.json({ pubkey: getCurrentPubkey() })
+  const { privkey, password } = req.body
+  if (!privkey || !password) return res.status(400).json({ error: 'privkey e password richieste' })
+  try {
+    const result = loadKeys(privkey, password)
+    res.json({ pubkey: result.pubkey })
+  } catch (err) { res.status(500).json({ error: err.message }) }
+})
+
+app.post('/api/v1/nostr/unlock', verifyApiKey, (req, res) => {
+  const { password } = req.body
+  if (!password) return res.status(400).json({ error: 'Password richiesta' })
+  try {
+    const result = unlockNostrKeys(password)
+    res.json({ status: 'unlocked', pubkey: result.pubkey })
+  } catch (err) { res.status(401).json({ error: err.message }) }
+})
+
+app.post('/api/v1/nostr/lock', verifyApiKey, (req, res) => {
+  lockNostrKeys()
+  res.json({ status: 'locked' })
 })
 
 app.get('/api/v1/nostr/relays', async (req, res) => {
@@ -617,22 +634,23 @@ app.get('/api/v1/nostr/feed', async (req, res) => {
 app.post('/api/v1/nostr/post', async (req, res) => {
   try {
     const { content, tags } = req.body
-    const keys = loadSavedKeys()
-    if (!keys) return res.status(401).json({ error: 'Nostr keys not configured' })
-    const event = await publishNote(content, keys.privkey, tags || [])
+    const privkey = getUnlockedNostrPrivkey()
+    if (!privkey) return res.status(401).json({ error: 'Nostr keys not unlocked. Call /api/v1/nostr/unlock first.' })
+    const event = await publishNote(content, privkey, tags || [])
     res.json(event)
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
 
 app.post('/api/v1/nostr/profile', async (req, res) => {
   try {
-    const profKeys = loadSavedKeys()
-    if (!profKeys) return res.status(401).json({ error: 'Nostr keys not configured' })
-    const event = await publishProfile(req.body, profKeys.privkey)
+    const privkey = getUnlockedNostrPrivkey()
+    if (!privkey) return res.status(401).json({ error: 'Nostr keys not unlocked. Call /api/v1/nostr/unlock first.' })
+    const pubkey = getCurrentPubkey()
+    const event = await publishProfile(req.body, privkey)
     if (process.env.HEAD_NODE_URL && req.body.name) {
       const hb = require('./heartbeat')
       const id = require('./h8identity').getUnlockedIdentity()
-      hb.registerUser({ address: id ? id.address : profKeys.pubkey, name: req.body.name, pubkey: profKeys.pubkey })
+      hb.registerUser({ address: id ? id.address : pubkey, name: req.body.name, pubkey })
     }
     res.json(event)
   } catch (err) { res.status(500).json({ error: err.message }) }
@@ -641,18 +659,18 @@ app.post('/api/v1/nostr/profile', async (req, res) => {
 app.post('/api/v1/nostr/dm', async (req, res) => {
   try {
     const { recipientPubkey, message } = req.body
-    const dmKeys = loadSavedKeys()
-    if (!dmKeys) return res.status(401).json({ error: 'Nostr keys not configured' })
-    const event = await sendEncryptedDM(recipientPubkey, message, dmKeys.privkey)
+    const privkey = getUnlockedNostrPrivkey()
+    if (!privkey) return res.status(401).json({ error: 'Nostr keys not unlocked. Call /api/v1/nostr/unlock first.' })
+    const event = await sendEncryptedDM(recipientPubkey, message, privkey)
     res.json(event)
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
 
 app.get('/api/v1/nostr/dm/:pubkey', async (req, res) => {
   try {
-    const fetchKeys = loadSavedKeys()
-    if (!fetchKeys) return res.status(401).json({ error: 'Nostr keys not configured' })
-    const messages = await fetchDMs(fetchKeys.pubkey, req.params.pubkey, fetchKeys.privkey)
+    const privkey = getUnlockedNostrPrivkey()
+    if (!privkey) return res.status(401).json({ error: 'Nostr keys not unlocked. Call /api/v1/nostr/unlock first.' })
+    const messages = await fetchDMs(getCurrentPubkey(), req.params.pubkey, privkey)
     res.json(messages)
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
