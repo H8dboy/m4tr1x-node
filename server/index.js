@@ -218,7 +218,7 @@ const uploadLimit = rateLimit({
 
 // âââ API Key middleware âââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 function verifyApiKey(req, res, next) {
-  const ip = req.ip || req.connection?.remoteAddress || ''
+  const ip = req.socket.remoteAddress || ''
   const isLocal = ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1'
   if (API_KEY && !isLocal && req.headers['x-api-key'] !== API_KEY) {
     return res.status(401).json({ error: 'Invalid or missing API key' })
@@ -518,6 +518,15 @@ app.get('/api/v1/h8/ledger', (req, res) => {
 // Public supply stats — total minted, allocation, max supply
 app.get('/api/v1/h8/stats', (req, res) => {
   res.json(h8token.getLedgerStats())
+})
+
+// Admin-only mint (requires H8_ADMIN_MINT_KEY env — disabled unless explicitly set)
+app.post('/api/v1/admin/h8/mint', localhostOnly, verifyAdminKey, async (req, res) => {
+  try {
+    const { toAddress, amount } = req.body
+    if (!toAddress || !amount) return res.status(400).json({ error: 'toAddress and amount required' })
+    res.json(await h8token.mintTokens(toAddress, parseInt(amount), process.env.H8_ADMIN_MINT_KEY || ADMIN_KEY))
+  } catch (e) { res.status(500).json({ error: e.message }) }
 })
 
 // ─── Explorer API ─────────────────────────────────────────────────────────────
@@ -928,7 +937,7 @@ app.post('/api/v1/train/model/update', verifyApiKey, async (req, res) => {
 
 // Middleware: solo localhost per endpoint admin
 function localhostOnly(req, res, next) {
-  const ip = req.ip || req.connection.remoteAddress || ''
+  const ip = req.socket.remoteAddress || ''
   if (ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1') return next()
   return res.status(403).json({ error: 'Admin access restricted to localhost' })
 }

@@ -294,14 +294,54 @@ function getBoostScore(contentId) {
   return getDb().prepare(`SELECT COALESCE(SUM(amount),0) as s FROM ledger WHERE content_id=? AND tx_type='boost'`).get(contentId).s
 }
 
+const SQLITE_VAR_LIMIT = 999
+
 function getBoostScoresBatch(ids) {
   if (!ids?.length) return {}
-  const ph = ids.map(() => '?').join(',')
-  const rows = getDb().prepare(`SELECT content_id, COALESCE(SUM(amount),0) as s FROM ledger WHERE tx_type='boost' AND content_id IN (${ph}) GROUP BY content_id`).all(...ids)
   const result = {}
   ids.forEach(id => { result[id] = 0 })
-  rows.forEach(r => { result[r.content_id] = r.s })
+  const db = getDb()
+  for (let i = 0; i < ids.length; i += SQLITE_VAR_LIMIT) {
+    const chunk = ids.slice(i, i + SQLITE_VAR_LIMIT)
+    const ph = chunk.map(() => '?').join(',')
+    const rows = db.prepare(`SELECT content_id, COALESCE(SUM(amount),0) as s FROM ledger WHERE tx_type='boost' AND content_id IN (${ph}) GROUP BY content_id`).all(...chunk)
+    rows.forEach(r => { result[r.content_id] = r.s })
+  }
   return result
+}
+
+// ─── Privileged mint (admin key required — bypasses fixed-supply guard) ───────
+// Only active when H8_ADMIN_MINT_KEY env var is explicitly set (not in production).
+async function mintTokens(to, amount, adminKey) {
+  const expectedKey = process.env.H8_ADMIN_MINT_KEY
+  if (!expectedKey) throw new Error('H8_ADMIN_MINT_KEY not configured — mint disabled')
+  if (!adminKey || adminKey !== expectedKey) throw new Error('Invalid admin key')
+  if (!validAddress(to)) throw new Error('Invalid recipient address')
+  if (!Number.isInteger(amount) || amount <= 0) throw new Error('amount must be a positive integer')
+
+  const db      = getDb()
+  const last    = db.prepare('SELECT * FROM ledger ORDER BY block_index DESC LIMIT 1').get()
+  const idx     = (last ? last.block_index : 0) + 1
+  const ts      = Math.floor(Date.now() / 1000)
+  const prevHash = last ? last.hash : '0'.repeat(64)
+  const hash    = hashBlock(idx, ts, '0x0', to, amount, 'mint', null, prevHash)
+
+  let signature, fromPubkey = null
+  try {
+    signature  = await h8id.signWithUnlocked(hash)
+    const u    = h8id.getUnlockedIdentity()
+    fromPubkey = u ? u.publicKey : null
+  } catch {
+    throw new Error('H8 wallet locked — unlock wallet before admin mint')
+  }
+
+  db.prepare(`INSERT INTO ledger (ts, from_addr, to_addr, amount, tx_type, content_id, note, prev_hash, hash, signature, from_pubkey) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+    .run(ts, '0x0', to, amount, 'mint', null, 'admin_mint', prevHash, hash, signature, fromPubkey)
+
+  console.log(`[H8] Mint autorizzato: ${amount} → ${to}`)
+  const block = { block_index: idx, ts, from_addr: '0x0', to_addr: to, amount, tx_type: 'mint', hash, signature, signer_pubkey: fromPubkey }
+  if (signature && fromPubkey) setImmediate(() => getSync().announceBlock(block).catch(() => {}))
+  return block
 }
 
 // ─── Chain verification (hash integrity + ML-DSA signature verification) ──────
@@ -356,6 +396,7 @@ module.exports = {
   getBoostScore,
   getBoostScoresBatch,
   verifyChain,
+  mintTokens,
   MAX_SUPPLY,
   FOUNDER_ADDRESS,
   COMMUNITY_ADDRESS,

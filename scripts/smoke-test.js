@@ -51,6 +51,7 @@ async function run() {
     H8_PLATFORM_ADDRESS: 'H8' + '1'.repeat(38),
     H8_SERVER_ADDRESS:   'H8' + '2'.repeat(38),
     APP_SECRET: 'a'.repeat(64),
+    H8_ADMIN_MINT_KEY: ADMIN,
     M4TR1X_DATA_DIR: DATA_DIR,
   }
 
