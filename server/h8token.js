@@ -91,7 +91,8 @@ function initLedger() {
       note        TEXT,
       prev_hash   TEXT    NOT NULL,
       hash        TEXT    NOT NULL,
-      signature   TEXT    NOT NULL
+      signature   TEXT    NOT NULL,
+      from_pubkey TEXT
     );
     CREATE INDEX IF NOT EXISTS idx_from    ON ledger(from_addr);
     CREATE INDEX IF NOT EXISTS idx_to      ON ledger(to_addr);
@@ -99,6 +100,13 @@ function initLedger() {
     CREATE INDEX IF NOT EXISTS idx_ts      ON ledger(ts DESC);
     CREATE INDEX IF NOT EXISTS idx_type    ON ledger(tx_type);
   `)
+
+  // Migration (audit #3): add from_pubkey column to existing databases
+  const cols = db.pragma('table_info(ledger)')
+  if (!cols.some(c => c.name === 'from_pubkey')) {
+    db.exec('ALTER TABLE ledger ADD COLUMN from_pubkey TEXT')
+    console.log('[H8] Migration: ledger.from_pubkey column added for ML-DSA signature verification')
+  }
 
   const count = db.prepare('SELECT COUNT(*) as c FROM ledger').get().c
   if (count === 0) {
@@ -152,15 +160,18 @@ async function appendBlock({ from, to, amount, tx_type, content_id = null, note 
 
   // Every block requires a wallet signature — no exceptions
   let signature
+  let fromPubkey = null
   try {
     signature = await h8id.signWithUnlocked(hash)
+    const unlocked = h8id.getUnlockedIdentity()
+    fromPubkey = unlocked ? unlocked.publicKey : null
   } catch (e) {
     throw new Error('H8 wallet locked — unlock your wallet to sign this transaction')
   }
   if (!signature) throw new Error('Signature failed')
 
-  db.prepare(`INSERT INTO ledger (ts, from_addr, to_addr, amount, tx_type, content_id, note, prev_hash, hash, signature) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-    .run(ts, from, to, amount, tx_type, content_id, note, prevHash, hash, signature)
+  db.prepare(`INSERT INTO ledger (ts, from_addr, to_addr, amount, tx_type, content_id, note, prev_hash, hash, signature, from_pubkey) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+    .run(ts, from, to, amount, tx_type, content_id, note, prevHash, hash, signature, fromPubkey)
 
   return { block_index: idx, ts, from_addr: from, to_addr: to, amount, tx_type, hash }
 }
@@ -262,11 +273,11 @@ function getBoostScoresBatch(ids) {
   return result
 }
 
-// ─── Chain verification (hash + signature presence) ───────────────────────────
-function verifyChain() {
+// ─── Chain verification (hash integrity + ML-DSA signature verification) ──────
+async function verifyChain() {
   const rows = getDb().prepare('SELECT * FROM ledger ORDER BY block_index ASC').all()
   let expectedPrev = '0'.repeat(64)
-  let unsignedCount = 0
+  const warnings = []
 
   for (const b of rows) {
     if (b.prev_hash !== expectedPrev)
@@ -276,12 +287,30 @@ function verifyChain() {
     if (recomputed !== b.hash)
       return { valid: false, firstInvalidBlock: b.block_index, reason: 'hash mismatch' }
 
-    if (!b.signature) unsignedCount++
+    // Genesis blocks use a deterministic signature (not ML-DSA) — skip ML-DSA check
+    if (b.from_addr === MINT_ADDRESS && typeof b.signature === 'string' && b.signature.startsWith('genesis:')) {
+      expectedPrev = b.hash
+      continue
+    }
+
+    if (!b.signature)
+      return { valid: false, firstInvalidBlock: b.block_index, reason: 'missing signature on non-genesis block' }
+
+    if (!b.from_pubkey) {
+      // Block predates audit fix #3 migration — hash is intact but ML-DSA unverifiable
+      warnings.push({ block: b.block_index, reason: 'from_pubkey missing — ML-DSA signature not verifiable' })
+    } else {
+      const sigOk = await h8id.verifySignature(b.from_pubkey, b.hash, b.signature)
+      if (!sigOk)
+        return { valid: false, firstInvalidBlock: b.block_index, reason: 'invalid ML-DSA signature' }
+    }
 
     expectedPrev = b.hash
   }
 
-  return { valid: true, blocks: rows.length, unsigned_blocks: unsignedCount }
+  const result = { valid: true, blocks: rows.length }
+  if (warnings.length) result.warnings = warnings
+  return result
 }
 
 module.exports = {
