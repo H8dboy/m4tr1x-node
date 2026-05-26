@@ -1436,119 +1436,93 @@ app.get('/api/v1/p2p/stats', (req, res) => {
   res.json(p2p.getStats())
 })
 
-// ─── Routes: H8 Coin (H8C) ────────────────────────────────────────────────────
+// ─── Routes: H8 Token ledger ──────────────────────────────────────────────────
+// h8coin.js removed — all token operations now go through h8token.js (ML-DSA65, SHA3-256 chain)
 
-const coin   = require('./h8coin')
 const wallet = require('./h8wallet')
 
-// Auto-init genesis on startup (using node's Nostr privkey if genesis not yet created)
-;(async () => {
-  try {
-    coin.initCoinDb()
-    if (!coin.isGenesisCreated()) {
-      const keys = require('./nostr').loadSavedKeys()
-      if (keys && keys.privkey) {
-        await coin.createGenesis(keys.privkey)
-        console.log('[H8C] Genesis initialized from node identity key.')
-      } else {
-        console.log('[H8C] No keys found — genesis skipped. Generate Nostr identity first.')
-      }
-    }
-  } catch (err) {
-    if (err.message !== 'GENESIS_ALREADY_EXISTS') console.error('[H8C] Genesis init error:', err.message)
-  }
-})()
-
-// GET  /api/v1/coin/supply    — tokenomics overview
+// GET  /api/v1/coin/supply    — tokenomics overview (backed by h8token)
 app.get('/api/v1/coin/supply', (req, res) => {
-  const info = coin.getSupplyInfo()
-  if (!info) return res.status(503).json({ error: 'genesis not created yet' })
-  res.json(info)
-})
-
-// GET  /api/v1/coin/genesis   — genesis record (immutable)
-app.get('/api/v1/coin/genesis', (req, res) => {
-  const g = coin.getGenesisRecord()
-  if (!g) return res.status(503).json({ error: 'genesis not created' })
-  res.json(g)
+  res.json(h8token.getLedgerStats())
 })
 
 // GET  /api/v1/coin/balance/:address
 app.get('/api/v1/coin/balance/:address', (req, res) => {
-  const satoshis = coin.getBalance(req.params.address)
-  res.json({ address: req.params.address, satoshis: String(satoshis), h8c: coin.formatH8C(satoshis) })
-})
-
-// GET  /api/v1/coin/tx/:txid
-app.get('/api/v1/coin/tx/:txid', (req, res) => {
-  const tx = coin.getTx(req.params.txid)
-  if (!tx) return res.status(404).json({ error: 'tx not found' })
-  res.json(tx)
+  const bal = h8token.getBalance(req.params.address)
+  res.json({ address: req.params.address, balance: bal, symbol: 'H8' })
 })
 
 // GET  /api/v1/coin/history/:address
 app.get('/api/v1/coin/history/:address', (req, res) => {
-  const limit = parseInt(req.query.limit || '50')
-  res.json(coin.getTxHistory(req.params.address, limit))
+  const limit = Math.min(parseInt(req.query.limit || '50'), 200)
+  res.json(h8token.getHistory(req.params.address, limit))
 })
 
-// GET  /api/v1/coin/rich-list
-app.get('/api/v1/coin/rich-list', (req, res) => {
-  const limit = Math.min(parseInt(req.query.limit || '20'), 100)
-  res.json(coin.getRichList(limit))
+// GET  /api/v1/coin/ledger    — full public ledger (paginated)
+app.get('/api/v1/coin/ledger', (req, res) => {
+  const limit  = Math.min(parseInt(req.query.limit  || '100'), 500)
+  const offset = parseInt(req.query.offset || '0')
+  res.json(h8token.getPublicLedger(limit, offset))
 })
 
-// POST /api/v1/coin/send   — sign + broadcast (privkey provided by caller; desktop/node use only)
+// POST /api/v1/coin/send   — transfer H8 using the unlocked node identity
 app.post('/api/v1/coin/send', async (req, res) => {
   try {
-    const { from_privkey, to_address, amount_h8c, memo } = req.body
-    if (!from_privkey || !to_address || !amount_h8c) return res.status(400).json({ error: 'from_privkey, to_address, amount_h8c required' })
-    const amountSat = coin.parseH8C(String(amount_h8c))
-    const tx = await coin.createTransaction({ fromPrivkey: from_privkey, toAddress: to_address, amountSat, memo: memo || '' })
-    res.json({ ok: true, ...tx })
+    const { to_address, amount_h8c, memo } = req.body
+    if (!to_address || !amount_h8c) return res.status(400).json({ error: 'to_address and amount_h8c required' })
+    const block = await h8token.transfer(to_address, Math.floor(parseFloat(amount_h8c)), memo || '')
+    res.json({ ok: true, ...block })
   } catch (err) {
     res.status(400).json({ error: err.message })
   }
 })
 
-// ─── Routes: H8 Wallet ────────────────────────────────────────────────────────
-
-// POST /api/v1/wallet/generate
-// body: { name, password, bip39_passphrase? }
-// Returns mnemonic ONCE — never stored.  User must write it down.
-app.post('/api/v1/wallet/generate', (req, res) => {
+// GET  /api/v1/coin/verify   — verify chain integrity (hash + ML-DSA65 signatures)
+app.get('/api/v1/coin/verify', async (req, res) => {
   try {
-    const { name = '', password, bip39_passphrase = '' } = req.body
-    if (!password) return res.status(400).json({ error: 'password required' })
-    const w = wallet.generateWallet(bip39_passphrase)
-    wallet.saveWallet({ address: w.address, pubkey: w.pubkey, privkeyHex: w.privkey, name }, password)
-    if (process.env.HEAD_NODE_URL) {
-      const hb = require('./heartbeat')
-      hb.registerUser({ address: w.address, name: name || '', pubkey: w.pubkey })
-    }
-    res.json({ address: w.address, pubkey: w.pubkey, mnemonic: w.mnemonic, path: w.path, name,
-               warning: 'Write down the mnemonic NOW — it will never be shown again.' })
+    res.json(await h8token.verifyChain())
   } catch (err) {
     res.status(500).json({ error: err.message })
   }
 })
 
-// POST /api/v1/wallet/import
-// body: { mnemonic, name, password, bip39_passphrase? }
-app.post('/api/v1/wallet/import', (req, res) => {
+// ─── Routes: H8 Wallet (v3 — ML-DSA65 identity) ──────────────────────────────
+
+// POST /api/v1/wallet/generate
+// body: { password }
+// Creates a new ML-DSA65 node identity. No mnemonic — back up the identity file.
+app.post('/api/v1/wallet/generate', async (req, res) => {
   try {
-    const { mnemonic, name = '', password, bip39_passphrase = '' } = req.body
-    if (!mnemonic || !password) return res.status(400).json({ error: 'mnemonic and password required' })
-    const w = wallet.importWallet(mnemonic, bip39_passphrase)
-    wallet.saveWallet({ address: w.address, pubkey: w.pubkey, privkeyHex: w.privkey, name }, password)
+    const { password, name = '' } = req.body
+    if (!password) return res.status(400).json({ error: 'password required' })
+    const w = await wallet.generateWallet(password)
     if (process.env.HEAD_NODE_URL) {
       const hb = require('./heartbeat')
-      hb.registerUser({ address: w.address, name: name || '', pubkey: w.pubkey })
+      hb.registerUser({ address: w.address, name, pubkey: w.pubkey })
     }
-    res.json({ address: w.address, pubkey: w.pubkey, path: wallet.DERIV_PATH, name })
+    res.json({ address: w.address, pubkey: w.pubkey, path: w.path, name, warning: w.warning })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// POST /api/v1/wallet/unlock
+// body: { password }
+app.post('/api/v1/wallet/unlock', async (req, res) => {
+  try {
+    const { password } = req.body
+    if (!password) return res.status(400).json({ error: 'password required' })
+    await wallet.unlockWallet(password)
+    res.json({ ok: true, address: wallet.getAddress() })
   } catch (err) {
     res.status(400).json({ error: err.message })
   }
+})
+
+// POST /api/v1/wallet/lock
+app.post('/api/v1/wallet/lock', (req, res) => {
+  wallet.lockWallet()
+  res.json({ ok: true })
 })
 
 // GET  /api/v1/wallet/list
@@ -1568,12 +1542,14 @@ app.get('/api/v1/wallet/history/:address', (req, res) => {
 })
 
 // POST /api/v1/wallet/send
+// body: { to_address, amount_h8c, memo?, password? }
+// password needed only if the identity is currently locked.
 app.post('/api/v1/wallet/send', async (req, res) => {
   try {
-    const { address, password, to_address, amount_h8c, memo } = req.body
-    if (!address || !password || !to_address || !amount_h8c) return res.status(400).json({ error: 'address, password, to_address, amount_h8c required' })
-    const tx = await wallet.walletSend({ address, password, toAddress: to_address, amountH8C: amount_h8c, memo: memo || '' })
-    res.json({ ok: true, ...tx })
+    const { to_address, amount_h8c, memo, password, address } = req.body
+    if (!to_address || !amount_h8c) return res.status(400).json({ error: 'to_address and amount_h8c required' })
+    const block = await wallet.walletSend({ address, password, toAddress: to_address, amountH8C: amount_h8c, memo: memo || '' })
+    res.json({ ok: true, ...block })
   } catch (err) {
     res.status(400).json({ error: err.message })
   }
@@ -1582,9 +1558,9 @@ app.post('/api/v1/wallet/send', async (req, res) => {
 // POST /api/v1/wallet/change-password
 app.post('/api/v1/wallet/change-password', async (req, res) => {
   try {
-    const { address, old_password, new_password } = req.body
-    if (!address || !old_password || !new_password) return res.status(400).json({ error: 'address, old_password, new_password required' })
-    await wallet.changePassword(address, old_password, new_password)
+    const { old_password, new_password } = req.body
+    if (!old_password || !new_password) return res.status(400).json({ error: 'old_password and new_password required' })
+    await wallet.changePassword(null, old_password, new_password)
     res.json({ ok: true })
   } catch (err) {
     res.status(400).json({ error: err.message })
@@ -1593,18 +1569,7 @@ app.post('/api/v1/wallet/change-password', async (req, res) => {
 
 // POST /api/v1/admin/wallet/reset-lockout/:address  (localhost-only)
 app.post('/api/v1/admin/wallet/reset-lockout/:address', localhostOnly, verifyAdminKey, (req, res) => {
-  try {
-    wallet.resetLockout(req.params.address)
-    res.json({ ok: true })
-  } catch (err) {
-    res.status(400).json({ error: err.message })
-  }
-})
-
-// DELETE /api/v1/wallet/:address  (localhost-only for safety)
-app.delete('/api/v1/wallet/:address', localhostOnly, (req, res) => {
-  wallet.deleteWallet(req.params.address)
-  res.json({ ok: true })
+  res.json(wallet.resetLockout())
 })
 
 // ─── Routes: H8 Shop (buy H8C) ────────────────────────────────────────────────
@@ -1618,13 +1583,12 @@ app.get('/api/v1/shop/info', (req, res) => {
     .filter(([, m]) => m.enabled)
     .map(([key, m]) => ({ key, label: m.label, notes: m.notes }))
   res.json({
-    price_eur:     cfg.price_eur,
-    price_usd:     cfg.price_usd,
-    price_btc:     cfg.price_btc,
-    min_order_h8c: cfg.min_order_h8c,
-    max_order_h8c: cfg.max_order_h8c,
+    price_eur:    cfg.price_eur,
+    price_usd:    cfg.price_usd,
+    min_order_h8: cfg.min_order_h8 || cfg.min_order_h8c,
+    max_order_h8: cfg.max_order_h8 || cfg.max_order_h8c,
     methods,
-    symbol: 'H8C',
+    symbol: 'H8',
   })
 })
 
