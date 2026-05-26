@@ -171,6 +171,86 @@ function getPublicInfo() {
 }
 
 /**
+ * Cambia la password senza modificare la chiave ML-DSA65.
+ *
+ * Invarianti garantite:
+ *   - address H8 immutato  (dipende da publicKey, non da password)
+ *   - publicKey immutata
+ *   - secretKey immutato   (solo l'envelope AES-GCM cambia)
+ *   - firme storiche restano valide
+ *
+ * Scrittura atomica:
+ *   1. Backup .bak del file attuale
+ *   2. Write su file .tmp
+ *   3. rename atomico .tmp → originale
+ *   Se il processo crasha tra 2 e 3, il .bak permette il recovery manuale.
+ *
+ * @param {string} oldPassword - password corrente
+ * @param {string} newPassword - nuova password (non può essere vuota)
+ * @returns {{ address: string, publicKey: string }}
+ */
+async function changePassword(oldPassword, newPassword) {
+  if (!newPassword || newPassword.length === 0) {
+    throw new Error('New password cannot be empty.')
+  }
+
+  // ── 1. Lockout check ──────────────────────────────────────────────────────
+  const now = Date.now()
+  if (now < _lockedUntil) {
+    const secs = Math.ceil((_lockedUntil - now) / 1000)
+    throw new Error(`Troppi tentativi falliti. Riprova tra ${secs} secondi.`)
+  }
+
+  const p = getIdentityPath()
+  if (!fs.existsSync(p)) throw new Error('H8 identity non trovata.')
+
+  const stored = JSON.parse(fs.readFileSync(p, 'utf8'))
+
+  // ── 2. Verifica vecchia password (stessa logica di unlockIdentity) ─────────
+  let secretKey
+  try {
+    secretKey = decryptSecret(stored, oldPassword)
+  } catch {
+    _failedAttempts++
+    if (_failedAttempts >= MAX_ATTEMPTS) {
+      _lockedUntil    = Date.now() + LOCKOUT_MS
+      _failedAttempts = 0
+      throw new Error(`Invalid current password. Too many failed attempts: locked for ${LOCKOUT_MS / 1000} seconds.`)
+    }
+    throw new Error(`Invalid current password. (${_failedAttempts}/${MAX_ATTEMPTS})`)
+  }
+  _failedAttempts = 0
+
+  // ── 3. Ri-cifra lo stesso secretKey con la nuova password ─────────────────
+  //    Nuovo salt scrypt + nuovo IV AES-GCM: forward secrecy dell'envelope.
+  const fresh   = encryptSecret(secretKey, newPassword)
+  const updated = { ...stored, version: 2, ...fresh }
+
+  // ── 4. Scrittura atomica: backup → tmp → rename ────────────────────────────
+  const bakPath = p + '.bak'
+  const tmpPath = p + '.tmp.' + crypto.randomBytes(4).toString('hex')
+
+  // Backup PRIMA di qualsiasi scrittura — recovery manuale se crash tra step 2 e 3
+  fs.copyFileSync(p, bakPath)
+
+  try {
+    fs.writeFileSync(tmpPath, JSON.stringify(updated), { mode: 0o600 })
+    fs.renameSync(tmpPath, p)   // atomico su stessa filesystem (POSIX rename(2))
+  } catch (err) {
+    try { fs.unlinkSync(tmpPath) } catch {}   // pulizia tmp; .bak + originale intatti
+    throw err
+  }
+
+  // ── 5. Aggiorna sessione in memoria se il wallet era aperto ──────────────
+  if (_unlocked && _unlocked.address === stored.address) {
+    _unlocked = { address: stored.address, publicKey: stored.publicKey, secretKey }
+  }
+
+  console.log(`[H8] Password cambiata per: ${stored.address}`)
+  return { address: stored.address, publicKey: stored.publicKey }
+}
+
+/**
  * Firma dati con il secret key dell'identità sbloccata.
  * Lancia errore se il wallet è bloccato.
  */
@@ -208,4 +288,5 @@ module.exports = {
   h8AddressFrom,
   signWithUnlocked,
   verifySignature,
+  changePassword,
 }
