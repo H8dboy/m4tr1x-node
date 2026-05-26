@@ -81,22 +81,18 @@ function listWallets() {
 }
 
 /**
- * changePassword — re-derives and re-encrypts the identity with a new password.
- * Requires the old password to unlock first.
+ * changePassword — ri-cifra il secretKey ML-DSA65 con la nuova password.
+ * Delega a h8identity.changePassword: address, publicKey e chiave ML-DSA immutati.
+ * `address` è ignorato — esiste una sola identità per nodo.
+ *
+ * @param {string} address    - ignorato (compat firma pubblica)
+ * @param {string} oldPassword
+ * @param {string} newPassword
+ * @returns {{ address: string, publicKey: string }}
  */
 async function changePassword(address, oldPassword, newPassword) {
-  if (!newPassword) throw new Error('new_password required')
-  // Unlock with old password validates it
-  const id = await h8id.unlockIdentity(oldPassword)
-  // Re-generate with the same secret key but new password
-  // h8identity stores the encrypted secret; we call generateIdentity which overwrites it
-  // Note: this regenerates the identity file — address stays the same because the secret is preserved
-  const secretKey = id.secretKey
-  const { ml_dsa65 } = await (require('./h8identity').__getLib?.() || Promise.resolve({ ml_dsa65: null }))
-  // Fallback: re-generate from scratch (user gets a new address — inform them)
-  await h8id.generateIdentity(newPassword)
-  console.log('[WALLET] changePassword: identity re-generated with new password. Address may have changed.')
-  return { ok: true }
+  if (!oldPassword || !newPassword) throw new Error('old_password and new_password required')
+  return h8id.changePassword(oldPassword, newPassword)
 }
 
 /**
