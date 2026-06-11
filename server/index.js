@@ -1,4 +1,4 @@
-/**
+﻿/**
  * M4TR1X - API Server (Node.js / Express)
  * Traduzione completa di api_server.py senza Python.
  *
@@ -54,7 +54,7 @@ const story      = require('./story')
 const p2p        = require('./p2p')
 const federation = require('./federation')
 
-// âââ Embedded Nostr Relay âââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€ Embedded Nostr Relay Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€
 // Avviato in processo figlio per evitare che EADDRINUSE faccia crashare il server
 const _net = require('net')
 const _sock = _net.createConnection(4848, '127.0.0.1')
@@ -67,7 +67,7 @@ _sock.once('error', () => {
     console.error('[RELAY] Failed to start relay:', e.message)
   }
 })
-// âââ Config âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€ Config Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€
 const MAX_FILE_MB      = parseInt(process.env.MAX_FILE_SIZE_MB || '100')
 const API_KEY          = process.env.M4TR1X_API_KEY || ''
 const ALLOWED_ORIGINS  = (process.env.ALLOWED_ORIGINS || 'http://localhost:8080').split(',')
@@ -83,14 +83,14 @@ const ADMIN_KEY = (() => {
   if (fs.existsSync(ADMIN_KEY_FILE)) return fs.readFileSync(ADMIN_KEY_FILE, 'utf8').trim()
   const generated = crypto.randomBytes(32).toString('hex')
   fs.writeFileSync(ADMIN_KEY_FILE, generated, { mode: 0o600 })
-  console.warn('[SECURITY] ADMIN_KEY generata e salvata in .admin_key — conservala.')
+  console.warn('[SECURITY] ADMIN_KEY generata e salvata in .admin_key â€” conservala.')
   console.warn(`[SECURITY]     ${generated}`)
   return generated
 })()
 const BADGE_DOCS_DIR = path.join(DATA_DIR, 'badge_docs')
 if (!fs.existsSync(BADGE_DOCS_DIR)) fs.mkdirSync(BADGE_DOCS_DIR, { recursive: true })
 
-// âââ App ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€ App Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€
 const app = express()
 
 // Security headers
@@ -103,7 +103,7 @@ app.use((req, res, next) => {
   next()
 })
 
-// CORS â accetta localhost (Electron) + origini configurate
+// CORS Ã¢Â€Â” accetta localhost (Electron) + origini configurate
 app.use(cors({
   origin: (origin, cb) => {
     if (!origin) return cb(null, true)
@@ -129,7 +129,7 @@ const globalLimit = rateLimit({
   message: { error: 'Troppe richieste. Riprova tra un minuto.' },
 })
 
-// Stripe webhook needs raw body — register BEFORE express.json()
+// Stripe webhook needs raw body â€” register BEFORE express.json()
 app.post('/api/v1/shop/stripe/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
   try {
     const shopMod = require('./h8shop')
@@ -161,13 +161,13 @@ app.use((req, res, next) => {
   next()
 })
 
-// âââ Multer (upload file) âââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€ Multer (upload file) Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€
 const upload = multer({
   dest: UPLOAD_DIR,
   limits: { fileSize: MAX_FILE_MB * 1024 * 1024 },
 })
 
-// Photo upload (JPEG/PNG/WebP/GIF — max 20MB)
+// Photo upload (JPEG/PNG/WebP/GIF â€” max 20MB)
 const ALLOWED_IMG_EXT = new Set([".jpg", ".jpeg", ".png", ".webp", ".gif"])
 const photoUpload = multer({
   dest: UPLOAD_DIR,
@@ -178,7 +178,7 @@ const photoUpload = multer({
   },
 })
 
-// Badge document upload (PDF, JPG, PNG â max 10MB)
+// Badge document upload (PDF, JPG, PNG Ã¢Â€Â” max 10MB)
 const badgeUpload = multer({
   dest: BADGE_DOCS_DIR,
   limits: { fileSize: 10 * 1024 * 1024 },
@@ -189,7 +189,7 @@ const badgeUpload = multer({
   },
 })
 
-// âââ Rate limiting ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€ Rate limiting Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€
 const analyzeLimit = rateLimit({
   windowMs: 60 * 1000,
   max: 10,
@@ -216,7 +216,7 @@ const uploadLimit = rateLimit({
   message: { error: "Limite upload raggiunto. Riprova tra un'ora." },
 })
 
-// âââ API Key middleware âââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€ API Key middleware Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€
 function verifyApiKey(req, res, next) {
   const ip = req.socket.remoteAddress || ''
   const isLocal = ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1'
@@ -226,7 +226,7 @@ function verifyApiKey(req, res, next) {
   next()
 }
 
-// âââ Routes âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€ Routes Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€
 
 // Health check
 app.get('/health', (req, res) => {
@@ -238,7 +238,7 @@ app.get('/health', (req, res) => {
   })
 })
 
-// ─── Blossom local storage ────────────────────────────────────────────────────
+// â”€â”€â”€ Blossom local storage â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const BLOBS_DIR = path.join(DATA_DIR, 'blobs')
 if (!fs.existsSync(BLOBS_DIR)) fs.mkdirSync(BLOBS_DIR, { recursive: true })
 
@@ -346,7 +346,7 @@ app.get('/api/v1/analyses', verifyApiKey, (req, res) => {
   res.json(listResults(limit))
 })
 
-// âââ Routes: H8 Wallet ââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€ Routes: H8 Wallet Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€
 
 // Stato wallet H8 (esiste? saldo? address?)
 app.get('/api/v1/h8/wallet/status', verifyApiKey, (req, res) => {
@@ -360,12 +360,12 @@ app.get('/api/v1/h8/wallet/status', verifyApiKey, (req, res) => {
   }
 })
 
-// Crea nuova identitÃ  H8
+// Crea nuova identitÃƒÂ  H8
 app.post('/api/v1/h8/wallet/create', verifyApiKey, async (req, res) => {
   try {
     const { password } = req.body
     if (!password) return res.status(400).json({ error: 'Password richiesta' })
-    if (identityExists()) return res.status(409).json({ error: 'IdentitÃ  H8 giÃ  esistente' })
+    if (identityExists()) return res.status(409).json({ error: 'IdentitÃƒÂ  H8 giÃƒÂ  esistente' })
     const result = await generateIdentity(password)
     if (process.env.HEAD_NODE_URL) {
       const hb = require('./heartbeat')
@@ -377,7 +377,7 @@ app.post('/api/v1/h8/wallet/create', verifyApiKey, async (req, res) => {
   }
 })
 
-// Sblocca wallet (password â secret key in memoria per la sessione)
+// Sblocca wallet (password Ã¢Â†Â’ secret key in memoria per la sessione)
 app.post('/api/v1/h8/wallet/unlock', verifyApiKey, async (req, res) => {
   try {
     const { password } = req.body
@@ -407,7 +407,7 @@ app.get('/api/v1/h8/session-info', (req, res) => {
   res.json({ address: id.address, pubkey: sk.pubKeyHex })
 })
 
-// Firma un evento Nostr con la chiave derivata dall'identità H8.
+// Firma un evento Nostr con la chiave derivata dall'identitÃ  H8.
 // Il client invia l'evento senza id/sig; il server aggiunge entrambi.
 app.post('/api/v1/h8/sign-event', (req, res) => {
   try {
@@ -426,7 +426,7 @@ app.post('/api/v1/h8/sign-event', (req, res) => {
   }
 })
 
-// ─── H8 Token Economy ────────────────────────────────────────────────────────
+// â”€â”€â”€ H8 Token Economy â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const h8token    = require('./h8token')
 const ledgerSync = require('./ledger_sync')
 h8token.initLedger()
@@ -468,7 +468,7 @@ app.post('/api/v1/h8/tip', paymentLimit, verifyApiKey, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
 
-// NFT photo purchase — frontend calls this when buying a photo
+// NFT photo purchase â€” frontend calls this when buying a photo
 app.post('/api/v1/h8tips/send', paymentLimit, async (req, res) => {
   try {
     const { from_h8address, to_pubkey, amount, memo, event_id } = req.body
@@ -508,19 +508,19 @@ app.get('/api/v1/h8/chain/verify', async (req, res) => {
   catch (e) { res.status(500).json({ error: e.message }) }
 })
 
-// Public ledger — anyone can read and verify the full transaction history
+// Public ledger â€” anyone can read and verify the full transaction history
 app.get('/api/v1/h8/ledger', (req, res) => {
   const limit  = Math.min(parseInt(req.query.limit  || '100'), 500)
   const offset = parseInt(req.query.offset || '0')
   res.json(h8token.getPublicLedger(limit, offset))
 })
 
-// Public supply stats — total minted, allocation, max supply
+// Public supply stats â€” total minted, allocation, max supply
 app.get('/api/v1/h8/stats', (req, res) => {
   res.json(h8token.getLedgerStats())
 })
 
-// Admin-only mint (requires H8_ADMIN_MINT_KEY env — disabled unless explicitly set)
+// Admin-only mint (requires H8_ADMIN_MINT_KEY env â€” disabled unless explicitly set)
 app.post('/api/v1/admin/h8/mint', localhostOnly, verifyAdminKey, async (req, res) => {
   try {
     const { toAddress, amount } = req.body
@@ -529,7 +529,7 @@ app.post('/api/v1/admin/h8/mint', localhostOnly, verifyAdminKey, async (req, res
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
 
-// ─── Explorer API ─────────────────────────────────────────────────────────────
+// â”€â”€â”€ Explorer API â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 app.get('/api/v1/explorer/stats', (req, res) => {
   try {
     const relayDbPath = process.env.USERDATA_PATH
@@ -578,8 +578,8 @@ app.get('/api/v1/explorer/stats', (req, res) => {
         files: totalFiles,
         photos: totalPhotosN,
         recent: recentEvents.map(e => ({
-          id: e.id.slice(0, 16) + '…',
-          pubkey: e.pubkey.slice(0, 16) + '…',
+          id: e.id.slice(0, 16) + 'â€¦',
+          pubkey: e.pubkey.slice(0, 16) + 'â€¦',
           kind: e.kind,
           ts: e.created_at,
         })),
@@ -598,7 +598,7 @@ app.get('/explorer', (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'frontend', 'explorer.html'))
 })
 
-// âââ Routes: Nostr ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€ Routes: Nostr Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€
 
 app.post('/api/v1/nostr/keys', (req, res) => {
   res.json(generateKeys())
@@ -687,7 +687,7 @@ app.get('/api/v1/nostr/dm/:pubkey', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
 
-// âââ Routes: Mastodon âââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€ Routes: Mastodon Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€
 
 app.get('/api/v1/mastodon/timeline', async (req, res) => {
   try {
@@ -703,6 +703,20 @@ app.get('/api/v1/mastodon/hashtag/:tag', async (req, res) => {
     const inst = instances ? instances.split(',') : undefined
     const posts = await mastodon.searchHashtag(req.params.tag, inst, parseInt(limit || '20'))
     res.json(posts)
+  } catch (err) { res.status(500).json({ error: err.message }) }
+})
+
+// ── Unified search across posts, videos, tracks ───────────────────────────────
+app.get('/api/v1/search', verifyApiKey, async (req, res) => {
+  try {
+    const q = (req.query.q || '').trim()
+    if (!q) return res.json({ posts: [], videos: [], tracks: [] })
+    const [postResults, videos, tracks] = await Promise.all([
+      mastodon.search(q),
+      Promise.resolve(db.searchVideos(q, 20)),
+      Promise.resolve(db.searchTracks(q, 20)),
+    ])
+    res.json({ posts: postResults.statuses || [], videos, tracks })
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
 
@@ -722,7 +736,7 @@ app.post('/api/v1/mastodon/post', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
 
-// âââ Routes: PeerTube âââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€ Routes: PeerTube Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€
 
 app.get('/api/v1/peertube/videos', async (req, res) => {
   try {
@@ -777,7 +791,7 @@ app.get('/api/v1/peertube/instances', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
 
-// âââ Routes: Funkwhale (Musica) âââââââââââââââââââââââââââââââââââââââââââââââ
+// Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€ Routes: Funkwhale (Musica) Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€
 
 app.get('/api/v1/music/tracks', async (req, res) => {
   try {
@@ -819,7 +833,7 @@ app.get('/api/v1/music/instances', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
 
-// âââ Routes: Crowdsourced Training âââââââââââââââââââââââââââââââââââââââââââ
+// Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€ Routes: Crowdsourced Training Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€
 
 // Vota un video (REALE o AI)
 app.post('/api/v1/train/vote', async (req, res) => {
@@ -933,7 +947,7 @@ app.post('/api/v1/train/model/update', verifyApiKey, async (req, res) => {
   }
 })
 
-// âââ Routes: Professional Badge System âââââââââââââââââââââââââââââââââââââââ
+// Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€ Routes: Professional Badge System Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€
 
 // Middleware: solo localhost per endpoint admin
 function localhostOnly(req, res, next) {
@@ -958,7 +972,7 @@ function verifyAdminKey(req, res, next) {
   next()
 }
 
-// POST /api/v1/badge/request â utente invia richiesta con documento
+// POST /api/v1/badge/request Ã¢Â€Â” utente invia richiesta con documento
 app.post('/api/v1/badge/request', badgeUpload.single('document'), async (req, res) => {
   try {
     const { pubkey, category } = req.body
@@ -969,16 +983,16 @@ app.post('/api/v1/badge/request', badgeUpload.single('document'), async (req, re
     if (!req.file) {
       return res.status(400).json({ error: 'Documento obbligatorio (PDF, JPG o PNG)' })
     }
-    // Controlla se esiste giÃ  una richiesta pending o approvata
+    // Controlla se esiste giÃƒÂ  una richiesta pending o approvata
     const existing = getUserRequest(pubkey)
     if (existing && (existing.status === 'pending' || existing.status === 'approved')) {
       fs.unlinkSync(req.file.path)
       return res.status(409).json({
-        error: 'Hai giÃ  una richiesta in corso o un badge approvato',
+        error: 'Hai giÃƒÂ  una richiesta in corso o un badge approvato',
         status: existing.status,
       })
     }
-    // Sanitizza: prendi solo la basename e poi solo l'estensione â nessun path traversal
+    // Sanitizza: prendi solo la basename e poi solo l'estensione Ã¢Â€Â” nessun path traversal
     const safeName = path.basename(req.file.originalname || '')
     const ext      = path.extname(safeName).toLowerCase()
     const allowedExts = new Set(['.pdf', '.jpg', '.jpeg', '.png'])
@@ -997,7 +1011,7 @@ app.post('/api/v1/badge/request', badgeUpload.single('document'), async (req, re
   }
 })
 
-// GET /api/v1/badge/my/:pubkey â stato richiesta dell'utente stesso (must be before /:pubkey)
+// GET /api/v1/badge/my/:pubkey Ã¢Â€Â” stato richiesta dell'utente stesso (must be before /:pubkey)
 app.get('/api/v1/badge/my/:pubkey', (req, res) => {
   try {
     const request = getUserRequest(req.params.pubkey)
@@ -1008,7 +1022,7 @@ app.get('/api/v1/badge/my/:pubkey', (req, res) => {
   }
 })
 
-// GET /api/v1/badge/:pubkey â badge approvato pubblico di un utente
+// GET /api/v1/badge/:pubkey Ã¢Â€Â” badge approvato pubblico di un utente
 app.get('/api/v1/badge/:pubkey', (req, res) => {
   try {
     const badge = getApprovedBadge(req.params.pubkey)
@@ -1019,7 +1033,7 @@ app.get('/api/v1/badge/:pubkey', (req, res) => {
   }
 })
 
-// GET /api/v1/admin/badges â lista tutte le richieste (admin only)
+// GET /api/v1/admin/badges Ã¢Â€Â” lista tutte le richieste (admin only)
 app.get('/api/v1/admin/badges', localhostOnly, verifyAdminKey, (req, res) => {
   try {
     const { status } = req.query
@@ -1030,7 +1044,7 @@ app.get('/api/v1/admin/badges', localhostOnly, verifyAdminKey, (req, res) => {
   }
 })
 
-// POST /api/v1/admin/badge/:id/approve â approva richiesta (admin only)
+// POST /api/v1/admin/badge/:id/approve Ã¢Â€Â” approva richiesta (admin only)
 app.post('/api/v1/admin/badge/:id/approve', localhostOnly, verifyAdminKey, (req, res) => {
   try {
     const { category } = req.body
@@ -1042,7 +1056,7 @@ app.post('/api/v1/admin/badge/:id/approve', localhostOnly, verifyAdminKey, (req,
   }
 })
 
-// POST /api/v1/admin/badge/:id/reject â rifiuta richiesta (admin only)
+// POST /api/v1/admin/badge/:id/reject Ã¢Â€Â” rifiuta richiesta (admin only)
 app.post('/api/v1/admin/badge/:id/reject', localhostOnly, verifyAdminKey, (req, res) => {
   try {
     const { notes } = req.body
@@ -1053,7 +1067,7 @@ app.post('/api/v1/admin/badge/:id/reject', localhostOnly, verifyAdminKey, (req, 
   }
 })
 
-// âââ Routes: Universal Post âââââââââââââââââââââââââââââââââââââââââââââââââââ
+// Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€ Routes: Universal Post Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€
 const universal = require('./universal_post')
 universal.initUniversalDb()
 
@@ -1083,7 +1097,7 @@ app.delete('/api/v1/profile/protocols/:protocol', (req, res) => {
   res.json({ ok: true })
 })
 
-// Sync profilo M4TR1X â tutti i protocolli connessi
+// Sync profilo M4TR1X Ã¢Â†Â’ tutti i protocolli connessi
 app.post('/api/v1/profile/sync', async (req, res) => {
   const { h8address, name, bio, picture } = req.body
   if (!h8address) return res.status(400).json({ error: 'h8address richiesto' })
@@ -1103,7 +1117,7 @@ app.post('/api/v1/profile/sync/:protocol', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
 
-// Post universale â pubblica su tutti i protocolli connessi
+// Post universale Ã¢Â€Â” pubblica su tutti i protocolli connessi
 app.post('/api/v1/profile/post', async (req, res) => {
   const { h8address, text, title, tags } = req.body
   if (!h8address) return res.status(400).json({ error: 'h8address richiesto' })
@@ -1120,12 +1134,12 @@ app.post('/api/v1/profile/post', async (req, res) => {
   }
 })
 
-// âââ Serve nostr-tools bundle da node_modules (evita dipendenza CDN esterna) ââ
-// Cerca il bundle in ordine: build CommonJS â bundle UMD â fallback 404
-// ─── Config ───────────────────────────────────────────────────────────────────
+// Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€ Serve nostr-tools bundle da node_modules (evita dipendenza CDN esterna) Ã¢Â”Â€Ã¢Â”Â€
+// Cerca il bundle in ordine: build CommonJS Ã¢Â†Â’ bundle UMD Ã¢Â†Â’ fallback 404
+// â”€â”€â”€ Config â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 app.get('/api/v1/config', (req, res) => {
   const port     = process.env.PORT || 8080
-  // Always the LAN/localhost URL — not the public domain
+  // Always the LAN/localhost URL â€” not the public domain
   const { networkInterfaces } = require('os')
   const _lan = Object.values(networkInterfaces()).flat().find(n => n.family === 'IPv4' && !n.internal)
   const localUrl = _lan ? `http://${_lan.address}:${port}` : `http://localhost:${port}`
@@ -1161,7 +1175,7 @@ app.get('/api/v1/config', (req, res) => {
   })
 })
 
-// ─── Node Manager API ─────────────────────────────────────────────────────────
+// â”€â”€â”€ Node Manager API â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 app.get('/api/v1/node/config', (req, res) => {
   res.json({ config: getNodeConfig() })
 })
@@ -1186,7 +1200,7 @@ app.get('/api/v1/node/peers', (req, res) => {
   res.json({ nodes: discoverNodes(capability) })
 })
 
-// ─── Live Streaming API ───────────────────────────────────────────────────────
+// â”€â”€â”€ Live Streaming API â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 app.get('/api/v1/live/streams', (req, res) => {
   const { category } = req.query
   res.json({ streams: listStreams(category) })
@@ -1228,7 +1242,7 @@ app.get('/libs/nostr.bundle.js', (req, res) => {
   res.status(404).send('// nostr-tools bundle not found. Run: npm install')
 })
 
-// ─── Frontend compat aliases ────────────────────────────────────────────────
+// â”€â”€â”€ Frontend compat aliases â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 app.get('/api/v1/timelines/tag/:tag', async (req, res) => {
   try {
     const limit = parseInt(req.query.limit || '20')
@@ -1253,7 +1267,7 @@ app.get('/api/v1/tracks', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
 
-// ─── Content location — find which node has a given content ID ───────────────
+// â”€â”€â”€ Content location â€” find which node has a given content ID â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 app.get('/api/v1/node/onion', (req, res) => {
   const onion = getOnionAddress()
@@ -1278,7 +1292,7 @@ app.get('/api/v1/content/stream/:id', async (req, res) => {
   res.status(404).json({ error: 'Content not found on any node' })
 })
 
-// ─── Local media streaming ────────────────────────────────────────────────────
+// â”€â”€â”€ Local media streaming â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const UPLOADS_DIR = path.join(DATA_DIR, 'uploads')
 
@@ -1344,7 +1358,7 @@ app.post('/api/v1/music/upload', upload.single('audio'), async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
 
-// ─── Routes: Photo Posts (NIP-68 kind:20) ────────────────────────────────────
+// â”€â”€â”€ Routes: Photo Posts (NIP-68 kind:20) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 // Upload + strip EXIF + store Blossom + publish Nostr kind:20
 app.post('/api/v1/photo/publish', photoUpload.single('photo'), async (req, res) => {
@@ -1385,7 +1399,7 @@ app.get('/api/v1/photo/:id', (req, res) => {
   res.json(p)
 })
 
-// ─── Routes: Stories (NIP-68 kind:20 + NIP-40 expiry 24h) ───────────────────
+// â”€â”€â”€ Routes: Stories (NIP-68 kind:20 + NIP-40 expiry 24h) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 // Upload + publish story (expires in 24h)
 app.post('/api/v1/story/publish', photoUpload.single('photo'), async (req, res) => {
@@ -1423,25 +1437,25 @@ app.get('/api/v1/story/:id', (req, res) => {
   res.json(s)
 })
 
-// ─── Routes: P2P ─────────────────────────────────────────────────────────────
+// â”€â”€â”€ Routes: P2P â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-// GET /api/v1/p2p/config — tracker URL + loader config for clients
+// GET /api/v1/p2p/config â€” tracker URL + loader config for clients
 app.get('/api/v1/p2p/config', (req, res) => {
   const base = process.env.PRIVATE_NODE_URL || `http://${req.headers.host || 'localhost:' + (process.env.PORT || 8080)}`
   res.json(p2p.getP2PConfig(base))
 })
 
-// GET /api/v1/p2p/stats — active swarms + peer count
+// GET /api/v1/p2p/stats â€” active swarms + peer count
 app.get('/api/v1/p2p/stats', (req, res) => {
   res.json(p2p.getStats())
 })
 
-// ─── Routes: H8 Token ledger ──────────────────────────────────────────────────
-// h8coin.js removed — all token operations now go through h8token.js (ML-DSA65, SHA3-256 chain)
+// â”€â”€â”€ Routes: H8 Token ledger â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// h8coin.js removed â€” all token operations now go through h8token.js (ML-DSA65, SHA3-256 chain)
 
 const wallet = require('./h8wallet')
 
-// GET  /api/v1/coin/supply    — tokenomics overview (backed by h8token)
+// GET  /api/v1/coin/supply    â€” tokenomics overview (backed by h8token)
 app.get('/api/v1/coin/supply', (req, res) => {
   res.json(h8token.getLedgerStats())
 })
@@ -1458,14 +1472,14 @@ app.get('/api/v1/coin/history/:address', (req, res) => {
   res.json(h8token.getHistory(req.params.address, limit))
 })
 
-// GET  /api/v1/coin/ledger    — full public ledger (paginated)
+// GET  /api/v1/coin/ledger    â€” full public ledger (paginated)
 app.get('/api/v1/coin/ledger', (req, res) => {
   const limit  = Math.min(parseInt(req.query.limit  || '100'), 500)
   const offset = parseInt(req.query.offset || '0')
   res.json(h8token.getPublicLedger(limit, offset))
 })
 
-// POST /api/v1/coin/send   — transfer H8 using the unlocked node identity
+// POST /api/v1/coin/send   â€” transfer H8 using the unlocked node identity
 app.post('/api/v1/coin/send', async (req, res) => {
   try {
     const { to_address, amount_h8c, memo } = req.body
@@ -1477,7 +1491,7 @@ app.post('/api/v1/coin/send', async (req, res) => {
   }
 })
 
-// GET  /api/v1/coin/verify   — verify chain integrity (hash + ML-DSA65 signatures)
+// GET  /api/v1/coin/verify   â€” verify chain integrity (hash + ML-DSA65 signatures)
 app.get('/api/v1/coin/verify', async (req, res) => {
   try {
     res.json(await h8token.verifyChain())
@@ -1486,11 +1500,11 @@ app.get('/api/v1/coin/verify', async (req, res) => {
   }
 })
 
-// ─── Routes: H8 Wallet (v3 — ML-DSA65 identity) ──────────────────────────────
+// â”€â”€â”€ Routes: H8 Wallet (v3 â€” ML-DSA65 identity) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 // POST /api/v1/wallet/generate
 // body: { password }
-// Creates a new ML-DSA65 node identity. No mnemonic — back up the identity file.
+// Creates a new ML-DSA65 node identity. No mnemonic â€” back up the identity file.
 app.post('/api/v1/wallet/generate', async (req, res) => {
   try {
     const { password, name = '' } = req.body
@@ -1572,11 +1586,11 @@ app.post('/api/v1/admin/wallet/reset-lockout/:address', localhostOnly, verifyAdm
   res.json(wallet.resetLockout())
 })
 
-// ─── Routes: H8 Shop (buy H8C) ────────────────────────────────────────────────
+// â”€â”€â”€ Routes: H8 Shop (buy H8C) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const shop = require('./h8shop')
 
-// GET  /api/v1/shop/info  — prices + enabled payment methods (public)
+// GET  /api/v1/shop/info  â€” prices + enabled payment methods (public)
 app.get('/api/v1/shop/info', (req, res) => {
   const cfg = shop.loadConfig()
   const methods = Object.entries(cfg.methods)
@@ -1592,7 +1606,7 @@ app.get('/api/v1/shop/info', (req, res) => {
   })
 })
 
-// POST /api/v1/shop/buy  — create purchase order
+// POST /api/v1/shop/buy  â€” create purchase order
 // body: { method, amount_h8c, buyer_address }
 // For method=stripe also returns client_secret + publishable_key
 app.post('/api/v1/shop/buy', async (req, res) => {
@@ -1606,22 +1620,22 @@ app.post('/api/v1/shop/buy', async (req, res) => {
   }
 })
 
-// GET  /api/v1/shop/order/:id  — check order status
+// GET  /api/v1/shop/order/:id  â€” check order status
 app.get('/api/v1/shop/order/:id', (req, res) => {
   const order = shop.getOrder(req.params.id)
   if (!order) return res.status(404).json({ error: 'order not found' })
   res.json(order)
 })
 
-// GET  /api/v1/shop/orders/:address  — all orders for a buyer address
+// GET  /api/v1/shop/orders/:address  â€” all orders for a buyer address
 app.get('/api/v1/shop/orders/:address', (req, res) => {
   const limit = parseInt(req.query.limit || '20')
   res.json(shop.listOrders({ buyerAddress: req.params.address, limit }))
 })
 
-// ─── Admin: Shop management (localhost only) ──────────────────────────────────
+// â”€â”€â”€ Admin: Shop management (localhost only) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-// GET  /api/v1/admin/shop/orders  — all orders with optional ?status= filter
+// GET  /api/v1/admin/shop/orders  â€” all orders with optional ?status= filter
 app.get('/api/v1/admin/shop/orders', localhostOnly, verifyAdminKey, (req, res) => {
   const { status, limit = 100, offset = 0 } = req.query
   res.json(shop.listOrders({ status, limit: parseInt(limit), offset: parseInt(offset) }))
@@ -1632,7 +1646,7 @@ app.get('/api/v1/admin/shop/stats', localhostOnly, verifyAdminKey, (req, res) =>
   res.json(shop.shopStats())
 })
 
-// POST /api/v1/admin/shop/fulfill/:id  — mark paid, issue coins
+// POST /api/v1/admin/shop/fulfill/:id  â€” mark paid, issue coins
 app.post('/api/v1/admin/shop/fulfill/:id', localhostOnly, verifyAdminKey, async (req, res) => {
   try {
     const result = await shop.fulfillOrder(req.params.id, req.body.notes || '')
@@ -1651,7 +1665,7 @@ app.post('/api/v1/admin/shop/cancel/:id', localhostOnly, verifyAdminKey, (req, r
   }
 })
 
-// PUT  /api/v1/admin/shop/config  — update prices + payment method details
+// PUT  /api/v1/admin/shop/config  â€” update prices + payment method details
 app.put('/api/v1/admin/shop/config', localhostOnly, verifyAdminKey, (req, res) => {
   try {
     const current = shop.loadConfig()
@@ -1663,7 +1677,7 @@ app.put('/api/v1/admin/shop/config', localhostOnly, verifyAdminKey, (req, res) =
   }
 })
 
-// ─── Routes: Native Video Hosting (NIP-71) ────────────────────────────────────
+// â”€â”€â”€ Routes: Native Video Hosting (NIP-71) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 // Upload + transcode + publish (Nostr NIP-71 kind:34235)
 app.post('/api/v1/video/publish', upload.single('video'), async (req, res) => {
@@ -1691,7 +1705,7 @@ app.get('/api/v1/video/list', (req, res) => {
   res.json(videoHost.listVideos(limit, offset))
 })
 
-// Global federated feed — merges content from all registered nodes
+// Global federated feed â€” merges content from all registered nodes
 app.get('/api/v1/feed/global', (req, res) => {
   const type  = req.query.type  || 'film'
   const limit = Math.min(parseInt(req.query.limit || '50'), 200)
@@ -1739,7 +1753,7 @@ app.get('/v/:id/:file', (req, res) => {
   res.sendFile(f)
 })
 
-// ─── Mobile PWA + App Distribution ───────────────────────────────────────────
+// â”€â”€â”€ Mobile PWA + App Distribution â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const mobilePath = path.join(__dirname, 'mobile')
 app.use('/m', express.static(mobilePath, {
   setHeaders: (res, filePath) => {
@@ -1758,7 +1772,7 @@ app.post('/admin/update-ios-manifest', localhostOnly, verifyAdminKey, (req, res)
   plist = plist.replace(/IPA_URL_PLACEHOLDER|<string>https?:\/\/[^<]+\.ipa<\/string>/,
     `<string>${ipa_url}</string>`)
   fs.writeFileSync(plistPath, plist)
-  console.log(`[IOS] manifest.plist aggiornato → ${ipa_url}`)
+  console.log(`[IOS] manifest.plist aggiornato â†’ ${ipa_url}`)
   res.json({ ok: true, ipa_url })
 })
 app.get('/m', (req, res) => res.sendFile(path.join(mobilePath, 'index.html')))
@@ -1775,18 +1789,18 @@ if (fs.existsSync(frontendPath)) {
     res.sendFile(path.join(frontendPath, 'safety.html'))
   })
 
-  // Admin panel â solo localhost
+  // Admin panel Ã¢Â€Â” solo localhost
   app.get('/admin', localhostOnly, (req, res) => {
     res.sendFile(path.join(frontendPath, 'admin.html'))
   })
 
-  // Fallback SPA â rimanda a index.html per qualsiasi route non trovata
+  // Fallback SPA Ã¢Â€Â” rimanda a index.html per qualsiasi route non trovata
   app.get('/app/*', (req, res) => {
     res.sendFile(path.join(frontendPath, 'index.html'))
   })
 }
 
-// âââ Avvio / stop server ââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€ Avvio / stop server Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€
 let server
 
 function startServer(port = 8080) {
@@ -1896,7 +1910,7 @@ function stopServer() {
   }
 }
 
-// ─── Admin: graceful server-only reload (no Electron restart needed) ──────────
+// â”€â”€â”€ Admin: graceful server-only reload (no Electron restart needed) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 app.post('/api/v1/admin/reload', (req, res) => {
   res.json({ ok: true, message: 'Reloading server...' })
   setTimeout(() => {
@@ -1921,3 +1935,4 @@ if (require.main === module) {
     process.exit(1)
   })
 }
+
