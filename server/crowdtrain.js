@@ -101,7 +101,7 @@ function initCrowdtrainDb() {
 }
 
 // ─── Parametri consenso ───────────────────────────────────────────────────────
-const MIN_VOTES        = 10    // voti minimi per confermare un'etichetta
+const MIN_VOTES        = parseInt(process.env.CROWDTRAIN_MIN_VOTES || '3')  // override via env for scaling
 const MIN_AGREEMENT    = 0.70  // % accordo minimo (ponderato per reputazione)
 const MAX_REPUTATION   = 5.0
 const MIN_REPUTATION   = 0.1

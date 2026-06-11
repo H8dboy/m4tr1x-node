@@ -136,15 +136,7 @@ async function preprocessFrame(imagePath) {
 
 // ─── Analisi singolo frame ────────────────────────────────────────────────────
 async function analyzeFrame(imagePath) {
-  // Fallback se il modello non è caricato
-  if (!session) {
-    const real = 0.45 + Math.random() * 0.1
-    return {
-      label: 'UNCERTAIN',
-      confidence: 0.5,
-      probabilities: { real: parseFloat(real.toFixed(4)), ai_generated: parseFloat((1 - real).toFixed(4)) },
-    }
-  }
+  if (!session) throw new Error('ONNX model not loaded')
 
   const tensorData = await preprocessFrame(imagePath)
   const tensor     = new ort.Tensor('float32', tensorData, [1, 3, FRAME_SIZE, FRAME_SIZE])
@@ -186,6 +178,16 @@ function computeVideoHash(videoPath) {
 // ─── Pipeline completa (uguale a analyze_video in Python) ─────────────────────
 async function analyzeVideo(videoPath) {
   const videoHash = await computeVideoHash(videoPath)
+
+  if (!session) {
+    return {
+      status: 'MODEL_NOT_LOADED',
+      error: 'ONNX model not available. Place a trained model at models/m4tr1x_detector.onnx and restart.',
+      video_hash_sha256: videoHash,
+      timestamp: new Date().toISOString(),
+    }
+  }
+
   let frameResults = []
   let tempDir      = null
 
