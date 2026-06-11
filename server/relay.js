@@ -204,10 +204,8 @@ wss.on('connection', ws => {
 httpServer.on('error', e => {
   if (e.code === 'EADDRINUSE') {
     console.log(`[RELAY] Port ${RELAY_PORT} already in use — relay already running`)
-    process.exit(0)
   } else {
     console.error('[RELAY] Error:', e.message)
-    process.exit(1)
   }
 })
 httpServer.listen(RELAY_PORT, '::', () => {

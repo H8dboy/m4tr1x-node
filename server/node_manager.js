@@ -8,7 +8,7 @@
 const path = require('path')
 const fs   = require('fs')
 const os   = require('os')
-const { publishNote, getCurrentPubkey, loadSavedKeys, subscribeToFilter } = require('./nostr')
+const { publishNote, getCurrentPubkey, loadSavedKeys, subscribeToFilter, getUnlockedNostrPrivkey } = require('./nostr')
 
 const NODE_KIND    = 30078
 const NODE_TAG     = 'm4tr1x-node'
@@ -47,11 +47,11 @@ async function declareNode(capabilities, wsPort = 4848) {
   const cfg = { name: NODE_NAME, capabilities: validCaps, wsPort, nodeUrl, onion: onion || undefined, since: Math.floor(Date.now() / 1000) }
   saveNodeConfig(cfg)
 
-  const keys = loadSavedKeys()
-  if (keys) {
+  const privkey = getUnlockedNostrPrivkey()
+  if (privkey) {
     publishNote(
       JSON.stringify({ type: NODE_TAG, name: NODE_NAME, capabilities: validCaps, port: wsPort, nodeUrl, onion }),
-      keys.privkey,
+      privkey,
       [
         ['t', NODE_TAG],
         ['caps', validCaps.join(',')],
@@ -60,6 +60,8 @@ async function declareNode(capabilities, wsPort = 4848) {
         ...(onion ? [['onion', onion]] : []),
       ]
     ).catch(() => {})
+  } else {
+    console.warn('[NODE] Nostr keys locked — node announcement skipped (unlock to broadcast)')
   }
 
   nodeRegistry.set(pubkey, { pubkey, name: NODE_NAME, capabilities: validCaps, wsPort, nodeUrl, onion, ts: Date.now() })
@@ -143,15 +145,15 @@ function getOnionAddress() {
 const CONTENT_KIND = 30403
 
 async function announceContent({ id, type, title, category, uploader }) {
-  const keys = loadSavedKeys()
-  if (!keys) return
+  const privkey = getUnlockedNostrPrivkey()
+  if (!privkey) return
   const nodeUrl = getLocalUrl()
   const onion   = getOnionAddress()
 
   // Nostr broadcast
   publishNote(
     JSON.stringify({ id, type, title, category, uploader, node: nodeUrl, nodeName: NODE_NAME }),
-    keys.privkey,
+    privkey,
     [
       ['t', 'm4tr1x-content'],
       ['content-id', id],
