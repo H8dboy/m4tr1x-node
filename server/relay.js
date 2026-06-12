@@ -15,7 +15,7 @@ const path     = require('path')
 const crypto   = require('crypto')
 const { verifyNostrEvent } = require('./nostr-verify')
 
-const RELAY_PORT = 4848
+const RELAY_PORT = parseInt(process.env.RELAY_PORT || '4848', 10)
 const DB_PATH    = path.join(process.env.USERDATA_PATH || __dirname, '..', 'relay.db')
 
 // ── Database ──────────────────────────────────────────────────────────────────

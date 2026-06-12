@@ -1,11 +1,11 @@
-{
+﻿{
   "name": "m4tr1x-head",
   "version": "1.0.0",
-  "description": "M4TR1X Head Node — registry and monitoring only",
+  "description": "M4TR1X Head Node â€” registry and monitoring only",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js",
-    "server": "node index.js"
+    "start": "node head_server.js",
+    "server": "node head_server.js"
   },
   "dependencies": {
     "@noble/hashes": "^2.2.0",

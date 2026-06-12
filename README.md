@@ -61,20 +61,48 @@ cp .env.example .env
 Edit `.env`:
 
 ```env
-NODE_PORT=3000
-STORAGE_PATH=./data
-TOR_ENABLED=true
-FOUNDER_PUBKEY=<founder_pubkey>
-NODE_PRIVKEY=<your_node_keypair_privkey>
+PORT=8080
+NODE_NAME=my-node
+HEAD_NODE_URL=http://<head-node-host>:8080   # node directory (optional)
+RELAY_PEERS=ws://<peer-host>:4848            # static mesh peers (optional)
 ```
 
-Start:
+Start (headless — `npm start` launches the desktop client instead):
 
 ```bash
-npm start
+npm run server
 ```
 
 The node will announce itself to the network and begin accepting connections.
+
+**One-command install (Ubuntu 22.04+ / Debian 12+)** — installs Node.js 20 and
+ffmpeg, configures the node and registers it as a systemd service:
+
+```bash
+HEAD_NODE_URL=http://<head-host>:8080 NODE_NAME=my-node \
+  bash scripts/install-node.sh
+```
+
+---
+
+## Relay mesh — how content travels between nodes
+
+Each node runs its own embedded Nostr relay (`ws://<node>:4848`). The **relay
+mesh** keeps these relays in sync using only standard NIP-01 messages: every
+node opens a persistent subscription to its peers' relays and imports their
+events into its own relay, where signatures are verified and duplicates are
+dropped. Posts, likes, follows, profiles and ledger blocks propagate across
+the whole network while every client keeps talking only to its local relay —
+no central server in the data path, works over LAN and clearnet today.
+
+Peers are discovered automatically from the head node directory
+(`HEAD_NODE_URL`) and/or configured statically (`RELAY_PEERS`) — a network
+can run with no head node at all.
+
+```bash
+curl http://localhost:8080/api/v1/mesh/status      # sync status per peer
+npm run test:mesh                                  # two-node end-to-end test
+```
 
 ---
 

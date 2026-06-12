@@ -144,10 +144,11 @@ function getCurrentPubkey () {
 }
 
 // ── Relay pool ────────────────────────────────────────────────────────────────
-// ws://localhost:4848 is FIRST — the embedded M4TR1X relay has priority
-// M4TR1X uses only its embedded local relay — no external Nostr networks
+// M4TR1X uses only its embedded local relay — no external Nostr networks.
+// Cross-node propagation is handled by relay_mesh.js (relay ↔ relay sync).
+const LOCAL_RELAY = `ws://localhost:${parseInt(process.env.RELAY_PORT || '4848', 10)}`
 const DEFAULT_RELAYS = [
-  'ws://localhost:4848',
+  LOCAL_RELAY,
 ]
 
 let _pool            = null
@@ -193,7 +194,7 @@ async function connectToRelays (relayUrls) {
   ))
 
   // If local relay is not reachable, schedule a reconnect attempt
-  if (!_connectedRelays.includes('ws://localhost:4848')) {
+  if (!_connectedRelays.includes(LOCAL_RELAY)) {
     _scheduleReconnect()
   }
 
@@ -205,14 +206,14 @@ function _scheduleReconnect () {
   _reconnectTimer = setTimeout(async () => {
     _reconnectTimer = null
     console.log('[nostr] Reconnecting local relay (ws://localhost:4848)...')
-    await connectToRelays(['ws://localhost:4848'])
+    await connectToRelays([LOCAL_RELAY])
     _reconnectDelay = Math.min(_reconnectDelay * 2, MAX_RECONNECT)
   }, _reconnectDelay)
 }
 
 function getConnectedRelays () {
   // Always return at least the local relay URL so callers have something to work with
-  return _connectedRelays.length > 0 ? _connectedRelays : ['ws://localhost:4848']
+  return _connectedRelays.length > 0 ? _connectedRelays : [LOCAL_RELAY]
 }
 
 // ── Publish helpers ───────────────────────────────────────────────────────────

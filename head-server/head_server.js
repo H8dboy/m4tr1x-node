@@ -219,9 +219,11 @@ setInterval(() => {
 }, 6 * 3600 * 1000)
 
 // ── Start ─────────────────────────────────────────────────────────────────────
-app.listen(PORT, '127.0.0.1', () => {
+// Default 127.0.0.1 (dietro Tor hidden service). HOST=0.0.0.0 per esporre su LAN (test).
+const HOST = process.env.HOST || '127.0.0.1'
+app.listen(PORT, HOST, () => {
   const onion = getOnionAddress()
-  console.log('[HEAD] Nodo testa in ascolto su 127.0.0.1:' + PORT)
+  console.log(`[HEAD] Nodo testa in ascolto su ${HOST}:${PORT}`)
   if (onion) console.log('[HEAD] Indirizzo Tor: http://' + onion)
   else console.log('[HEAD] Tor address non ancora disponibile')
 })

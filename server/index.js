@@ -53,16 +53,18 @@ const photo      = require('./photo')
 const story      = require('./story')
 const p2p        = require('./p2p')
 const federation = require('./federation')
+const relayMesh  = require('./relay_mesh')
 
 // Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€ Embedded Nostr Relay Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€Ã¢Â”Â€
 // Avviato in processo figlio per evitare che EADDRINUSE faccia crashare il server
 const _net = require('net')
-const _sock = _net.createConnection(4848, '127.0.0.1')
-_sock.once('connect', () => { _sock.destroy(); console.log('[RELAY] Already running on :4848') })
+const _RELAY_PORT = parseInt(process.env.RELAY_PORT || '4848', 10)
+const _sock = _net.createConnection(_RELAY_PORT, '127.0.0.1')
+_sock.once('connect', () => { _sock.destroy(); console.log(`[RELAY] Already running on :${_RELAY_PORT}`) })
 _sock.once('error', () => {
   try {
     require('./relay')
-    console.log('[M4TR1X] Embedded Nostr relay starting on ws://localhost:4848')
+    console.log(`[M4TR1X] Embedded Nostr relay starting on ws://localhost:${_RELAY_PORT}`)
   } catch (e) {
     console.error('[RELAY] Failed to start relay:', e.message)
   }
@@ -630,6 +632,18 @@ app.post('/api/v1/nostr/lock', verifyApiKey, (req, res) => {
 app.get('/api/v1/nostr/relays', async (req, res) => {
   const connected = await connectToRelays()
   res.json({ connected, all: DEFAULT_RELAYS })
+})
+
+// ─── Relay mesh: stato sync cross-nodo + aggiunta peer manuale ────────────────
+app.get('/api/v1/mesh/status', (req, res) => {
+  res.json(relayMesh.getMeshStatus())
+})
+
+app.post('/api/v1/mesh/peer', localhostOnly, (req, res) => {
+  const { url } = req.body || {}
+  if (!url || !/^wss?:\/\//.test(url)) return res.status(400).json({ error: 'url ws:// o wss:// richiesto' })
+  const added = relayMesh.addPeer(url)
+  res.json({ added, status: relayMesh.getMeshStatus() })
 })
 
 app.get('/api/v1/nostr/feed', async (req, res) => {
@@ -1811,6 +1825,8 @@ function startServer(port = 8080) {
   setTimeout(() => checkAndUpdateModel().catch(() => {}), 5000)
   setTimeout(() => startNodeDiscovery(), 2000)
   setTimeout(() => startContentDiscovery(), 3000)
+  // Relay mesh: sync eventi Nostr coi relay degli altri nodi (peer da env + head)
+  setTimeout(() => relayMesh.startMesh(), 4000)
   if (process.env.HEAD_NODE_URL) {
     setTimeout(() => {
       const { getCurrentPubkey } = require('./nostr')

@@ -16,7 +16,8 @@
     "build:mac": "electron-builder --mac",
     "server": "node server/index.js",
     "build:linux": "electron-builder --linux deb",
-    "test:smoke": "node scripts/smoke-test.js"
+    "test:smoke": "node scripts/smoke-test.js",
+    "test:mesh": "node scripts/mesh-test.js"
   },
   "build": {
     "appId": "com.h8dboy.m4tr1x",
