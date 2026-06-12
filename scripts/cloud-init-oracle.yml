@@ -1,0 +1,57 @@
+#cloud-config
+#
+# M4TR1X — cloud-init per Oracle Cloud (OCI Always Free)
+#
+# Incolla questo file in: Crea istanza → Opzioni avanzate → Cloud-init script.
+# Al primo boot la VM diventa da sola: nodo M4TR1X (porta 8080) + head server
+# (porta 8081) + relay Nostr (porta 4848), tutto come servizi systemd.
+#
+# RICORDA: oltre a questo script devi aprire le porte anche nella
+# Security List della VCN (vedi docs/ORACLE_CLOUD.md) — Oracle blocca
+# tutto di default sia nel firewall di rete sia in iptables dentro la VM.
+
+package_update: true
+packages:
+  - git
+  - curl
+
+runcmd:
+  # ── Firewall locale: le immagini Ubuntu di OCI bloccano tutto tranne SSH ──
+  - iptables -I INPUT -p tcp --dport 8080 -j ACCEPT
+  - iptables -I INPUT -p tcp --dport 8081 -j ACCEPT
+  - iptables -I INPUT -p tcp --dport 4848 -j ACCEPT
+  - sh -c 'command -v netfilter-persistent >/dev/null && netfilter-persistent save || true'
+
+  # ── Installa il nodo (Node.js 20, ffmpeg, repo, systemd) come utente ubuntu ──
+  - sudo -u ubuntu -H bash -c 'cd /home/ubuntu && curl -fsSL https://raw.githubusercontent.com/H8dboy/m4tr1x-node/main/scripts/install-node.sh -o install-node.sh && HEAD_NODE_URL=http://127.0.0.1:8081 NODE_NAME=oracle-node-1 INSTALL_DIR=/home/ubuntu/m4tr1x-node bash install-node.sh'
+
+  # ── Head server (directory + dashboard) sulla porta 8081, esposto ──────────
+  - |
+    cat > /etc/systemd/system/m4tr1x-head.service <<'EOF'
+    [Unit]
+    Description=M4TR1X Head Server — node directory and dashboard
+    After=network-online.target
+    Wants=network-online.target
+
+    [Service]
+    Type=simple
+    User=ubuntu
+    WorkingDirectory=/home/ubuntu/m4tr1x-node/head-server
+    Environment=HOST=0.0.0.0
+    Environment=PORT=8081
+    Environment=M4TR1X_DATA_DIR=/home/ubuntu/m4tr1x-head-data
+    ExecStart=/usr/bin/node head_server.js
+    Restart=on-failure
+    RestartSec=5
+    NoNewPrivileges=true
+    PrivateTmp=true
+
+    [Install]
+    WantedBy=multi-user.target
+    EOF
+  - mkdir -p /home/ubuntu/m4tr1x-head-data
+  - chown ubuntu:ubuntu /home/ubuntu/m4tr1x-head-data
+  - systemctl daemon-reload
+  - systemctl enable --now m4tr1x-head
+
+final_message: "M4TR1X pronto: nodo :8080 · head :8081 · relay :4848 (apri le porte anche nella Security List!)"
