@@ -28,6 +28,23 @@ function getSync() {
   return _sync
 }
 
+// Lazy import del session guard (mitigazione: una sola sessione attiva per identità).
+let _guard = null
+function getGuard() {
+  if (!_guard) { try { _guard = require('./session_guard') } catch { _guard = { hasConflict: () => false } } }
+  return _guard
+}
+
+// Rifiuta la spesa se è stata rilevata una sessione concorrente per la stessa identità.
+function assertNoSessionConflict(address) {
+  try {
+    if (getGuard().hasConflict(address))
+      throw new Error('Sessione concorrente rilevata per questa identità — spese sospese. Blocca l\'identità sugli altri nodi.')
+  } catch (e) {
+    if (/Sessione concorrente/.test(e.message)) throw e   // rilancia solo il nostro errore
+  }
+}
+
 // ─── Supply constants ─────────────────────────────────────────────────────────
 const MAX_SUPPLY       = 100_000_000
 const FOUNDER_SHARE    =  50_000_000
@@ -48,6 +65,12 @@ const VALID_TX_TYPES = new Set([
   'boost',
   'shop_seller', 'shop_platform', 'shop_server',
 ])
+
+// Mitigazione lancio (pre-head canonico): tetto ai fondi NON confermati che
+// si possono rispendere subito. Fino a MAX_UNCONFIRMED di entrate fresche è
+// spendibile all'istante (UX dei tip), oltre quel tetto bisogna aspettare la
+// finestra di conferma del gossip. Configurabile via H8_MAX_UNCONFIRMED.
+const MAX_UNCONFIRMED = Math.max(0, parseInt(process.env.H8_MAX_UNCONFIRMED || '1000'))
 
 let _db = null
 
@@ -227,6 +250,32 @@ function getBalance(address) {
   return localBal + remoteBal
 }
 
+// ─── Spendable balance (mitigazioni lancio) ───────────────────────────────────
+// Saldo che il proprietario può spendere ORA: totale meno la quota di entrate
+// remote ancora "in attesa" che eccede il tetto MAX_UNCONFIRMED. Il saldo locale
+// (genesi/mint/proprie uscite) è sempre confermato. È questo — non getBalance —
+// che governa i controlli di spesa in transfer/tip/boost.
+function getSpendable(address) {
+  if (!validAddress(address)) return 0
+  const total = getBalance(address)
+  let pending = 0
+  try { pending = getSync().getRemoteBalances(address).pending } catch {}
+  const withheld = Math.max(pending - MAX_UNCONFIRMED, 0)
+  return total - withheld
+}
+
+// Breakdown per UI/diagnostica: { total, spendable, pending_unconfirmed }.
+function getBalanceBreakdown(address) {
+  const total = getBalance(address)
+  let pending = 0
+  try { pending = getSync().getRemoteBalances(address).pending } catch {}
+  return {
+    total,
+    spendable: total - Math.max(pending - MAX_UNCONFIRMED, 0),
+    pending_unconfirmed: Math.max(pending, 0),
+  }
+}
+
 // ─── History ──────────────────────────────────────────────────────────────────
 function getHistory(address, limit = 50) {
   if (!validAddress(address)) return []
@@ -284,7 +333,8 @@ async function transfer(to, amount, note = '') {
   if (!unlocked) throw new Error('H8 wallet locked')
   if (!validAddress(to)) throw new Error('Invalid recipient address')
   return withSenderLock(unlocked.address, async () => {
-    if (getBalance(unlocked.address) < amount) throw new Error('Insufficient balance')
+    assertNoSessionConflict(unlocked.address)
+    if (getSpendable(unlocked.address) < amount) throw new Error('Insufficient balance')
     return appendBlock({ from: unlocked.address, to, amount, tx_type: 'transfer', note })
   })
 }
@@ -294,7 +344,8 @@ async function tip(creatorAddr, amount, contentId) {
   const unlocked = h8id.getUnlockedIdentity()
   if (!unlocked) throw new Error('H8 wallet locked')
   return withSenderLock(unlocked.address, async () => {
-    if (getBalance(unlocked.address) < amount) throw new Error('Insufficient balance for tip')
+    assertNoSessionConflict(unlocked.address)
+    if (getSpendable(unlocked.address) < amount) throw new Error('Insufficient balance for tip')
 
     const creatorShare  = Math.floor(amount * 0.50)
     const platformShare = Math.floor(amount * 0.20)
@@ -312,7 +363,8 @@ async function boost(contentId, amount) {
   const unlocked = h8id.getUnlockedIdentity()
   if (!unlocked) throw new Error('H8 wallet locked')
   return withSenderLock(unlocked.address, async () => {
-    if (getBalance(unlocked.address) < amount) throw new Error('Insufficient balance for boost')
+    assertNoSessionConflict(unlocked.address)
+    if (getSpendable(unlocked.address) < amount) throw new Error('Insufficient balance for boost')
     return appendBlock({ from: unlocked.address, to: PLATFORM_ADDRESS, amount, tx_type: 'boost', content_id: contentId })
   })
 }
@@ -415,6 +467,8 @@ async function verifyChain() {
 module.exports = {
   initLedger,
   getBalance,
+  getSpendable,
+  getBalanceBreakdown,
   getHistory,
   getPublicLedger,
   getLedgerStats,

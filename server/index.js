@@ -389,6 +389,7 @@ app.post('/api/v1/h8/wallet/unlock', verifyApiKey, async (req, res) => {
       const hb = require('./heartbeat')
       hb.registerUser({ address: result.address, name: result.name || '', pubkey: getCurrentPubkey() })
     }
+    try { require('./session_guard').claim(result.address) } catch {}
     res.json({ status: 'unlocked', address: result.address, balance: null })
   } catch (err) {
     res.status(401).json({ error: err.message })
@@ -398,7 +399,14 @@ app.post('/api/v1/h8/wallet/unlock', verifyApiKey, async (req, res) => {
 // Blocca wallet
 app.post('/api/v1/h8/wallet/lock', verifyApiKey, (req, res) => {
   lockIdentity()
+  try { require('./session_guard').release() } catch {}
   res.json({ status: 'locked' })
+})
+
+// Stato del session guard: rileva se l'identità è attiva anche su un altro nodo.
+app.get('/api/v1/h8/session-guard', (req, res) => {
+  try { res.json(require('./session_guard').getState()) }
+  catch { res.json({ active: false }) }
 })
 
 // Ritorna address H8 e chiave pubblica di firma (secp256k1 derivata) della sessione attiva.
@@ -437,7 +445,10 @@ ledgerSync.startBlockSync()
 app.get('/api/v1/h8/balance', verifyApiKey, (req, res) => {
   const addr = req.query.address || require('./h8identity').getUnlockedIdentity()?.address
   if (!addr) return res.status(400).json({ error: 'address richiesto o wallet bloccato' })
-  res.json({ address: addr, balance: h8token.getBalance(addr) })
+  const b = h8token.getBalanceBreakdown(addr)
+  // `balance` resta il totale (retrocompat); `spendable`/`pending_unconfirmed`
+  // espongono la finestra di conferma + tetto fondi non confermati.
+  res.json({ address: addr, balance: b.total, spendable: b.spendable, pending_unconfirmed: b.pending_unconfirmed })
 })
 
 app.get('/api/v1/h8/history', verifyApiKey, (req, res) => {

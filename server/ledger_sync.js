@@ -35,6 +35,12 @@ const SYNCABLE_TX_TYPES = new Set([
   'boost', 'shop_seller', 'shop_platform', 'shop_server',
 ])
 
+// Mitigazione lancio (pre-head canonico): i fondi appena ricevuti via gossip non
+// sono "saldati" finché non sono trascorsi CONFIRM_WINDOW_MS dalla ricezione —
+// finestra entro cui un eventuale double-spend conflittuale farebbe in tempo a
+// propagarsi. Configurabile via H8_CONFIRM_WINDOW_MS.
+const CONFIRM_WINDOW_MS = Math.max(0, parseInt(process.env.H8_CONFIRM_WINDOW_MS || '8000'))
+
 // ─── Remote block DB ──────────────────────────────────────────────────────────
 
 let _rdb = null
@@ -223,6 +229,28 @@ function getRemoteBalance(address) {
   return incoming - outgoing
 }
 
+// Breakdown confermato vs in attesa. Le entrate contano come "confermate" solo
+// dopo CONFIRM_WINDOW_MS dalla ricezione; le uscite contano sempre per intero
+// (ciò che ho già speso non torna spendibile). `pending` è sempre >= 0.
+function getRemoteBalances(address) {
+  const db     = getRemoteDb()
+  const cutoff = Math.floor((Date.now() - CONFIRM_WINDOW_MS) / 1000)
+  const incAll = db.prepare(
+    'SELECT COALESCE(SUM(amount),0) as s FROM remote_blocks WHERE to_addr = ? AND verified = 1'
+  ).get(address).s
+  const incConf = db.prepare(
+    'SELECT COALESCE(SUM(amount),0) as s FROM remote_blocks WHERE to_addr = ? AND verified = 1 AND received_at <= ?'
+  ).get(address, cutoff).s
+  const outgoing = db.prepare(
+    'SELECT COALESCE(SUM(amount),0) as s FROM remote_blocks WHERE from_addr = ? AND verified = 1'
+  ).get(address).s
+  return {
+    confirmed: incConf - outgoing,   // spendibile subito (al netto delle uscite)
+    pending:   incAll - incConf,     // entrate ancora dentro la finestra di conferma
+    total:     incAll - outgoing,
+  }
+}
+
 function getRemoteHistory(address, limit = 50) {
   return getRemoteDb().prepare(`
     SELECT hash, ts, from_addr, to_addr, amount, tx_type, content_id,
@@ -247,6 +275,8 @@ module.exports = {
   startBlockSync,
   importRemoteBlock,
   getRemoteBalance,
+  getRemoteBalances,
   getRemoteHistory,
   getRemoteStats,
+  CONFIRM_WINDOW_MS,
 }
