@@ -36,6 +36,10 @@ runcmd:
   # ── Genera una M4TR1X_API_KEY casuale nel .env e riavvia il nodo ──
   - |
     ENV=/home/ubuntu/m4tr1x-node/.env
+    if [ ! -f "$ENV" ]; then
+      echo "[cloud-init] $ENV assente: install-node.sh non è andato a buon fine — salto la API key" >&2
+      exit 0
+    fi
     KEY=$(openssl rand -hex 32)
     if grep -q '^M4TR1X_API_KEY=' "$ENV"; then
       sed -i "s|^M4TR1X_API_KEY=.*|M4TR1X_API_KEY=$KEY|" "$ENV"
