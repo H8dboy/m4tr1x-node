@@ -20,6 +20,13 @@ const path     = require('path')
 const { subscribeToFilter, publishEvent, getUnlockedNostrPrivkey } = require('./nostr')
 const h8id     = require('./h8identity')
 
+// Lazy import to break the h8token ⇄ ledger_sync require cycle.
+let _token = null
+function getToken() {
+  if (!_token) _token = require('./h8token')
+  return _token
+}
+
 const BLOCK_KIND = 30078
 const BLOCK_TAG  = 'm4tr1x-h8-block'
 
@@ -102,7 +109,21 @@ async function importRemoteBlock(block) {
     return false
   }
 
-  const verified = await verifyRemoteBlock(block)
+  let verified = await verifyRemoteBlock(block)
+
+  // Negative-balance net (audit): a block with a valid ML-DSA signature is still
+  // rejected if it would drive the sender's global balance below zero. The signature
+  // proves authenticity, not that the sender hadn't already spent these funds.
+  // This is a safety net, not a consensus fix — out-of-order gossip can still mark a
+  // legitimate block unverified until the canonical head node provides ordering.
+  if (verified) {
+    try {
+      if (getToken().getBalance(block.from_addr) < block.amount) {
+        console.warn(`[LEDGER_SYNC] ⚠️ Rifiutato overspend ${block.from_addr.slice(0, 10)} ${block.amount} H8 (saldo andrebbe negativo)`)
+        verified = false
+      }
+    } catch {}
+  }
 
   db.prepare(`
     INSERT OR IGNORE INTO remote_blocks

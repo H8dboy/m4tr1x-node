@@ -148,6 +148,22 @@ function _genesisSync() {
   }
 }
 
+// ─── Per-sender async lock (intra-node double-spend guard) ────────────────────
+// Node is single-threaded, but appendBlock awaits the ML-DSA signature, which
+// yields the event loop. Without this, two concurrent spends from the same
+// address could both pass the balance check before either writes its block.
+// Serializing the check+append critical section per sender closes that race.
+const _senderChains = new Map()
+
+function withSenderLock(key, fn) {
+  const prev   = _senderChains.get(key) || Promise.resolve()
+  const result = prev.then(fn, fn)              // run after prev settles, either way
+  const tail   = result.then(() => {}, () => {}) // never-rejecting tail for the next waiter
+  _senderChains.set(key, tail)
+  tail.then(() => { if (_senderChains.get(key) === tail) _senderChains.delete(key) })
+  return result
+}
+
 // ─── Append signed block ──────────────────────────────────────────────────────
 async function appendBlock({ from, to, amount, tx_type, content_id = null, note = null }) {
   if (!validAddress(from)) throw new Error(`Invalid from address: ${from}`)
@@ -157,6 +173,12 @@ async function appendBlock({ from, to, amount, tx_type, content_id = null, note 
 
   // Block any mint beyond genesis
   if (tx_type === 'mint') throw new Error('Mint closed: supply is fixed at genesis')
+
+  // Negative-balance guard (audit): never let a spend drive the sender below zero.
+  // Defence-in-depth — the public wrappers also check, but this protects every path
+  // and runs inside the per-sender lock so concurrent spends can't race past it.
+  if (from !== MINT_ADDRESS && getBalance(from) < amount)
+    throw new Error('Insufficient balance')
 
   const db      = getDb()
   const last    = db.prepare('SELECT * FROM ledger ORDER BY block_index DESC LIMIT 1').get()
@@ -261,32 +283,38 @@ async function transfer(to, amount, note = '') {
   const unlocked = h8id.getUnlockedIdentity()
   if (!unlocked) throw new Error('H8 wallet locked')
   if (!validAddress(to)) throw new Error('Invalid recipient address')
-  if (getBalance(unlocked.address) < amount) throw new Error('Insufficient balance')
-  return appendBlock({ from: unlocked.address, to, amount, tx_type: 'transfer', note })
+  return withSenderLock(unlocked.address, async () => {
+    if (getBalance(unlocked.address) < amount) throw new Error('Insufficient balance')
+    return appendBlock({ from: unlocked.address, to, amount, tx_type: 'transfer', note })
+  })
 }
 
 // ─── Tip (50% creator · 20% platform · 30% server) ───────────────────────────
 async function tip(creatorAddr, amount, contentId) {
   const unlocked = h8id.getUnlockedIdentity()
   if (!unlocked) throw new Error('H8 wallet locked')
-  if (getBalance(unlocked.address) < amount) throw new Error('Insufficient balance for tip')
+  return withSenderLock(unlocked.address, async () => {
+    if (getBalance(unlocked.address) < amount) throw new Error('Insufficient balance for tip')
 
-  const creatorShare  = Math.floor(amount * 0.50)
-  const platformShare = Math.floor(amount * 0.20)
-  const serverShare   = amount - creatorShare - platformShare
+    const creatorShare  = Math.floor(amount * 0.50)
+    const platformShare = Math.floor(amount * 0.20)
+    const serverShare   = amount - creatorShare - platformShare
 
-  const b1 = await appendBlock({ from: unlocked.address, to: creatorAddr,      amount: creatorShare,  tx_type: 'tip_creator',  content_id: contentId })
-  const b2 = await appendBlock({ from: unlocked.address, to: PLATFORM_ADDRESS, amount: platformShare, tx_type: 'tip_platform', content_id: contentId })
-  const b3 = await appendBlock({ from: unlocked.address, to: SERVER_ADDRESS,   amount: serverShare,   tx_type: 'tip_server',   content_id: contentId })
-  return { creator: b1, platform: b2, server: b3, total: amount }
+    const b1 = await appendBlock({ from: unlocked.address, to: creatorAddr,      amount: creatorShare,  tx_type: 'tip_creator',  content_id: contentId })
+    const b2 = await appendBlock({ from: unlocked.address, to: PLATFORM_ADDRESS, amount: platformShare, tx_type: 'tip_platform', content_id: contentId })
+    const b3 = await appendBlock({ from: unlocked.address, to: SERVER_ADDRESS,   amount: serverShare,   tx_type: 'tip_server',   content_id: contentId })
+    return { creator: b1, platform: b2, server: b3, total: amount }
+  })
 }
 
 // ─── Boost ────────────────────────────────────────────────────────────────────
 async function boost(contentId, amount) {
   const unlocked = h8id.getUnlockedIdentity()
   if (!unlocked) throw new Error('H8 wallet locked')
-  if (getBalance(unlocked.address) < amount) throw new Error('Insufficient balance for boost')
-  return appendBlock({ from: unlocked.address, to: PLATFORM_ADDRESS, amount, tx_type: 'boost', content_id: contentId })
+  return withSenderLock(unlocked.address, async () => {
+    if (getBalance(unlocked.address) < amount) throw new Error('Insufficient balance for boost')
+    return appendBlock({ from: unlocked.address, to: PLATFORM_ADDRESS, amount, tx_type: 'boost', content_id: contentId })
+  })
 }
 
 // ─── Boost scores ─────────────────────────────────────────────────────────────
