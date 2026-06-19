@@ -1,14 +1,23 @@
 #cloud-config
 #
-# M4TR1X — cloud-init per Oracle Cloud (OCI Always Free)
+# M4TR1X — cloud-init per Oracle Cloud (OCI Always Free) — versione HARDENED
 #
-# Incolla questo file in: Crea istanza → Opzioni avanzate → Cloud-init script.
-# Al primo boot la VM diventa da sola: nodo M4TR1X (porta 8080) + head server
-# (porta 8081) + relay Nostr (porta 4848), tutto come servizi systemd.
+# Al primo boot la VM diventa: nodo M4TR1X (:8080) + head server (:8081) +
+# relay Nostr (:4848), tutto come servizi systemd.
 #
-# RICORDA: oltre a questo script devi aprire le porte anche nella
-# Security List della VCN (vedi docs/ORACLE_CLOUD.md) — Oracle blocca
-# tutto di default sia nel firewall di rete sia in iptables dentro la VM.
+# Postura di sicurezza (decisa 2026-06-19):
+#  - relay Nostr :4848  → PUBBLICO (un relay è fatto per esserlo)
+#  - node API  :8080    → resta LOCALE; aprilo nella Security List solo
+#                         deliberatamente, quando vuoi l'API pubblica
+#  - head + dashboard :8081 → LOCALE (HOST=127.0.0.1): NON è autenticato,
+#                         quindi non va MAI esposto a Internet
+#  - M4TR1X_API_KEY casuale generata al primo boot (protegge le route sensibili)
+#  - iptables apre SOLO 4848
+#
+# Dashboard / API in locale: raggiungili via tunnel SSH, es.
+#   ssh -L 8081:localhost:8081 -L 8080:localhost:8080 ubuntu@<PUBLIC_IP>
+#
+# RICORDA: oltre a iptables, apri 4848 anche nella Security List della VCN.
 
 package_update: true
 packages:
@@ -16,20 +25,31 @@ packages:
   - curl
 
 runcmd:
-  # ── Firewall locale: le immagini Ubuntu di OCI bloccano tutto tranne SSH ──
-  - iptables -I INPUT -p tcp --dport 8080 -j ACCEPT
-  - iptables -I INPUT -p tcp --dport 8081 -j ACCEPT
+  # ── Firewall locale: apri SOLO il relay pubblico ──
   - iptables -I INPUT -p tcp --dport 4848 -j ACCEPT
   - sh -c 'command -v netfilter-persistent >/dev/null && netfilter-persistent save || true'
 
   # ── Installa il nodo (Node.js 20, ffmpeg, repo, systemd) come utente ubuntu ──
-  - sudo -u ubuntu -H bash -c 'cd /home/ubuntu && curl -fsSL https://raw.githubusercontent.com/H8dboy/m4tr1x-node/main/scripts/install-node.sh -o install-node.sh && HEAD_NODE_URL=http://127.0.0.1:8081 NODE_NAME=oracle-node-1 INSTALL_DIR=/home/ubuntu/m4tr1x-node bash install-node.sh'
+  #    URL pinnato a un commit revisionato (NON 'main'): la VM esegue una versione esatta.
+  - sudo -u ubuntu -H bash -c 'cd /home/ubuntu && curl -fsSL https://raw.githubusercontent.com/H8dboy/m4tr1x-node/f20eb81e175e04845cb314019f8b3e5af921e916/scripts/install-node.sh -o install-node.sh && HEAD_NODE_URL=http://127.0.0.1:8081 NODE_NAME=oracle-node-1 INSTALL_DIR=/home/ubuntu/m4tr1x-node bash install-node.sh'
 
-  # ── Head server (directory + dashboard) sulla porta 8081, esposto ──────────
+  # ── Genera una M4TR1X_API_KEY casuale nel .env e riavvia il nodo ──
+  - |
+    ENV=/home/ubuntu/m4tr1x-node/.env
+    KEY=$(openssl rand -hex 32)
+    if grep -q '^M4TR1X_API_KEY=' "$ENV"; then
+      sed -i "s|^M4TR1X_API_KEY=.*|M4TR1X_API_KEY=$KEY|" "$ENV"
+    else
+      echo "M4TR1X_API_KEY=$KEY" >> "$ENV"
+    fi
+    chown ubuntu:ubuntu "$ENV"
+    systemctl restart m4tr1x-node || true
+
+  # ── Head server (directory + dashboard) — SOLO LOCALE (127.0.0.1:8081) ──
   - |
     cat > /etc/systemd/system/m4tr1x-head.service <<'EOF'
     [Unit]
-    Description=M4TR1X Head Server — node directory and dashboard
+    Description=M4TR1X Head Server — node directory and dashboard (local only)
     After=network-online.target
     Wants=network-online.target
 
@@ -37,7 +57,7 @@ runcmd:
     Type=simple
     User=ubuntu
     WorkingDirectory=/home/ubuntu/m4tr1x-node/head-server
-    Environment=HOST=0.0.0.0
+    Environment=HOST=127.0.0.1
     Environment=PORT=8081
     Environment=M4TR1X_DATA_DIR=/home/ubuntu/m4tr1x-head-data
     ExecStart=/usr/bin/node head_server.js
@@ -54,4 +74,4 @@ runcmd:
   - systemctl daemon-reload
   - systemctl enable --now m4tr1x-head
 
-final_message: "M4TR1X pronto: nodo :8080 · head :8081 · relay :4848 (apri le porte anche nella Security List!)"
+final_message: "M4TR1X pronto: relay :4848 (pubblico) · nodo :8080 e head :8081 (LOCALI, via tunnel SSH). API key in /home/ubuntu/m4tr1x-node/.env"
