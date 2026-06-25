@@ -55,7 +55,7 @@
     if(!list)return;
     const r=await fetch('/api/v1/live/streams').then(r=>r.json()).catch(()=>({streams:[]}));
     if(!r.streams.length){
-      list.innerHTML='<div class="slide-placeholder"><div class="ph-text" style="color:rgba(255,0,68,0.3)">[ NO LIVE STREAMS ]\n\nBe the first to go live.\nPress GO LIVE above.</div></div>';
+      list.innerHTML='<div class="slide-placeholder"><div class="ph-text" style="color:rgba(255,90,106,0.9)">[ NO LIVE STREAMS ]\n\nBe the first to go live.\nPress GO LIVE above.</div></div>';
       return;
     }
     list.innerHTML='';
@@ -185,31 +185,34 @@
   <link rel="stylesheet" href="m4tr1x.css">
   <link rel="stylesheet" href="comfort.css">
   <link rel="stylesheet" href="design.css">
+  <link rel="stylesheet" href="redesign-theme.css">
 </head><body>
   <div id="section-pill" class="signal-pill">SIGNAL</div>
   <div id="topbar">
-    <div class="logo">M4TR1X</div>
+    <div class="logo">M4TR1X<span class="mx-signal-dot"></span></div>
     <span id="session-timer" onclick="toggleSessionAlert()" title="Tempo sessione — clicca per impostare limite">00:00</span>
     <div id="topbar-right">
       <button class="top-btn h8-wallet-btn" onclick="openWalletModal()" title="H8 Wallet" id="topbar-wallet-btn">
+        <img class="h8-logo" src="assets/h8-token.png?v=2" alt="H8" draggable="false">
         <span id="topbar-h8-amount" style="font-size:0.7em;font-family:var(--font-mono);color:rgba(0,255,136,0.5);letter-spacing:1px">H8</span>
       </button>
+      <button class="top-btn" onclick="openSearch()" title="Cerca persone e contenuti"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg></button>
       <div class="notif-btn-wrap">
-        <button class="top-btn" onclick="openNotifDrawer()" title="Notifications">🔔</button>
+        <button class="top-btn" onclick="openNotifDrawer()" title="Notifications"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6z"/><path d="M10 20a2 2 0 0 0 4 0"/></svg></button>
         <div class="notif-dot" id="notif-dot"></div>
       </div>
-      <button class="top-btn" onclick="openNodeModal()" title="Node Settings" style="font-size:0.8em">⚡</button>
-      <div id="user-avatar-top" onclick="openMyProfile()" title="My Profile">👤</div>
+      <button class="top-btn" onclick="openNodeModal()" title="Node Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L4.5 13H11l-1 9 8.5-11H12l1-9z"/></svg></button>
+      <div id="user-avatar-top" onclick="openMyProfile()" title="My Profile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 4-6 8-6s8 2 8 6"/></svg></div>
     </div>
   </div>
   <div id="section-tabs">
-    <button class="sec-tab active" onclick="switchSec('signal')">📡</button>
-    <button class="sec-tab film-tab" onclick="switchSec('film')">🎬</button>
-    <button class="sec-tab music-tab" onclick="switchSec('music')">🎵</button>
-    <button class="sec-tab forum-tab" onclick="switchSec('forum')">🏛️</button>
-    <button class="sec-tab shop-tab desktop-only" onclick="switchSec('shop')">🛍️</button>
-    <button class="sec-tab dm-tab" onclick="switchSec('dm')">💬</button>
-    <button class="sec-tab live-tab" onclick="switchSec('live')">🔴</button>
+    <button class="sec-tab active" onclick="switchSec('signal')" title="Signal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2.2" fill="currentColor" stroke="none"/><path d="M7.8 7.8a6 6 0 0 0 0 8.4"/><path d="M16.2 7.8a6 6 0 0 1 0 8.4"/><path d="M4.9 5a10 10 0 0 0 0 14"/><path d="M19.1 5a10 10 0 0 1 0 14"/></svg></button>
+    <button class="sec-tab film-tab" onclick="switchSec('film')" title="Film"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="M10 9l5 3-5 3z" fill="currentColor" stroke="none"/></svg></button>
+    <button class="sec-tab music-tab" onclick="switchSec('music')" title="Music"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V6l10-2v12"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="16.5" cy="16" r="2.5"/></svg></button>
+    <button class="sec-tab forum-tab" onclick="switchSec('forum')" title="Forum"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-5 9 5"/><path d="M5 9v9M19 9v9M9 9v9M15 9v9"/><path d="M3 18h18"/></svg></button>
+    <button class="sec-tab shop-tab desktop-only" onclick="switchSec('shop')" title="Shop"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8h12l-1 12H7L6 8z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/></svg></button>
+    <button class="sec-tab dm-tab" onclick="switchSec('dm')" title="Messages"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H9l-4 4v-4H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/></svg></button>
+    <button class="sec-tab live-tab" onclick="switchSec('live')" title="Live"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2" fill="currentColor" stroke="none"/><path d="M7.5 7.5a6 6 0 0 0 0 9M16.5 7.5a6 6 0 0 1 0 9"/></svg></button>
   </div>
   <div class="section-banner" id="banner-film">
     <span class="banner-icon">🎬</span>
@@ -233,6 +236,7 @@
   </div>
   <div class="section-banner" id="banner-live"><span class="banner-icon">🔴</span><div class="banner-text"><strong>LIVE STREAMS</strong> WebRTC P2P · Decentralized <span class="integration-status live">P2P LIVE</span></div></div>
   <button id="mute-btn" onclick="toggleMute()">🔇</button>
+  <div id="stories-bar"></div>
   <div id="feed-wrap">
     <div class="section-feed active" id="feed-signal"><div class="slide-placeholder"><div class="ph-text">[ CONNECTING TO RELAYS... ]</div></div></div>
     <div class="section-feed" id="feed-film"><div class="slide-placeholder"><div class="ph-text">[ CONNECTING TO PEERTUBE INSTANCES... ]</div></div></div>
@@ -260,7 +264,7 @@
           <button class="go-live-btn" onclick="openGoLive()" style="flex:1">🔴 GO LIVE</button>
           <button class="go-live-btn" onclick="stopGoLive()" style="flex:1;background:rgba(255,255,255,0.06)">⏹ STOP</button>
         </div>
-        <div id="live-streams-list"><div class="slide-placeholder"><div class="ph-text" style="color:rgba(255,0,68,0.3)">[ NO LIVE STREAMS ]\n\nBe the first to go live.</div></div></div>
+        <div id="live-streams-list"><div class="slide-placeholder"><div class="ph-text" style="color:rgba(255,90,106,0.9)">[ NO LIVE STREAMS ]\n\nBe the first to go live.</div></div></div>
       </div>
     </div>
     <div class="section-feed" id="feed-dm">
@@ -278,16 +282,249 @@
     <a href="https://funkwhale.audio" target="_blank">FUNKWHALE</a>
   </div>
   <div id="bottom-nav">
-    <button class="bnav active" id="bnav-signal" onclick="switchSec('signal')"><span class="bicon">📡</span><span class="bnav-label">SIGNAL</span></button>
-    <button class="bnav film-nav" id="bnav-film" onclick="switchSec('film')"><span class="bicon">🎬</span><span class="bnav-label">FILM</span></button>
-    <button class="bnav forum-nav" id="bnav-forum" onclick="switchSec('forum')"><span class="bicon">🏛️</span><span class="bnav-label">FORUM</span></button>
-    <button class="bnav post-nav" onclick="openUpload()"><span class="bicon">＋</span><span class="bnav-label">POST</span></button>
-    <button class="bnav music-nav" id="bnav-music" onclick="switchSec('music')"><span class="bicon">🎵</span><span class="bnav-label">MUSIC</span></button>
-    <button class="bnav shop-nav" id="bnav-shop" onclick="switchSec('shop')"><span class="bicon">🛍️</span><span class="bnav-label">SHOP</span></button>
-    <button class="bnav live-nav" id="bnav-live" onclick="switchSec('live')" style="position:relative"><span class="bicon">🔴</span><span class="bnav-label">LIVE</span><span id="live-count-badge" style="display:none;position:absolute;top:4px;right:4px;background:var(--red);color:#fff;font-size:0.5em;font-family:var(--font-mono);border-radius:8px;padding:1px 5px;min-width:16px;text-align:center;letter-spacing:0"></span></button>
-    <button class="bnav dm-nav" id="bnav-dm" onclick="switchSec('dm')" style="position:relative"><span class="bicon">💬</span><span class="bnav-label">DM</span><span id="dm-unread-badge" style="display:none;position:absolute;top:4px;right:4px;background:var(--red);color:#fff;font-size:0.5em;font-family:var(--font-mono);border-radius:8px;padding:1px 5px;min-width:16px;text-align:center;letter-spacing:0"></span></button>
+    <button class="bnav active" id="bnav-signal" onclick="switchSec('signal')"><span class="bicon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2.2" fill="currentColor" stroke="none"/><path d="M7.8 7.8a6 6 0 0 0 0 8.4"/><path d="M16.2 7.8a6 6 0 0 1 0 8.4"/><path d="M4.9 5a10 10 0 0 0 0 14"/><path d="M19.1 5a10 10 0 0 1 0 14"/></svg></span><span class="bnav-label">SIGNAL</span></button>
+    <button class="bnav film-nav" id="bnav-film" onclick="switchSec('film')"><span class="bicon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="M10 9l5 3-5 3z" fill="currentColor" stroke="none"/></svg></span><span class="bnav-label">FILM</span></button>
+    <button class="bnav forum-nav" id="bnav-forum" onclick="switchSec('forum')"><span class="bicon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-5 9 5"/><path d="M5 9v9M19 9v9M9 9v9M15 9v9"/><path d="M3 18h18"/></svg></span><span class="bnav-label">FORUM</span></button>
+    <button class="bnav post-nav" onclick="openUpload()"><span class="bicon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span><span class="bnav-label">POST</span></button>
+    <button class="bnav music-nav" id="bnav-music" onclick="switchSec('music')"><span class="bicon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V6l10-2v12"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="16.5" cy="16" r="2.5"/></svg></span><span class="bnav-label">MUSIC</span></button>
+    <button class="bnav shop-nav" id="bnav-shop" onclick="switchSec('shop')"><span class="bicon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8h12l-1 12H7L6 8z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/></svg></span><span class="bnav-label">SHOP</span></button>
+    <button class="bnav live-nav" id="bnav-live" onclick="switchSec('live')" style="position:relative"><span class="bicon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2" fill="currentColor" stroke="none"/><path d="M7.5 7.5a6 6 0 0 0 0 9M16.5 7.5a6 6 0 0 1 0 9"/></svg></span><span class="bnav-label">LIVE</span><span id="live-count-badge" style="display:none;position:absolute;top:4px;right:4px;background:var(--red);color:#fff;font-size:0.5em;font-family:var(--font-mono);border-radius:8px;padding:1px 5px;min-width:16px;text-align:center;letter-spacing:0"></span></button>
+    <button class="bnav dm-nav" id="bnav-dm" onclick="switchSec('dm')" style="position:relative"><span class="bicon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H9l-4 4v-4H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/></svg></span><span class="bnav-label">DM</span><span id="dm-unread-badge" style="display:none;position:absolute;top:4px;right:4px;background:var(--red);color:#fff;font-size:0.5em;font-family:var(--font-mono);border-radius:8px;padding:1px 5px;min-width:16px;text-align:center;letter-spacing:0"></span></button>
   </div>
-  <button class="forum-new-btn" id="forum-fab" onclick="openForumModal()">＋</button>
+  <button class="forum-new-btn" id="forum-fab" onclick="openForumModal()"><svg viewBox="0 0 24 24" fill="none" stroke="#080b10" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+  <button class="mx-fab" id="mx-compose-fab" onclick="openUpload()" title="Compose"><svg viewBox="0 0 24 24" fill="none" stroke="#080b10" stroke-width="2.3" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+
+  <!-- ░░ SEARCH — cerca persone e contenuti ░░ -->
+  <div id="mx-search-overlay" onclick="if(event.target===this)closeSearch()">
+    <div class="mx-search-panel">
+      <div class="mx-search-bar">
+        <svg class="mx-search-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+        <input id="mx-search-input" autocomplete="off" spellcheck="false" placeholder="Cerca persone, post, video, musica…" oninput="mxSearchDebounced()">
+        <button class="mx-search-esc" onclick="closeSearch()">ESC</button>
+      </div>
+      <div id="mx-search-results" class="mx-search-results"><div class="mx-search-hint">Cerca persone e contenuti nella rete M4TR1X</div></div>
+    </div>
+  </div>
+  <script>
+  let _mxSearchT = null;
+  function openSearch(){ const o=document.getElementById('mx-search-overlay'); if(!o)return; o.classList.add('show'); const i=document.getElementById('mx-search-input'); setTimeout(()=>{ if(i){ i.focus(); i.select(); } },30); }
+  function closeSearch(){ const o=document.getElementById('mx-search-overlay'); if(o)o.classList.remove('show'); }
+  function mxSearchDebounced(){ clearTimeout(_mxSearchT); _mxSearchT=setTimeout(mxRunSearch,250); }
+  async function mxRunSearch(){
+    const inp=document.getElementById('mx-search-input'); const box=document.getElementById('mx-search-results');
+    const q=(inp.value||'').trim();
+    if(q.length<2){ box.innerHTML='<div class="mx-search-hint">Digita almeno 2 caratteri…</div>'; return; }
+    box.innerHTML='<div class="mx-search-hint">◢◤ Ricerca in corso…</div>';
+    let j; try{ j=await fetch('/api/v1/search?q='+encodeURIComponent(q)).then(r=>r.json()); }catch(e){ box.innerHTML='<div class="mx-search-hint">Errore di rete</div>'; return; }
+    const posts=j.posts||[], videos=j.videos||[], tracks=j.tracks||[];
+    const seen={}, people=[];
+    posts.forEach(p=>{ const a=p.account; if(a&&a.id&&!seen[a.id]){ seen[a.id]=1; people.push(a); } });
+    let html='';
+    if(people.length){
+      html+='<div class="mx-sr-section">PERSONE · '+people.length+'</div>';
+      people.forEach(a=>{
+        const name=esc(a.displayName||a.username||a.id.slice(0,12));
+        const handle=esc('@'+(a.username||a.id.slice(0,12)));
+        const av=a.avatar ? '<img src="'+esc(a.avatar)+'" alt="">' : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 4-6 8-6s8 2 8 6"/></svg>';
+        html+='<div class="mx-sr-row" onclick="closeSearch();viewProf(\''+a.id+'\')"><span class="mx-sr-av">'+av+'</span><span class="mx-sr-meta"><b>'+name+'</b><small>'+handle+'</small></span><svg class="mx-sr-go" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg></div>';
+      });
+    }
+    if(posts.length){
+      html+='<div class="mx-sr-section">POST · '+posts.length+'</div>';
+      posts.slice(0,20).forEach(p=>{
+        const a=p.account||{}; const who=esc('@'+(a.username||'anon'));
+        const txt=esc((p.content||'').replace(/<[^>]+>/g,'').slice(0,140));
+        const act=a.id ? 'closeSearch();viewProf(\''+a.id+'\')' : 'closeSearch()';
+        html+='<div class="mx-sr-row mx-sr-post" onclick="'+act+'"><span class="mx-sr-meta"><small class="mx-sr-who">'+who+'</small><span class="mx-sr-txt">'+txt+'</span></span></div>';
+      });
+    }
+    if(videos.length){
+      html+='<div class="mx-sr-section">VIDEO · '+videos.length+'</div>';
+      videos.slice(0,12).forEach(v=>{ html+='<div class="mx-sr-row"><span class="mx-sr-txt">'+esc(v.title||v.name||'video')+'</span></div>'; });
+    }
+    if(tracks.length){
+      html+='<div class="mx-sr-section">MUSICA · '+tracks.length+'</div>';
+      tracks.slice(0,12).forEach(t=>{ html+='<div class="mx-sr-row"><span class="mx-sr-txt">'+esc(t.title||t.name||'track')+'</span></div>'; });
+    }
+    box.innerHTML = html || '<div class="mx-search-hint">Nessun risultato per “'+esc(q)+'”</div>';
+  }
+  document.addEventListener('keydown', e=>{ if(e.key==='Escape'){ const o=document.getElementById('mx-search-overlay'); if(o&&o.classList.contains('show')) closeSearch(); } });
+  </script>
+
+  <!-- ░░ STORIES — barra + viewer + compose (separati dai post) ░░ -->
+  <input type="file" id="story-file" accept="image/*" style="display:none" onchange="onStoryFile(event)">
+  <div id="story-viewer">
+    <div class="sv-progress" id="sv-progress"></div>
+    <div class="sv-head">
+      <span class="sv-av" id="sv-av"></span>
+      <span class="sv-who"><b id="sv-name">—</b><small id="sv-time"></small></span>
+      <button class="sv-close" onclick="closeStory()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>
+    <div class="sv-stage"><img id="sv-img" alt=""></div>
+    <div class="sv-caption" id="sv-caption"></div>
+    <div class="sv-tap sv-tap-l" onclick="storyPrev()"></div>
+    <div class="sv-tap sv-tap-r" onclick="storyNext()"></div>
+    <div class="sv-owner" id="sv-owner">
+      <button class="sv-ob" onclick="deleteStory()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13M10 11v6M14 11v6"/></svg><span>Elimina</span></button>
+      <button class="sv-ob sv-ob-hl" id="sv-hl-btn" onclick="toggleStoryHighlight()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 9.2c1.4-1.6 3.8-.6 3.8 1.4 0 1.7-2.1 3-3.8 4.4-1.7-1.4-3.8-2.7-3.8-4.4 0-2 2.4-3 3.8-1.4z"/></svg><span>In evidenza</span></button>
+    </div>
+  </div>
+  <div id="story-compose">
+    <div class="sc-panel">
+      <div class="sc-head"><span>NUOVA STORIA · 24H</span><button class="sv-close" onclick="closeStoryCompose()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+      <div class="sc-preview"><img id="sc-img" alt=""></div>
+      <input id="sc-caption" maxlength="200" autocomplete="off" spellcheck="false" placeholder="Aggiungi una didascalia…">
+      <button class="sc-publish" id="sc-publish" onclick="publishStory()">CONDIVIDI STORIA</button>
+    </div>
+  </div>
+  <script>
+  let _storyGroups = [], _svGroup = 0, _svItem = 0, _svTimer = null, _storyFile = null, _svCur = null, _profStoryHl = [];
+  const STORY_MS = 6000;
+
+  async function loadStories(){
+    let list = [];
+    try { list = await fetch('/api/v1/story/list').then(r=>r.json()); } catch(e){}
+    if(!Array.isArray(list)) list = [];
+    const groups = {}, order = [];
+    list.forEach(s=>{ const k=s.uploader||'anon'; if(!groups[k]){ groups[k]=[]; order.push(k);} groups[k].push(s); });
+    _storyGroups = order.map(k=>({ uploader:k, items:groups[k] }));
+    renderStoriesBar();
+  }
+  function _storyName(pk){
+    if(!pk || pk==='anon') return 'anon';
+    if(typeof S!=='undefined' && S.pubkey && pk===S.pubkey) return 'Tu';
+    try { const n=(typeof profName==='function')?profName(pk):''; if(n) return n; } catch(e){}
+    return '@'+String(pk).slice(0,8);
+  }
+  function renderStoriesBar(){
+    const bar=document.getElementById('stories-bar'); if(!bar) return;
+    let html='<div class="story-item story-add" onclick="startStory()" title="Aggiungi alla tua storia">'
+      +'<div class="story-ring story-ring-add"><div class="story-av"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></div></div>'
+      +'<span class="story-label">La tua storia</span></div>';
+    _storyGroups.forEach((g,gi)=>{
+      const s=g.items[0]; const thumb=s.thumb||s.url||'';
+      html+='<div class="story-item" onclick="openStoryGroup('+gi+')">'
+        +'<div class="story-ring"><div class="story-av">'+(thumb?'<img src="'+esc(thumb)+'" alt="">':'')+'</div></div>'
+        +'<span class="story-label">'+esc(_storyName(g.uploader))+'</span></div>';
+    });
+    bar.innerHTML=html;
+    const onSignal = (typeof S==='undefined' || !S.section || S.section==='signal');
+    bar.style.display = onSignal ? 'flex' : 'none';
+  }
+  function openStoryGroup(gi){
+    if(!_storyGroups[gi]) return;
+    _svGroup=gi; _svItem=0;
+    document.getElementById('story-viewer').classList.add('show');
+    renderStory();
+  }
+  function renderStory(){
+    const g=_storyGroups[_svGroup]; if(!g){ closeStory(); return; }
+    const s=g.items[_svItem]; if(!s){ closeStory(); return; }
+    document.getElementById('sv-img').src = s.url||s.thumb||'';
+    document.getElementById('sv-name').textContent = _storyName(g.uploader);
+    document.getElementById('sv-time').textContent = (typeof ago==='function'?ago(s.created_at):'');
+    const cap=document.getElementById('sv-caption');
+    cap.textContent = s.caption||''; cap.style.display = s.caption?'block':'none';
+    _svCur = s;
+    const isOwner = (typeof S!=='undefined' && S.pubkey && g.uploader===S.pubkey);
+    const owner=document.getElementById('sv-owner'); if(owner) owner.style.display = isOwner ? 'flex' : 'none';
+    const viewer=document.getElementById('story-viewer'); if(viewer) viewer.classList.toggle('has-owner', isOwner);
+    const hlBtn=document.getElementById('sv-hl-btn'); if(hlBtn) hlBtn.classList.toggle('on', !!s.highlighted);
+    let p=''; g.items.forEach((it,i)=>{ p+='<div class="sv-seg"><i '+(i<_svItem?'style="width:100%"':(i===_svItem?'class="sv-fill"':'style="width:0"'))+'></i></div>'; });
+    document.getElementById('sv-progress').innerHTML=p;
+    clearTimeout(_svTimer); _svTimer=setTimeout(storyNext, STORY_MS);
+  }
+  function storyNext(){
+    const g=_storyGroups[_svGroup]; if(!g){ closeStory(); return; }
+    if(_svItem < g.items.length-1){ _svItem++; renderStory(); }
+    else if(_svGroup < _storyGroups.length-1){ _svGroup++; _svItem=0; renderStory(); }
+    else closeStory();
+  }
+  function storyPrev(){
+    if(_svItem>0){ _svItem--; renderStory(); }
+    else if(_svGroup>0){ _svGroup--; _svItem=(_storyGroups[_svGroup].items.length-1); renderStory(); }
+  }
+  function closeStory(){ clearTimeout(_svTimer); const v=document.getElementById('story-viewer'); if(v)v.classList.remove('show'); if(typeof loadStories==='function') loadStories(); }
+
+  // ── Storie in evidenza sul profilo (IG-style) ──
+  async function loadStoryHighlights(pk){
+    const row=document.getElementById('prof-story-hl'); if(!row) return;
+    row.style.display='none'; row.innerHTML=''; _profStoryHl=[];
+    let list=[];
+    try{ list=await fetch('/api/v1/story/highlights?uploader='+encodeURIComponent(pk)).then(r=>r.json()); }catch(e){}
+    if(!Array.isArray(list)||!list.length) return;
+    _profStoryHl=list;
+    let html='<div class="shl-title">STORIE IN EVIDENZA</div><div class="shl-circles">';
+    list.forEach((s,i)=>{
+      const thumb=s.thumb||s.url||''; const lab=esc((s.caption||'Storia').slice(0,12));
+      html+='<div class="shl-item" onclick="openStoryHl('+i+')"><div class="shl-ring"><div class="shl-av">'+(thumb?'<img src="'+esc(thumb)+'" alt="">':'')+'</div></div><span class="shl-label">'+lab+'</span></div>';
+    });
+    html+='</div>'; row.innerHTML=html; row.style.display='block';
+  }
+  function openStoryHl(i){
+    if(!_profStoryHl.length) return;
+    _storyGroups=[{ uploader:(_profStoryHl[0].uploader||''), items:_profStoryHl }];
+    _svGroup=0; _svItem=i||0;
+    document.getElementById('story-viewer').classList.add('show');
+    renderStory();
+  }
+
+  // ⭐ Salva la PROPRIA storia nelle "Storie in evidenza" (IG-style, sopravvive alle 24h)
+  async function toggleStoryHighlight(){
+    if(!_svCur) return;
+    clearTimeout(_svTimer);                 // pausa l'auto-avanzamento mentre interagisci
+    const newOn = !_svCur.highlighted;
+    _svCur.highlighted = newOn;
+    const hlBtn=document.getElementById('sv-hl-btn'); if(hlBtn) hlBtn.classList.toggle('on', newOn);
+    try{
+      await fetch('/api/v1/story/highlight',{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ id:_svCur.id, on:newOn }) });
+      if(typeof toast==='function') toast(newOn ? 'AGGIUNTA IN EVIDENZA' : 'RIMOSSA DALLE EVIDENZE');
+    }catch(e){ if(typeof toast==='function') toast('ERRORE DI RETE'); }
+    _svTimer=setTimeout(storyNext, STORY_MS);
+  }
+
+  // 🗑 Elimina la propria storia
+  async function deleteStory(){
+    if(!_svCur) return;
+    clearTimeout(_svTimer);
+    if(!confirm('Eliminare questa storia? L\'azione è definitiva.')){ _svTimer=setTimeout(storyNext, STORY_MS); return; }
+    const id=_svCur.id;
+    try{
+      await fetch('/api/v1/story/delete',{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ id }) });
+      if(typeof toast==='function') toast('STORIA ELIMINATA');
+    }catch(e){ if(typeof toast==='function') toast('ERRORE DI RETE'); }
+    closeStory();
+    if(typeof S!=='undefined' && S.pubkey && typeof loadStoryHighlights==='function'){ const row=document.getElementById('prof-story-hl'); if(row && row.style.display!=='none') loadStoryHighlights(S.pubkey); }
+  }
+
+  // ── Aggiungi storia — flusso DEDICATO, separato dai post ──
+  function startStory(){ const f=document.getElementById('story-file'); if(f)f.click(); }
+  function onStoryFile(e){
+    const f=e.target.files && e.target.files[0]; if(!f) return;
+    _storyFile=f;
+    const r=new FileReader();
+    r.onload=()=>{ document.getElementById('sc-img').src=r.result; document.getElementById('sc-caption').value=''; document.getElementById('story-compose').classList.add('show'); };
+    r.readAsDataURL(f);
+    e.target.value='';
+  }
+  function closeStoryCompose(){ const c=document.getElementById('story-compose'); if(c)c.classList.remove('show'); _storyFile=null; }
+  async function publishStory(){
+    if(!_storyFile){ closeStoryCompose(); return; }
+    const btn=document.getElementById('sc-publish'); const old=btn.textContent; btn.disabled=true; btn.textContent='PUBBLICAZIONE…';
+    try{
+      const fd=new FormData();
+      fd.append('photo', _storyFile);
+      fd.append('caption', document.getElementById('sc-caption').value||'');
+      if(typeof S!=='undefined' && S.pubkey) fd.append('uploader', S.pubkey);
+      const r=await fetch('/api/v1/story/publish',{ method:'POST', body:fd }).then(r=>r.json());
+      if(r && r.ok){ if(typeof toast==='function')toast('STORIA PUBBLICATA · 24H'); closeStoryCompose(); loadStories(); }
+      else { if(typeof toast==='function')toast('ERRORE: '+((r&&r.error)||'upload')); }
+    }catch(err){ if(typeof toast==='function')toast('ERRORE DI RETE'); }
+    btn.disabled=false; btn.textContent=old;
+  }
+  document.addEventListener('keydown', e=>{ if(e.key==='Escape'){ const v=document.getElementById('story-viewer'); if(v&&v.classList.contains('show'))closeStory(); const c=document.getElementById('story-compose'); if(c&&c.classList.contains('show'))closeStoryCompose(); } });
+  setTimeout(()=>{ if(typeof loadStories==='function') loadStories(); }, 1400);
+  </script>
   <button class="shop-sell-btn" id="shop-fab" onclick="openSellModal()">＋</button>
   <!-- Funkwhale Audio Player -->
   <div id="fw-player">
@@ -399,7 +636,7 @@
         <div style="display:flex;align-items:center;justify-content:space-between">
           <div>
             <div style="font-size:0.58em;color:rgba(0,255,136,0.4);letter-spacing:2px;margin-bottom:3px">SALDO</div>
-            <div style="font-family:var(--font-display);font-size:1.4em;color:var(--green)"><span id="wallet-balance-big">0</span> <span style="font-size:0.45em;opacity:0.6">H8</span></div>
+            <div style="font-family:var(--font-display);font-size:1.4em;color:var(--green);display:flex;align-items:center;gap:8px"><img class="h8-logo h8-logo-lg" src="assets/h8-token.png?v=2" alt="H8" draggable="false"><span id="wallet-balance-big">0</span> <span style="font-size:0.45em;opacity:0.6">H8</span></div>
           </div>
           <button id="wallet-action-btn" onclick="walletToggleLock()" style="background:rgba(0,255,136,0.1);border:1px solid rgba(0,255,136,0.35);color:var(--green);font-family:var(--font-mono);font-size:0.65em;letter-spacing:2px;padding:9px 16px;cursor:pointer;border-radius:10px">...</button>
         </div>
@@ -531,6 +768,8 @@
       </div>
       <!-- Highlights row -->
       <div id="prof-highlights" class="hl-hidden"></div>
+      <!-- Storie in evidenza (IG-style) -->
+      <div id="prof-story-hl" class="story-hl-row" style="display:none"></div>
       <div class="prof-stats">
         <div class="prof-stat"><div class="prof-stat-n" id="prof-posts">–</div><div class="prof-stat-l">POSTS</div></div>
         <div class="prof-stat" style="cursor:pointer" onclick="openUserList('followers')"><div class="prof-stat-n" id="prof-followers">–</div><div class="prof-stat-l">FOLLOWERS</div></div>
@@ -1067,6 +1306,9 @@
     if(name==='live')loadLiveStreams();
     document.getElementById('forum-fab').classList.toggle('show',name==='forum');
     document.getElementById('shop-fab').classList.toggle('show',name==='shop');
+    {const cf=document.getElementById('mx-compose-fab');if(cf)cf.style.display=(name==='signal'||name==='film'||name==='music')?'flex':'none';}
+    {const sb=document.getElementById('stories-bar');if(sb)sb.style.display=(name==='signal')?'flex':'none';}
+    if(name==='signal'&&typeof loadStories==='function')loadStories();
     document.getElementById('mute-btn').style.display=(name==='signal'||name==='film'||name==='music')?'flex':'none';
     document.getElementById('fw-player').classList.toggle('show',name==='music'&&S.fwPlaying);
     // Update section pill
@@ -1529,7 +1771,7 @@
 
     const renderList = async () => {
       const keys = Object.keys(convos).sort((a, b) => convos[b].ts - convos[a].ts);
-      if (!keys.length) { list.innerHTML = '<div class="slide-placeholder"><div class="ph-text" style="color:rgba(0,255,65,0.2);text-align:center;line-height:2">[ NESSUN MESSAGGIO ]\n\nI tuoi DM sono cifrati end-to-end.\nNessuno può leggerli tranne te.\nCerca un utente per iniziare una chat.</div></div>'; return }
+      if (!keys.length) { list.innerHTML = '<div class="slide-placeholder"><div class="ph-text" style="color:rgba(0,255,136,0.62);text-align:center;line-height:2">[ NESSUN MESSAGGIO ]\n\nI tuoi DM sono cifrati end-to-end.\nNessuno può leggerli tranne te.\nCerca un utente per iniziare una chat.</div></div>'; return }
       list.innerHTML = '';
       for (const pk of keys) {
         const lastSeen = getDmLastSeen(pk);
@@ -1931,6 +2173,7 @@
     panel.classList.add('open');
     // Load highlights
     loadHighlights(pk);
+    if (typeof loadStoryHighlights === 'function') loadStoryHighlights(pk);
     // Load badge
     loadBadge(pk);
     // Load Nostr profile metadata
@@ -2040,21 +2283,7 @@
         rb.className = 'repost-badge'; rb.textContent = '🔁 REPOST';
         div.appendChild(rb);
       }
-      // Pin button (solo proprio profilo, solo post originali)
-      if (isMe && !item.isRepost) {
-        const pinned = _hlSet.has(item.eid);
-        const pb = document.createElement('button');
-        pb.className = 'pin-btn' + (pinned ? ' pinned' : '');
-        pb.id = 'pin-' + item.eid;
-        pb.textContent = '⭐';
-        pb.title = pinned ? 'Rimuovi da highlights' : 'Aggiungi a highlights';
-        pb.onclick = e => {
-          e.stopPropagation();
-          if (_hlSet.has(item.eid)) removeHighlight(item.eid);
-          else addHighlight(item.eid, item.url, evCache[item.eid]?.content || '');
-        };
-        div.appendChild(pb);
-      }
+      // (stella highlights rimossa dai post — gli "in evidenza" sono solo per le storie, IG-style)
       div.addEventListener('click', () => {
         if(evCache[item.eid]) openHighlightVideo(item.eid);
         else closeProfile();

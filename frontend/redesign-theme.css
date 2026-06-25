@@ -1,0 +1,542 @@
+/* ============================================================================
+   M4TR1X · REDESIGN THEME  —  "Visual System v3"
+   A calmer, more credible Signal: same terminal soul, disciplined green,
+   IBM Plex type, hairlines over heavy borders, editorial space.
+   Loaded LAST → wins the cascade. Pure restyle, zero markup logic touched.
+   ========================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap');
+
+/* ─── 1 · RETUNE THE DESIGN TOKENS ───────────────────────────────────────── */
+:root {
+  /* Surfaces — deep "INK", calmer than the old blue-black */
+  --bg:        #080b10;
+  --surface:   #0c1118;
+  --surface2:  #11171f;
+  --surface3:  #161c25;
+  --border:    rgba(255,255,255,0.08);
+  --border-hi: rgba(255,255,255,0.14);
+
+  /* Reading voice — warm off-white, less neon-blue */
+  --text:      #e8edf2;
+  --text-dim:  rgba(232,237,242,0.78);
+  --text-muted:rgba(232,237,242,0.52);
+
+  /* Accent palette — green stays, the rest get the v3 hues */
+  --green:      #00ff88;
+  --green-dim:  #00cc6e;
+  --green-dark: rgba(0,255,136,0.5);   /* era 0.10 → testo/tab inattivi invisibili */
+  --green-glow: rgba(0,255,136,0.07);
+
+  --blue:       #4ca6ff;   /* FILM   */
+  --yellow:     #f5c451;   /* MUSIC  */
+  --purple:     #b48cff;   /* FORUM  */
+  --orange:     #ff9a4d;   /* SHOP   */
+  --shop-orange:#ff9a4d;
+  --pink:       #ff5c8d;   /* TIP    */
+  --red:        #ff5566;
+
+  /* Type — terminal labels in Mono, reading in Sans */
+  --font-mono:    'IBM Plex Mono', ui-monospace, monospace;
+  --font-display: 'IBM Plex Mono', ui-monospace, monospace;
+  --font-read:    'IBM Plex Sans', system-ui, sans-serif;
+
+  --r:      14px;
+  --rsm:    10px;
+  --rlg:    20px;
+}
+
+/* ─── 2 · BASE — editorial calm ──────────────────────────────────────────── */
+html, body {
+  background:
+    radial-gradient(circle at 22% 8%, rgba(0,255,136,0.045), transparent 42%),
+    var(--bg);
+  color: var(--text);
+  font-family: var(--font-read);
+  letter-spacing: 0.1px;
+}
+
+/* Soften the CRT scanline to a whisper */
+body::before { opacity: 0.5; }
+
+/* Anything that reads like prose gets the Sans voice */
+.forum-post-body, .up-body, .userlist-body,
+p, .caption, .bio, .post-text { font-family: var(--font-read); }
+
+/* ─── 3 · TOPBAR — hairline, glass, disciplined wordmark ──────────────────── */
+#topbar {
+  background: linear-gradient(to bottom, rgba(8,11,16,0.94), rgba(8,11,16,0.78));
+  border-bottom: 1px solid var(--border);
+  box-shadow: 0 1px 0 rgba(255,255,255,0.02), 0 8px 28px rgba(0,0,0,0.45);
+  backdrop-filter: blur(14px);
+}
+.logo {
+  background: none;
+  -webkit-text-fill-color: currentColor;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-weight: 600;
+  letter-spacing: 5px;
+  filter: none;
+  text-shadow: none;
+}
+/* the pulsing "signal alive" dot injected next to the wordmark */
+.mx-signal-dot {
+  width: 7px; height: 7px; border-radius: 2px;
+  background: var(--green);
+  box-shadow: 0 0 10px rgba(0,255,136,0.75);
+  display: inline-block; margin-left: 10px; vertical-align: middle;
+  animation: mxpulse 2.4s ease-in-out infinite;
+}
+@keyframes mxpulse { 0%,100%{opacity:.45} 50%{opacity:1} }
+
+.top-btn { color: var(--text-dim); border-radius: var(--rsm); }
+.top-btn:hover { color: var(--green); background: var(--green-glow); }
+
+/* ─── 4 · BOTTOM NAV — glass, hairline, line-icon discipline ──────────────── */
+#bottom-nav {
+  background: linear-gradient(to top, rgba(8,11,16,0.96), rgba(8,11,16,0.88));
+  border-top: 1px solid var(--border);
+  box-shadow: 0 -8px 28px rgba(0,0,0,0.5);
+  backdrop-filter: blur(18px);
+}
+.bnav { color: var(--text-muted); }
+.bnav .bicon { font-size: 1.5em; opacity: 0.9; transition: 0.2s; }
+/* line-icon svgs injected into the nav inherit currentColor + calm stroke */
+.bnav .bicon svg { width: 22px; height: 22px; display: block; }
+.bnav-label { font-family: var(--font-mono); font-size: 0.72em; letter-spacing: 1px; }
+
+/* green earns its glow → only the ACTIVE tab lights up */
+.bnav.active, .bnav:hover { color: var(--green); }
+.bnav.active .bicon { filter: drop-shadow(0 0 7px rgba(0,255,136,0.6)); }
+
+/* ─── 5 · CARDS — hairlines over heavy borders ───────────────────────────── */
+.forum-post {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+}
+.forum-post:hover { border-color: rgba(180,140,255,0.32); background: var(--surface2); }
+.forum-post-name  { font-family: var(--font-mono); color: var(--purple); letter-spacing: 0.5px; }
+.forum-post-title { font-family: var(--font-mono); color: var(--text); letter-spacing: 0.5px; }
+.forum-post-body  { color: var(--text-dim); line-height: 1.65; }
+
+/* ─── 6 · CHIPS / PILLS — the v3 status-chip language ─────────────────────── */
+.mx-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 11px; border-radius: 20px;
+  background: rgba(8,11,16,0.7); border: 1px solid var(--border-hi);
+  font-family: var(--font-mono); font-size: 0.62rem; letter-spacing: 1.4px;
+  backdrop-filter: blur(8px); color: var(--text-dim);
+}
+.mx-chip.is-human { border-color: rgba(0,255,136,0.45); color: var(--green); }
+.mx-chip.is-tor   { border-color: rgba(180,140,255,0.5); color: var(--purple); }
+
+/* ─── 7 · POST ACTIONS — measured glow, line-icon feel ───────────────────── */
+.sact-icon { border-radius: 50%; }
+.sact-label { font-family: var(--font-mono); color: var(--text-muted); letter-spacing: 1px; }
+
+/* ─── 8 · BUTTONS / INPUTS — terminal-clean ──────────────────────────────── */
+button, .btn { font-family: var(--font-mono); letter-spacing: 0.5px; }
+input, textarea { font-family: var(--font-read); }
+
+/* The signal-green primary call-to-action, used for POST / FAB-like actions */
+.bnav.post-nav { color: var(--green); }
+.bnav.post-nav .bicon { filter: drop-shadow(0 0 8px rgba(0,255,136,0.5)); }
+
+/* Selection picks up the signal */
+::selection { background: rgba(0,255,136,0.22); color: #fff; }
+
+/* Scrollbar — thin hairline rail */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.09); border-radius: 8px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(0,255,136,0.3); }
+
+/* ════════════════════════════════════════════════════════════════════════
+   LOVABILITY PASS — the details people feel even when they can't name them
+   ════════════════════════════════════════════════════════════════════════ */
+
+/* ─── 9 · MOTION — everything moves with intent, nothing janks ────────────── */
+.bnav, .top-btn, .sact, .forum-post, button, .btn, .mx-chip,
+.field-input, input, textarea, .address-box {
+  transition: color .18s ease, background .18s ease, border-color .18s ease,
+              box-shadow .22s ease, transform .14s cubic-bezier(.2,.8,.2,1);
+}
+/* Respect users who ask for less motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .001ms !important; transition-duration: .05ms !important; }
+}
+
+/* Section change — a calm rise, not a hard cut */
+.section-feed.active { animation: mxRise .34s cubic-bezier(.2,.8,.2,1); }
+@keyframes mxRise { from { opacity:0; transform: translateY(10px); } to { opacity:1; transform:none; } }
+
+/* ─── 10 · CARDS — a gentle lift invites the tap ─────────────────────────── */
+.forum-post:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.4), 0 0 0 1px rgba(180,140,255,0.18);
+}
+.forum-post-av { border-radius: 50%; box-shadow: 0 0 0 1.5px rgba(255,255,255,0.12); }
+
+/* ─── 11 · EMPTY / LOADING STATES — warm, branded, never a dead end ───────── */
+.slide-placeholder {
+  background:
+    radial-gradient(circle at 50% 38%, rgba(0,255,136,0.05), transparent 55%),
+    var(--bg);
+}
+.ph-text {
+  font-family: var(--font-mono);
+  font-size: 0.7rem; letter-spacing: 2.5px; line-height: 2.1;
+  color: var(--text-dim); text-align: center;
+  padding: 0 32px; white-space: pre-line;
+}
+/* "CONNECTING…" reads like a living signal, not a frozen screen */
+.ph-text::before {
+  content: '◢◤ '; color: var(--green);
+  animation: mxpulse 1.6s ease-in-out infinite;
+}
+
+/* Shimmer utility for skeleton blocks (use class="mx-skeleton") */
+.mx-skeleton {
+  background: linear-gradient(100deg,
+    var(--surface) 30%, var(--surface2) 50%, var(--surface) 70%);
+  background-size: 200% 100%;
+  animation: mxShimmer 1.4s linear infinite; border-radius: var(--rsm);
+}
+@keyframes mxShimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+
+/* ─── 12 · INPUTS — a clear green focus ring builds trust ─────────────────── */
+input:focus, textarea:focus, .field-input:focus {
+  outline: none;
+  border-color: rgba(0,255,136,0.55) !important;
+  box-shadow: 0 0 0 3px rgba(0,255,136,0.12);
+}
+input::placeholder, textarea::placeholder { color: var(--text-muted); letter-spacing: 0.5px; }
+
+/* ─── 13 · POST ACTIONS — tactile pop + a heart that means it ────────────── */
+.sact:active { transform: scale(0.84); }
+.sact:hover .sact-icon { transform: translateY(-1px); }
+.sact.liked .sact-icon, .liked .sact-icon {
+  color: var(--pink) !important;
+  filter: drop-shadow(0 0 8px rgba(255,92,141,0.6));
+  animation: mxHeart .42s cubic-bezier(.2,.9,.3,1.4);
+}
+@keyframes mxHeart { 0%{transform:scale(1)} 40%{transform:scale(1.35)} 100%{transform:scale(1)} }
+
+/* ─── 14 · TOAST — quiet glass, a green pulse of confirmation ─────────────── */
+#toast {
+  background: rgba(12,17,24,0.92) !important;
+  border: 1px solid var(--border-hi) !important;
+  border-left: 2px solid var(--green) !important;
+  border-radius: var(--rsm) !important;
+  font-family: var(--font-mono); letter-spacing: 0.5px;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+  backdrop-filter: blur(14px);
+}
+
+/* ─── 15 · PRIMARY CTA — the signal-green button people reach for ─────────── */
+.btn-primary {
+  background: var(--green) !important;
+  color: #06140d !important;
+  font-family: var(--font-mono); font-weight: 600; letter-spacing: 1px;
+  border-radius: 12px !important;
+  box-shadow: 0 8px 26px rgba(0,255,136,0.28);
+}
+.btn-primary:hover { transform: translateY(-1px); box-shadow: 0 12px 34px rgba(0,255,136,0.42) !important; }
+.btn-primary:active { transform: translateY(0) scale(0.99); }
+
+/* ─── 16 · SECTION PILL — the little context badge, refined ───────────────── */
+#section-pill, .signal-pill {
+  font-family: var(--font-mono); letter-spacing: 2px;
+  border: 1px solid var(--border-hi); background: rgba(8,11,16,0.7);
+  backdrop-filter: blur(8px); border-radius: 20px;
+}
+
+/* ─── 17 · H8 TOKEN MARK — the double-eagle "8" is the currency face ──────── */
+.h8-logo {
+  height: 20px; width: auto; display: inline-block; vertical-align: middle;
+  filter: drop-shadow(0 0 5px rgba(0,255,136,0.55));
+  -webkit-user-drag: none; user-select: none;
+}
+.h8-logo-lg { height: 34px; }
+.h8-wallet-btn {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 4px 11px 4px 7px; border-radius: 20px;
+  background: rgba(0,255,136,0.06); border: 1px solid rgba(0,255,136,0.22);
+}
+.h8-wallet-btn:hover { background: rgba(0,255,136,0.12); border-color: rgba(0,255,136,0.4); }
+.h8-wallet-btn:hover .h8-logo { filter: drop-shadow(0 0 9px rgba(0,255,136,0.85)); }
+#topbar-h8-amount { color: var(--green) !important; }
+
+/* ─── 18 · TOPBAR LINE ICONS — no emoji UI, hairline avatar ring ──────────── */
+.top-btn svg { width: 20px; height: 20px; display: block; }
+.top-btn { display: inline-flex; align-items: center; justify-content: center; }
+#user-avatar-top {
+  width: 30px; height: 30px; border-radius: 50%;
+  border: 1.5px solid rgba(0,255,136,0.5); background: #0f141b;
+  display: inline-flex; align-items: center; justify-content: center;
+  color: rgba(0,255,136,0.85); cursor: pointer;
+}
+#user-avatar-top svg { width: 16px; height: 16px; }
+#user-avatar-top:hover { border-color: var(--green); box-shadow: 0 0 12px rgba(0,255,136,0.35); }
+
+/* ─── 19 · FORUM THREADS — match design frame 03 (federated cards) ────────── */
+.forum-post {
+  background: #0f141b; border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 16px; padding: 16px;
+}
+.forum-post-av {
+  width: 30px; height: 30px; border-radius: 50%;
+  border: 1.5px solid rgba(180,140,255,0.5); background: #161c25;
+  box-shadow: none;
+}
+.forum-post-name { font-family: var(--font-mono); font-size: 0.74rem; color: var(--purple); letter-spacing: 0.3px; }
+.forum-post-time { font-family: var(--font-mono); font-size: 0.62rem; color: var(--text-muted); }
+.forum-post-title { font-family: var(--font-read); font-weight: 600; font-size: 0.95rem; letter-spacing: 0; color: var(--text); }
+.forum-post-body  { font-family: var(--font-read); font-size: 0.84rem; line-height: 1.6; color: rgba(232,237,242,0.6); }
+
+/* ─── 20 · FAB — the design's rounded-square compose button ───────────────── */
+.forum-new-btn {
+  border-radius: 16px !important;
+  box-shadow: 0 8px 26px rgba(180,140,255,0.42) !important;
+}
+.forum-new-btn svg { width: 24px; height: 24px; }
+.forum-new-btn:hover { transform: translateY(-2px) scale(1.04) !important; }
+
+/* ─── 21 · COMPOSE FAB — green rounded-square, bottom-right (design frame 01) */
+.mx-fab {
+  position: fixed; bottom: calc(var(--bottom) + 18px); right: 16px; z-index: 198;
+  width: 52px; height: 52px; border-radius: 16px;
+  background: var(--green); border: none; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 8px 26px rgba(0,255,136,0.4);
+  transition: transform .16s cubic-bezier(.2,.8,.2,1), box-shadow .22s ease;
+}
+.mx-fab svg { width: 24px; height: 24px; }
+.mx-fab:hover  { transform: translateY(-2px) scale(1.05); box-shadow: 0 12px 34px rgba(0,255,136,0.55); }
+.mx-fab:active { transform: translateY(0) scale(0.96); }
+
+/* POST leaves the bottom-nav → it now lives in the green FAB (per the design) */
+.bnav.post-nav { display: none !important; }
+
+/* ─── 22 · H8 TOKEN COIN — eagle mark already ships its own ink bg + glow ──── */
+.h8-logo {
+  border: 1px solid rgba(0,255,136,0.3);
+  border-radius: 7px;
+  box-shadow: 0 0 7px rgba(0,255,136,0.35);
+  object-fit: cover;
+}
+.h8-logo-lg { border-radius: 10px; border-width: 1.5px; }
+
+/* ─── 23 · SEARCH OVERLAY — find people & content, redesign-native ────────── */
+#mx-search-overlay {
+  position: fixed; inset: 0; z-index: 9000; display: none;
+  background: rgba(4,6,10,0.74); backdrop-filter: blur(10px);
+  padding-top: 8vh; justify-content: center; align-items: flex-start;
+}
+#mx-search-overlay.show { display: flex; animation: mxFade .18s ease; }
+@keyframes mxFade { from { opacity: 0 } to { opacity: 1 } }
+
+.mx-search-panel {
+  width: min(560px, 92vw); max-height: 80vh; display: flex; flex-direction: column;
+  background: var(--surface); border: 1px solid var(--border-hi);
+  border-radius: 18px; overflow: hidden;
+  box-shadow: 0 30px 80px rgba(0,0,0,0.6);
+  animation: mxRise .26s cubic-bezier(.2,.8,.2,1);
+}
+.mx-search-bar {
+  display: flex; align-items: center; gap: 11px;
+  padding: 14px 16px; border-bottom: 1px solid var(--border);
+}
+.mx-search-ico { width: 20px; height: 20px; color: var(--green); flex: none; }
+#mx-search-input {
+  flex: 1; background: none; border: none; outline: none; color: var(--text);
+  font-family: var(--font-read); font-size: 1rem; letter-spacing: 0.2px;
+}
+#mx-search-input::placeholder { color: var(--text-muted); }
+.mx-search-esc {
+  flex: none; font-family: var(--font-mono); font-size: 0.62rem; letter-spacing: 1px;
+  color: var(--text-muted); background: rgba(255,255,255,0.05);
+  border: 1px solid var(--border); border-radius: 6px; padding: 4px 8px; cursor: pointer;
+}
+.mx-search-esc:hover { color: var(--green); border-color: rgba(0,255,136,0.4); }
+
+.mx-search-results { overflow-y: auto; padding: 8px; }
+.mx-search-hint {
+  padding: 34px 20px; text-align: center; color: var(--text-muted);
+  font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 1px;
+}
+.mx-sr-section {
+  font-family: var(--font-mono); font-size: 0.58rem; letter-spacing: 2px;
+  color: var(--text-muted); padding: 12px 10px 6px;
+}
+.mx-sr-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 10px; border-radius: 10px; cursor: pointer;
+  transition: background .14s ease;
+}
+.mx-sr-row:hover { background: rgba(0,255,136,0.07); }
+.mx-sr-av {
+  width: 38px; height: 38px; flex: none; border-radius: 50%;
+  border: 1.5px solid rgba(0,255,136,0.4); background: #0f141b;
+  display: flex; align-items: center; justify-content: center; overflow: hidden;
+  color: rgba(0,255,136,0.8);
+}
+.mx-sr-av img { width: 100%; height: 100%; object-fit: cover; }
+.mx-sr-av svg { width: 18px; height: 18px; }
+.mx-sr-meta { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.mx-sr-meta b { font-family: var(--font-mono); font-size: 0.84rem; color: var(--text); font-weight: 600; }
+.mx-sr-meta small { font-family: var(--font-mono); font-size: 0.64rem; color: var(--text-dim); }
+.mx-sr-who { color: var(--green); }
+.mx-sr-txt {
+  font-family: var(--font-read); font-size: 0.82rem; color: var(--text-dim);
+  line-height: 1.45; overflow: hidden; text-overflow: ellipsis;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+}
+.mx-sr-go { width: 16px; height: 16px; color: var(--text-muted); flex: none; }
+.mx-sr-row:hover .mx-sr-go { color: var(--green); }
+
+/* ─── 24 · SECTION TABS — line icons (no emoji), consistent with nav ──────── */
+.sec-tab { display: inline-flex; align-items: center; justify-content: center; color: var(--text-muted); }
+.sec-tab svg { width: 20px; height: 20px; display: block; }
+.sec-tab.active { color: var(--green); }
+.sec-tab.film-tab.active  { color: var(--blue); }
+.sec-tab.music-tab.active { color: var(--yellow); }
+.sec-tab.forum-tab.active { color: var(--purple); }
+.sec-tab.shop-tab.active  { color: var(--orange); }
+.sec-tab.live-tab.active  { color: var(--red); }
+.sec-tab:hover { color: var(--text); }
+
+/* ════════════════════════════════════════════════════════════════════════
+   25 · CONTRAST FIX — readable BEFORE you click. Inactive/hint text had
+   opacity 0.1–0.38 (invisible on deep ink); raise the legible floor.
+   ════════════════════════════════════════════════════════════════════════ */
+
+/* Nav & section labels readable even when inactive */
+.bnav, .sec-tab { color: rgba(232,237,242,0.6); }
+.bnav-label { color: inherit; }
+
+/* Upload category tabs — inactive was 0.38, now clearly visible */
+.up-cat.signal  { color: rgba(0,255,136,0.78)  !important; border-color: rgba(0,255,136,0.3)  !important; }
+.up-cat.film    { color: rgba(76,166,255,0.82) !important; border-color: rgba(76,166,255,0.3) !important; }
+.up-cat.music   { color: rgba(245,196,81,0.85) !important; border-color: rgba(245,196,81,0.3) !important; }
+.up-cat.photo, .up-cat.story, .up-cat.live { color: var(--text-dim) !important; border-color: var(--border) !important; }
+
+/* Profile grid tabs inactive readability now comes from --green-dark (raised
+   above); we deliberately do NOT force a color here so switchGridTab can keep
+   highlighting the active tab in full green. */
+
+/* Session timer — was 0.2 green */
+#session-timer { color: rgba(0,255,136,0.62) !important; }
+
+/* Generic: very faint inline TEXT labels promoted to a readable dim
+   (covers empty-state hints styled with low-alpha green text only) */
+[style*="color:rgba(0,255,136,0.2)"], [style*="color:rgba(0,255,136,0.1)"],
+[style*="color:rgba(0, 255, 136, 0.2)"], [style*="color:rgba(0, 255, 136, 0.1)"] {
+  color: rgba(0,255,136,0.6) !important;
+}
+
+/* Any element the app dimmed below readability via opacity */
+.section-banner, .empty-hint, .muted { color: var(--text-dim); }
+
+/* ════════════════════════════════════════════════════════════════════════
+   26 · STORIES — ring bar (in Signal) + fullscreen viewer + compose
+   ════════════════════════════════════════════════════════════════════════ */
+#stories-bar {
+  position: fixed; top: var(--topbar); left: 0; right: 0; z-index: 140;
+  display: none; gap: 14px; align-items: flex-start;
+  padding: 12px 14px; overflow-x: auto; overflow-y: hidden;
+  background: linear-gradient(to bottom, rgba(8,11,16,0.96), rgba(8,11,16,0.7));
+  backdrop-filter: blur(14px); border-bottom: 1px solid var(--border);
+  scrollbar-width: none;
+}
+#stories-bar::-webkit-scrollbar { display: none; }
+
+.story-item { flex: none; width: 66px; display: flex; flex-direction: column; align-items: center; gap: 6px; cursor: pointer; }
+.story-ring {
+  width: 60px; height: 60px; border-radius: 50%; padding: 2.5px;
+  background: conic-gradient(from 210deg, #00ff88, #4ca6ff, #b48cff, #ff5c8d, #00ff88);
+  display: flex; align-items: center; justify-content: center;
+  transition: transform .15s ease;
+}
+.story-item:active .story-ring { transform: scale(0.92); }
+.story-ring-add { background: none; border: 1.5px dashed rgba(0,255,136,0.55); padding: 2px; }
+.story-av {
+  width: 100%; height: 100%; border-radius: 50%; overflow: hidden;
+  background: #0f141b; border: 2px solid var(--bg);
+  display: flex; align-items: center; justify-content: center; color: var(--green);
+}
+.story-av img { width: 100%; height: 100%; object-fit: cover; }
+.story-av svg { width: 22px; height: 22px; }
+.story-label {
+  font-family: var(--font-mono); font-size: 0.6rem; letter-spacing: 0.3px;
+  color: var(--text-dim); max-width: 64px; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; text-align: center;
+}
+
+/* ── Viewer ──────────────────────────────────────────────────────────────── */
+#story-viewer { position: fixed; inset: 0; z-index: 9500; display: none; flex-direction: column; background: #05070b; }
+#story-viewer.show { display: flex; animation: mxFade .18s ease; }
+.sv-progress { display: flex; gap: 4px; padding: 10px 12px 0; }
+.sv-seg { flex: 1; height: 2.5px; border-radius: 2px; background: rgba(255,255,255,0.25); overflow: hidden; }
+.sv-seg i { display: block; height: 100%; width: 0; background: #fff; border-radius: 2px; }
+.sv-fill { animation: svFill 6s linear forwards; }
+@keyframes svFill { from { width: 0 } to { width: 100% } }
+.sv-head { display: flex; align-items: center; gap: 10px; padding: 12px 14px; }
+.sv-av { width: 34px; height: 34px; border-radius: 50%; background: #161c25; border: 1.5px solid rgba(0,255,136,0.5); flex: none; }
+.sv-who { display: flex; flex-direction: column; line-height: 1.2; flex: 1; min-width: 0; }
+.sv-who b { font-family: var(--font-mono); font-size: 0.85rem; color: #fff; }
+.sv-who small { font-family: var(--font-mono); font-size: 0.62rem; color: rgba(255,255,255,0.55); }
+.sv-close { background: none; border: none; color: rgba(255,255,255,0.85); cursor: pointer; padding: 4px; }
+.sv-close svg { width: 22px; height: 22px; display: block; }
+/* Owner controls (IG-style): Elimina (cestino) + In evidenza (cerchio) */
+.sv-owner {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 5; display: none;
+  align-items: center; justify-content: center; gap: 36px; padding: 14px 16px 24px;
+  background: linear-gradient(to top, rgba(5,7,11,0.96), transparent);
+}
+.has-owner .sv-caption { bottom: 86px; }
+.sv-ob {
+  background: none; border: none; cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; gap: 5px;
+  color: rgba(255,255,255,0.9); font-family: var(--font-mono); font-size: 0.6rem; letter-spacing: 0.5px;
+  transition: transform .12s ease, color .15s ease;
+}
+.sv-ob svg { width: 26px; height: 26px; }
+.sv-ob:active { transform: scale(0.9); }
+.sv-ob-hl.on { color: #f5c451; }
+.sv-ob-hl.on svg { stroke: #f5c451; filter: drop-shadow(0 0 8px rgba(245,196,81,0.7)); }
+.sv-ob-hl.on svg path { fill: #f5c451; }
+.sv-stage { flex: 1; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.sv-stage img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.sv-caption {
+  position: absolute; left: 0; right: 0; bottom: 0; padding: 22px 20px 30px;
+  background: linear-gradient(to top, rgba(5,7,11,0.92), transparent);
+  font-family: var(--font-read); font-size: 0.95rem; color: #fff; line-height: 1.5; display: none;
+}
+.sv-tap { position: absolute; top: 64px; bottom: 0; width: 34%; z-index: 2; }
+.sv-tap-l { left: 0; } .sv-tap-r { right: 0; width: 66%; }
+
+/* ── Compose (dedicated story upload) ────────────────────────────────────── */
+#story-compose { position: fixed; inset: 0; z-index: 9600; display: none; align-items: center; justify-content: center; background: rgba(4,6,10,0.8); backdrop-filter: blur(10px); }
+#story-compose.show { display: flex; animation: mxFade .18s ease; }
+.sc-panel { width: min(380px, 92vw); background: var(--surface); border: 1px solid var(--border-hi); border-radius: 18px; overflow: hidden; box-shadow: 0 30px 80px rgba(0,0,0,0.6); animation: mxRise .26s cubic-bezier(.2,.8,.2,1); }
+.sc-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid var(--border); font-family: var(--font-mono); font-size: 0.7rem; letter-spacing: 2px; color: var(--green); }
+.sc-preview { aspect-ratio: 9/16; max-height: 52vh; background: #0b0f15; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.sc-preview img { width: 100%; height: 100%; object-fit: cover; }
+#sc-caption { width: 100%; background: none; border: none; border-bottom: 1px solid var(--border); outline: none; color: var(--text); font-family: var(--font-read); font-size: 0.92rem; padding: 14px 16px; }
+.sc-publish { width: 100%; padding: 15px; background: var(--green); color: #06140d; border: none; font-family: var(--font-mono); font-weight: 600; letter-spacing: 1.5px; font-size: 0.8rem; cursor: pointer; }
+.sc-publish:hover { box-shadow: inset 0 0 40px rgba(0,0,0,0.12); }
+.sc-publish:disabled { opacity: 0.6; cursor: default; }
+
+/* ── Story Highlights on the profile (IG-style, gold ring) ───────────────── */
+.story-hl-row { padding: 8px 14px 12px; }
+.shl-title { font-family: var(--font-mono); font-size: 0.58rem; letter-spacing: 2px; color: var(--text-muted); margin-bottom: 9px; }
+.shl-circles { display: flex; gap: 14px; overflow-x: auto; scrollbar-width: none; }
+.shl-circles::-webkit-scrollbar { display: none; }
+.shl-item { flex: none; width: 64px; display: flex; flex-direction: column; align-items: center; gap: 6px; cursor: pointer; }
+.shl-ring { width: 58px; height: 58px; border-radius: 50%; padding: 2.5px; background: linear-gradient(135deg, #f5c451, #ff9a4d); display: flex; transition: transform .15s ease; }
+.shl-item:active .shl-ring { transform: scale(0.92); }
+.shl-av { width: 100%; height: 100%; border-radius: 50%; overflow: hidden; background: #0f141b; border: 2px solid var(--bg); display: flex; align-items: center; justify-content: center; }
+.shl-av img { width: 100%; height: 100%; object-fit: cover; }
+.shl-label { font-family: var(--font-mono); font-size: 0.58rem; color: var(--text-dim); max-width: 60px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

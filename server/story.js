@@ -59,6 +59,34 @@ function initStoryDb() {
       expires_at   INTEGER DEFAULT 0
     )
   `)
+  // Story Highlights (IG-style): survive past the 24h expiry, shown on profile.
+  try { getDb().exec("ALTER TABLE stories ADD COLUMN highlighted INTEGER DEFAULT 0") } catch (e) { /* column already exists */ }
+}
+
+// ─── Highlights ─────────────────────────────────────────────────────────────
+function highlightStory(id, on) {
+  initStoryDb()
+  const r = getDb().prepare('UPDATE stories SET highlighted=? WHERE id=?').run(on ? 1 : 0, id)
+  return { ok: r.changes > 0, id, highlighted: !!on }
+}
+
+function deleteStory(id) {
+  initStoryDb()
+  const r = getDb().prepare('DELETE FROM stories WHERE id=?').run(id)
+  return { ok: r.changes > 0, id }
+}
+
+function listHighlights(uploader, limit = 50) {
+  initStoryDb()
+  if (!uploader) return []
+  return getDb().prepare(
+    'SELECT * FROM stories WHERE uploader=? AND highlighted=1 ORDER BY created_at DESC LIMIT ?'
+  ).all(uploader, limit).map(row => ({
+    ...row,
+    tags:  JSON.parse(row.tags || '[]'),
+    url:   blobUrl(row.sha256),
+    thumb: blobUrl(row.thumb_sha256),
+  }))
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -298,4 +326,4 @@ function getStory(id) {
   }
 }
 
-module.exports = { publishStory, listStories, getStory, initStoryDb }
+module.exports = { publishStory, listStories, getStory, initStoryDb, highlightStory, listHighlights, deleteStory }

@@ -1455,6 +1455,28 @@ app.get('/api/v1/story/list', (req, res) => {
   res.json(story.listStories(limit))
 })
 
+// Story highlights (IG-style) — list a user's highlighted stories.
+// MUST be declared before '/api/v1/story/:id' so ':id' doesn't swallow it.
+app.get('/api/v1/story/highlights', (req, res) => {
+  const uploader = req.query.uploader || ''
+  res.json(story.listHighlights(uploader, parseInt(req.query.limit || '50')))
+})
+
+// Toggle a story into / out of the user's highlights.
+app.post('/api/v1/story/highlight', (req, res) => {
+  const { id, on } = req.body || {}
+  if (!id) return res.status(400).json({ error: 'id required' })
+  const flag = !(on === false || on === 'false' || on === 0 || on === '0')
+  res.json(story.highlightStory(id, flag))
+})
+
+// Delete a story (owner-initiated)
+app.post('/api/v1/story/delete', (req, res) => {
+  const { id } = req.body || {}
+  if (!id) return res.status(400).json({ error: 'id required' })
+  res.json(story.deleteStory(id))
+})
+
 // Single story
 app.get('/api/v1/story/:id', (req, res) => {
   const s = story.getStory(req.params.id)

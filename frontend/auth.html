@@ -6,19 +6,20 @@
     <title>M4TR1X — ACCESS PROTOCOL</title>
     <script src="m4tr1x-bridge.js"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap');
 
         :root {
-            --green: #00ff41;
-            --green-dim: #00aa2b;
-            --green-dark: #003311;
-            --green-glow: rgba(0,255,65,0.12);
-            --black: #000;
-            --surface: #050a05;
-            --red: #ff2222;
-            --yellow: #ffcc00;
-            --font-mono: 'Share Tech Mono', monospace;
-            --font-display: 'Orbitron', monospace;
+            --green: #00ff88;
+            --green-dim: #00cc6e;
+            --green-dark: rgba(0,255,136,0.14);
+            --green-glow: rgba(0,255,136,0.08);
+            --black: #080b10;
+            --surface: #0c1118;
+            --red: #ff5566;
+            --yellow: #f5c451;
+            --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+            --font-display: 'IBM Plex Mono', ui-monospace, monospace;
+            --font-read: 'IBM Plex Sans', system-ui, sans-serif;
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -370,11 +371,11 @@
         drops = Array.from({length: Math.floor(canvas.width/16)}, () => Math.random() * canvas.height/16);
     }
     function draw() {
-        ctx.fillStyle = 'rgba(0,0,0,0.05)'; ctx.fillRect(0,0,canvas.width,canvas.height);
-        ctx.font = '13px Share Tech Mono, monospace';
+        ctx.fillStyle = 'rgba(8,11,16,0.06)'; ctx.fillRect(0,0,canvas.width,canvas.height);
+        ctx.font = '13px IBM Plex Mono, monospace';
         drops.forEach((y,i) => {
             const char = chars[Math.floor(Math.random()*chars.length)];
-            ctx.fillStyle = Math.random() > 0.97 ? '#ffffff' : '#00ff41';
+            ctx.fillStyle = Math.random() > 0.97 ? '#ffffff' : '#00ff88';
             ctx.globalAlpha = Math.random()*0.5+0.1;
             ctx.fillText(char, i*16, y*16);
             ctx.globalAlpha = 1;
