@@ -6,6 +6,8 @@ node_modules/
 .env.local
 .env.*.local
 .env.runtime
+.admin_key
+.m4tr1x/
 *.secret
 *.secrets
 secrets/

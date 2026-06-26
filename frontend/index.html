@@ -429,7 +429,7 @@
     const isOwner = (typeof S!=='undefined' && S.pubkey && g.uploader===S.pubkey);
     const owner=document.getElementById('sv-owner'); if(owner) owner.style.display = isOwner ? 'flex' : 'none';
     const viewer=document.getElementById('story-viewer'); if(viewer) viewer.classList.toggle('has-owner', isOwner);
-    const hlBtn=document.getElementById('sv-hl-btn'); if(hlBtn) hlBtn.classList.toggle('on', !!s.highlighted);
+    const hlBtn=document.getElementById('sv-hl-btn'); if(hlBtn){ hlBtn.classList.toggle('on', !!s.highlighted); const sp=hlBtn.querySelector('span'); if(sp) sp.textContent = s.highlighted ? 'Salvata ✓' : 'Metti in evidenza'; }
     let p=''; g.items.forEach((it,i)=>{ p+='<div class="sv-seg"><i '+(i<_svItem?'style="width:100%"':(i===_svItem?'class="sv-fill"':'style="width:0"'))+'></i></div>'; });
     document.getElementById('sv-progress').innerHTML=p;
     clearTimeout(_svTimer); _svTimer=setTimeout(storyNext, STORY_MS);
@@ -450,10 +450,21 @@
   async function loadStoryHighlights(pk){
     const row=document.getElementById('prof-story-hl'); if(!row) return;
     row.style.display='none'; row.innerHTML=''; _profStoryHl=[];
+    const isMe = (typeof S!=='undefined' && S.pubkey && pk===S.pubkey);
     let list=[];
     try{ list=await fetch('/api/v1/story/highlights?uploader='+encodeURIComponent(pk)).then(r=>r.json()); }catch(e){}
-    if(!Array.isArray(list)||!list.length) return;
+    if(!Array.isArray(list)) list=[];
     _profStoryHl=list;
+    // Niente storie salvate: sul proprio profilo mostro comunque la sezione con un suggerimento.
+    if(!list.length){
+      if(!isMe) return;
+      row.innerHTML='<div class="shl-title">STORIE IN EVIDENZA</div><div class="shl-circles">'
+        +'<div class="shl-item shl-empty"><div class="shl-ring shl-ring-add"><div class="shl-av"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></div></div><span class="shl-label">Aggiungi</span></div>'
+        +'<div class="shl-hint">Apri una tua storia su Signal e premi <b>In evidenza</b> per salvarla qui (non scade).</div>'
+        +'</div>';
+      row.style.display='block';
+      return;
+    }
     let html='<div class="shl-title">STORIE IN EVIDENZA</div><div class="shl-circles">';
     list.forEach((s,i)=>{
       const thumb=s.thumb||s.url||''; const lab=esc((s.caption||'Storia').slice(0,12));
@@ -475,10 +486,12 @@
     clearTimeout(_svTimer);                 // pausa l'auto-avanzamento mentre interagisci
     const newOn = !_svCur.highlighted;
     _svCur.highlighted = newOn;
-    const hlBtn=document.getElementById('sv-hl-btn'); if(hlBtn) hlBtn.classList.toggle('on', newOn);
+    const hlBtn=document.getElementById('sv-hl-btn'); if(hlBtn){ hlBtn.classList.toggle('on', newOn); const sp=hlBtn.querySelector('span'); if(sp) sp.textContent = newOn ? 'Salvata ✓' : 'Metti in evidenza'; }
     try{
       await fetch('/api/v1/story/highlight',{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ id:_svCur.id, on:newOn }) });
       if(typeof toast==='function') toast(newOn ? 'AGGIUNTA IN EVIDENZA' : 'RIMOSSA DALLE EVIDENZE');
+      // Aggiorna subito la riga "Storie in evidenza" sul proprio profilo
+      if(typeof S!=='undefined' && S.pubkey){ const r=document.getElementById('prof-story-hl'); if(r && typeof loadStoryHighlights==='function') loadStoryHighlights(S.pubkey); }
     }catch(e){ if(typeof toast==='function') toast('ERRORE DI RETE'); }
     _svTimer=setTimeout(storyNext, STORY_MS);
   }
@@ -550,17 +563,17 @@
         <button class="up-close" onclick="closeUpload()">✕</button>
       </div>
       <div class="up-cats">
-        <button class="up-cat signal sel" onclick="selCat(this,'signal')">📡</button>
-        <button class="up-cat film" onclick="selCat(this,'film')">🎬</button>
-        <button class="up-cat music" onclick="selCat(this,'music')">🎵</button>
-        <button class="up-cat photo" onclick="selCat(this,'photo')">📸</button>
+        <button class="up-cat signal sel" onclick="selCat(this,'signal')" title="Signal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2"/><path d="M16.24 7.76a6 6 0 0 1 0 8.49M7.76 16.24a6 6 0 0 1 0-8.49M19.07 4.93a10 10 0 0 1 0 14.14M4.93 19.07a10 10 0 0 1 0-14.14"/></svg></button>
+        <button class="up-cat film" onclick="selCat(this,'film')" title="Film / Video"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2.5"/></svg></button>
+        <button class="up-cat music" onclick="selCat(this,'music')" title="Music"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></button>
+        <button class="up-cat photo" onclick="selCat(this,'photo')" title="Photo / NFT"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h3l2-3h6l2 3h3a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="3.5"/></svg></button>
       </div>
       <div class="up-body">
         <div class="up-disc film" id="disc-film">🎬 <strong>INDIE FILM CHANNEL</strong><br>Upload your own films. Distributed across M4TR1X nodes.</div>
         <div class="up-disc music" id="disc-music">🎵 <strong>UNDERGROUND MUSIC</strong><br>Original music only. M4TR1X network.</div>
         <div class="up-disc photo" id="disc-photo">📸 <strong>PHOTO & NFT</strong><br>Publish photos. Set a price to sell as NFT via H8 tips.</div>
         <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
-          <div class="dz-icon">📹</div>
+          <div class="dz-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2.5"/></svg></div>
           <strong style="font-size:0.82em">DROP VIDEO HERE</strong>
           <p>or click to select · MP4, MOV · max 500MB</p>
         </div>
@@ -766,9 +779,7 @@
           <button onclick="openProtoConnect()" style="background:rgba(0,170,255,0.04);border:1px solid rgba(0,170,255,0.2);color:rgba(0,170,255,0.6);font-family:var(--font-mono);font-size:0.58em;letter-spacing:1px;padding:5px 10px;cursor:pointer" id="proto-accounts-btn">🔗 ACCOUNTS</button>
         </div>
       </div>
-      <!-- Highlights row -->
-      <div id="prof-highlights" class="hl-hidden"></div>
-      <!-- Storie in evidenza (IG-style) -->
+      <!-- Storie in evidenza (IG-style) — saved highlights, permanenti -->
       <div id="prof-story-hl" class="story-hl-row" style="display:none"></div>
       <div class="prof-stats">
         <div class="prof-stat"><div class="prof-stat-n" id="prof-posts">–</div><div class="prof-stat-l">POSTS</div></div>
@@ -2171,8 +2182,7 @@
     _gridPosts = []; _gridReposts = []; _gridNft = []; _gridMode = 'posts';
     switchGridTab('posts');
     panel.classList.add('open');
-    // Load highlights
-    loadHighlights(pk);
+    // Storie in evidenza (IG-style) — salvate, non scadono. Nessun sistema "stella sui video".
     if (typeof loadStoryHighlights === 'function') loadStoryHighlights(pk);
     // Load badge
     loadBadge(pk);
@@ -2693,7 +2703,10 @@
     if(balance>0) el.innerHTML='<span style="color:var(--green)">'+balance+' H8</span>';
     else el.textContent='H8';
   }
-  // UPLOAD
+  // UPLOAD — line-icon glyphs for the drop zone
+  const DZ_VIDEO='<div class="dz-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2.5"/></svg></div>';
+  const DZ_PHOTO='<div class="dz-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h3l2-3h6l2 3h3a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="3.5"/></svg></div>';
+  const DZ_DONE='<div class="dz-icon done"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 12l3 3 5-6"/></svg></div>';
   function openUpload(){
     if(!S.pubkey){toast('LOGIN FIRST');return}
     if(IS_MOBILE){toast('UPLOAD DISPONIBILE SU DESKTOP');return}
@@ -2709,7 +2722,7 @@
     document.getElementById('prev-img-wrap').style.display='none';
     document.getElementById('btn-pub').disabled=true;
     document.getElementById('file-input').accept='video/*';
-    document.getElementById('drop-zone').innerHTML='<div class="dz-icon">\uD83D\uDCF9</div><strong style="font-size:0.82em">DROP VIDEO HERE</strong><p>or click to select \u00B7 MP4, MOV \u00B7 max 500MB</p>';
+    document.getElementById('drop-zone').innerHTML=DZ_VIDEO+'<strong style="font-size:0.82em">DROP VIDEO HERE</strong><p>or click to select \u00B7 MP4, MOV \u00B7 max 500MB</p>';
   }
   function selCat(btn,cat){
     document.querySelectorAll('.up-cat').forEach(b=>b.classList.remove('sel'));
@@ -2729,10 +2742,10 @@
     document.getElementById('btn-pub').disabled=true;
     if(cat==='photo'){
       fi.accept='image/*';
-      dz.innerHTML='<div class="dz-icon">\uD83D\uDCF8</div><strong style="font-size:0.82em">DROP PHOTO HERE</strong><p>or click to select \u00B7 JPG, PNG, WebP \u00B7 max 50MB</p>';
+      dz.innerHTML=DZ_PHOTO+'<strong style="font-size:0.82em">DROP PHOTO HERE</strong><p>or click to select \u00B7 JPG, PNG, WebP \u00B7 max 50MB</p>';
     } else {
       fi.accept='video/*';
-      dz.innerHTML='<div class="dz-icon">\uD83D\uDCF9</div><strong style="font-size:0.82em">DROP VIDEO HERE</strong><p>or click to select \u00B7 MP4, MOV \u00B7 max 500MB</p>';
+      dz.innerHTML=DZ_VIDEO+'<strong style="font-size:0.82em">DROP VIDEO HERE</strong><p>or click to select \u00B7 MP4, MOV \u00B7 max 500MB</p>';
     }
   }
   function handleFile(file){
@@ -2742,7 +2755,7 @@
       document.getElementById('prev-img').src=URL.createObjectURL(file);
       document.getElementById('prev-img-wrap').style.display='block';
       document.getElementById('prev-wrap').style.display='none';
-      document.getElementById('drop-zone').innerHTML='<div class="dz-icon">\u2705</div><strong>'+file.name+'</strong><p>'+(file.size/1024/1024).toFixed(1)+' MB</p>';
+      document.getElementById('drop-zone').innerHTML=DZ_DONE+'<strong>'+file.name+'</strong><p>'+(file.size/1024/1024).toFixed(1)+' MB</p>';
       document.getElementById('btn-pub').disabled=false;
     } else {
       if(!file||!file.type.startsWith('video/')){toast('VIDEO ONLY');return}
@@ -2750,7 +2763,7 @@
       document.getElementById('prev-video').src=URL.createObjectURL(file);
       document.getElementById('prev-wrap').style.display='block';
       document.getElementById('prev-img-wrap').style.display='none';
-      document.getElementById('drop-zone').innerHTML='<div class="dz-icon">\u2705</div><strong>'+file.name+'</strong><p>'+(file.size/1024/1024).toFixed(1)+' MB</p>';
+      document.getElementById('drop-zone').innerHTML=DZ_DONE+'<strong>'+file.name+'</strong><p>'+(file.size/1024/1024).toFixed(1)+' MB</p>';
       document.getElementById('btn-pub').disabled=false;
     }
   }

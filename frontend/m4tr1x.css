@@ -605,16 +605,24 @@ body::before {
 .up-cat.signal  { border-color:rgba(0,255,136,0.18); color:rgba(0,255,136,0.38) }
 .up-cat.film    { border-color:rgba(56,182,255,0.18); color:rgba(56,182,255,0.38) }
 .up-cat.music   { border-color:rgba(255,209,102,0.18); color:rgba(255,209,102,0.38) }
+.up-cat.photo   { border-color:rgba(179,136,255,0.18); color:rgba(179,136,255,0.38) }
 .up-cat.signal.sel { border-color:var(--green); color:var(--green); background:var(--green-glow) }
 .up-cat.film.sel   { border-color:var(--blue);  color:var(--blue);  background:rgba(56,182,255,0.08) }
 .up-cat.music.sel  { border-color:var(--yellow);color:var(--yellow);background:rgba(255,209,102,0.08) }
+.up-cat.photo.sel  { border-color:var(--purple);color:var(--purple);background:rgba(179,136,255,0.08) }
+/* line-icon glyphs inside upload category buttons */
+.up-cat svg { width:23px; height:23px; vertical-align:middle; display:inline-block }
+.up-cat.sel svg { filter:drop-shadow(0 0 6px currentColor) }
 .up-body { padding:16px 18px }
 .up-disc { display:none; padding:11px 14px; font-size:0.63em; line-height:1.7; margin-bottom:14px; border:1px solid; border-radius:var(--rsm) }
 .up-disc.film  { border-color:rgba(56,182,255,0.22); color:var(--blue); background:rgba(56,182,255,0.04) }
 .up-disc.music { border-color:rgba(255,209,102,0.22); color:var(--yellow); background:rgba(255,209,102,0.04) }
 .drop-zone { border:2px dashed var(--border-hi); border-radius:var(--r); padding:34px 16px; text-align:center; cursor:pointer; transition:0.2s; margin-bottom:14px }
 .drop-zone:hover, .drop-zone.drag { border-color:var(--green); background:var(--green-glow) }
-.dz-icon { font-size:2.2em; margin-bottom:9px }
+.dz-icon { font-size:2.2em; margin-bottom:9px; line-height:1 }
+.dz-icon svg { width:40px; height:40px; color:var(--green); opacity:0.85 }
+.drop-zone:hover .dz-icon svg, .drop-zone.drag .dz-icon svg { opacity:1; filter:drop-shadow(0 0 8px rgba(0,255,136,0.5)) }
+.dz-icon.done svg { color:var(--green); opacity:1 }
 .drop-zone p { font-size:0.72em; color:var(--text-muted) }
 #file-input { display:none }
 .prev-wrap { display:none; margin-bottom:14px; border-radius:var(--rsm); overflow:hidden }
