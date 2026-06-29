@@ -33,11 +33,11 @@ runcmd:
   #    URL pinnato a un commit revisionato (NON 'main'): la VM esegue una versione esatta.
   - sudo -u ubuntu -H bash -c 'cd /home/ubuntu && curl -fsSL https://raw.githubusercontent.com/H8dboy/m4tr1x-node/f20eb81e175e04845cb314019f8b3e5af921e916/scripts/install-node.sh -o install-node.sh && HEAD_NODE_URL=http://127.0.0.1:8081 NODE_NAME=oracle-node-1 INSTALL_DIR=/home/ubuntu/m4tr1x-node bash install-node.sh'
 
-  # ── Genera una M4TR1X_API_KEY casuale nel .env e riavvia il nodo ──
+  # ── Genera segreti casuali nel .env (API key + APP_SECRET) e riavvia il nodo ──
   - |
     ENV=/home/ubuntu/m4tr1x-node/.env
     if [ ! -f "$ENV" ]; then
-      echo "[cloud-init] $ENV assente: install-node.sh non è andato a buon fine — salto la API key" >&2
+      echo "[cloud-init] $ENV assente: install-node.sh non è andato a buon fine — salto i segreti" >&2
       exit 0
     fi
     KEY=$(openssl rand -hex 32)
@@ -45,6 +45,16 @@ runcmd:
       sed -i "s|^M4TR1X_API_KEY=.*|M4TR1X_API_KEY=$KEY|" "$ENV"
     else
       echo "M4TR1X_API_KEY=$KEY" >> "$ENV"
+    fi
+    # APP_SECRET cifra i token OAuth del cross-posting: senza, si usa una chiave
+    # di default pubblica nel sorgente. Genera SOLO se non già presente/valorizzata.
+    if ! grep -qE '^APP_SECRET=.+' "$ENV"; then
+      SECRET=$(openssl rand -hex 32)
+      if grep -q '^APP_SECRET=' "$ENV"; then
+        sed -i "s|^APP_SECRET=.*|APP_SECRET=$SECRET|" "$ENV"
+      else
+        echo "APP_SECRET=$SECRET" >> "$ENV"
+      fi
     fi
     chown ubuntu:ubuntu "$ENV"
     systemctl restart m4tr1x-node || true
