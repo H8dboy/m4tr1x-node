@@ -160,5 +160,6 @@
   "devDependencies": {
     "electron": "^32.3.3",
     "electron-builder": "^25.1.8"
-  }
+  },
+  "homepage": "https://nderja.com"
 }

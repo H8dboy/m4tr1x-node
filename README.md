@@ -6,6 +6,9 @@
 
 **The self-hosted backend that powers the M4TR1X network.**
 
+🌐 **Official site & downloads — [nderja.com](https://nderja.com)**
+_M4TR1X is distributed only from nderja.com._
+
 </div>
 
 ---
